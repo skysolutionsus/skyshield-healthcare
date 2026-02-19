@@ -1,0 +1,48 @@
+import { db } from "@/lib/db";
+import { Prisma } from "@prisma/client";
+
+export interface AuditLogParams {
+  organizationId: string;
+  userId?: string;
+  action: string;
+  resourceType?: string;
+  resourceId?: string;
+  metadata?: Prisma.InputJsonValue;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+/**
+ * Write an entry to the AuditLog table.
+ *
+ * Every significant action in the application should call this function.
+ * Audit logs are append-only and must never be deleted (per Pub 1075
+ * safeguards requirements).
+ *
+ * This function intentionally does NOT throw on failure — a logging error
+ * should never break the primary user flow.  Errors are logged to the
+ * server console so they surface in infrastructure monitoring.
+ */
+export async function logAudit(params: AuditLogParams): Promise<void> {
+  try {
+    await db.auditLog.create({
+      data: {
+        organizationId: params.organizationId,
+        userId: params.userId ?? null,
+        action: params.action,
+        resourceType: params.resourceType ?? null,
+        resourceId: params.resourceId ?? null,
+        metadata: params.metadata ?? undefined,
+        ipAddress: params.ipAddress ?? null,
+        userAgent: params.userAgent ?? null,
+      },
+    });
+  } catch (error) {
+    // Never throw — audit failures must not break the primary workflow.
+    console.error("[AuditLog] Failed to write audit log entry:", error, {
+      action: params.action,
+      organizationId: params.organizationId,
+      userId: params.userId,
+    });
+  }
+}
