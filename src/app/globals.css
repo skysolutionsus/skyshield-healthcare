@@ -1,14 +1,48 @@
 @import "tailwindcss";
 
+/* ========================================
+   Sky Solutions Design System
+   Brand: Deep Navy → Sky Blue gradient
+   ======================================== */
+
 @layer base {
+  :root {
+    /* Brand Colors */
+    --sky-navy: #0A1628;
+    --sky-navy-light: #0F2847;
+    --sky-royal: #1565C0;
+    --sky-blue: #2196F3;
+    --sky-light: #42A5F5;
+    --sky-cyan: #29B6F6;
+    --sky-glow: #64B5F6;
+    --sky-white: #E3F2FD;
+    
+    /* Semantic Colors */
+    --sky-surface: #0D1B2A;
+    --sky-surface-raised: #132438;
+    --sky-surface-overlay: #1A2E45;
+    --sky-border: rgba(33, 150, 243, 0.15);
+    --sky-border-bright: rgba(33, 150, 243, 0.3);
+    --sky-text-primary: #F1F5F9;
+    --sky-text-secondary: #94A3B8;
+    --sky-text-muted: #64748B;
+    
+    /* Gradients */
+    --sky-gradient-primary: linear-gradient(135deg, #1565C0 0%, #2196F3 50%, #29B6F6 100%);
+    --sky-gradient-surface: linear-gradient(180deg, #0F2847 0%, #0A1628 100%);
+    --sky-gradient-glow: radial-gradient(ellipse at 50% 0%, rgba(33, 150, 243, 0.15) 0%, transparent 70%);
+    --sky-gradient-card: linear-gradient(135deg, rgba(15, 40, 71, 0.8) 0%, rgba(10, 22, 40, 0.9) 100%);
+  }
+
   *,
   *::before,
   *::after {
-    @apply border-gray-200 dark:border-gray-800;
+    @apply border-[var(--sky-border)];
   }
 
   body {
-    @apply bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100;
+    background: var(--sky-navy);
+    color: var(--sky-text-primary);
     font-feature-settings: "rlig" 1, "calt" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -21,41 +55,137 @@
   }
 
   ::-webkit-scrollbar-track {
-    @apply bg-transparent;
+    background: transparent;
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-gray-300 dark:bg-gray-700 rounded-full;
+    background: rgba(33, 150, 243, 0.2);
+    border-radius: 9999px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-gray-400 dark:bg-gray-600;
+    background: rgba(33, 150, 243, 0.4);
   }
 
   /* Focus visible styles */
   :focus-visible {
-    @apply outline-2 outline-blue-500 outline-offset-2;
+    outline: 2px solid var(--sky-blue);
+    outline-offset: 2px;
   }
 }
 
 @layer utilities {
-  /* Subtle page transition animation */
+  /* Glassmorphism */
+  .glass {
+    background: rgba(15, 40, 71, 0.6);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--sky-border);
+  }
+
+  .glass-strong {
+    background: rgba(15, 40, 71, 0.8);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--sky-border-bright);
+  }
+
+  .glass-card {
+    background: var(--sky-gradient-card);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--sky-border);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  }
+
+  /* Gradient borders */
+  .gradient-border {
+    position: relative;
+  }
+  .gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: var(--sky-gradient-primary);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    -webkit-mask-composite: xor;
+    pointer-events: none;
+  }
+
+  /* Glow effects */
+  .glow-sm {
+    box-shadow: 0 0 15px rgba(33, 150, 243, 0.1), 0 0 30px rgba(33, 150, 243, 0.05);
+  }
+
+  .glow-md {
+    box-shadow: 0 0 20px rgba(33, 150, 243, 0.15), 0 0 40px rgba(33, 150, 243, 0.08);
+  }
+
+  .glow-lg {
+    box-shadow: 0 0 30px rgba(33, 150, 243, 0.2), 0 0 60px rgba(33, 150, 243, 0.1);
+  }
+
+  /* Animations */
   .animate-in {
-    animation: animateIn 0.3s ease-out;
+    animation: animateIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .fade-in {
     animation: fadeIn 0.3s ease-out;
   }
 
+  .slide-up {
+    animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .scale-in {
+    animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
   .slide-in-from-bottom-2 {
     animation: slideInFromBottom 0.3s ease-out;
+  }
+
+  /* Staggered animation delays */
+  .stagger-1 { animation-delay: 50ms; animation-fill-mode: both; }
+  .stagger-2 { animation-delay: 100ms; animation-fill-mode: both; }
+  .stagger-3 { animation-delay: 150ms; animation-fill-mode: both; }
+  .stagger-4 { animation-delay: 200ms; animation-fill-mode: both; }
+  .stagger-5 { animation-delay: 250ms; animation-fill-mode: both; }
+  .stagger-6 { animation-delay: 300ms; animation-fill-mode: both; }
+
+  /* Shimmer effect */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(33, 150, 243, 0.08) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
+
+  /* Gradient text */
+  .text-gradient {
+    background: var(--sky-gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Pulse glow for active indicators */
+  .pulse-glow {
+    animation: pulseGlow 2s ease-in-out infinite;
   }
 
   @keyframes animateIn {
     from {
       opacity: 0;
-      transform: translateY(4px);
+      transform: translateY(8px);
     }
     to {
       opacity: 1;
@@ -64,11 +194,29 @@
   }
 
   @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
     from {
       opacity: 0;
+      transform: translateY(16px);
     }
     to {
       opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
     }
   }
 
@@ -81,6 +229,16 @@
       opacity: 1;
       transform: translateY(0);
     }
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  @keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 0 4px rgba(33, 150, 243, 0.4); }
+    50% { box-shadow: 0 0 12px rgba(33, 150, 243, 0.6); }
   }
 
   /* Tabular nums for timestamps */

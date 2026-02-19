@@ -10,11 +10,11 @@ async function main() {
 
   // Create organization
   const org = await prisma.organization.upsert({
-    where: { slug: "safeguards-division" },
+    where: { slug: "sky-solutions" },
     update: {},
     create: {
-      name: "Safeguards Division",
-      slug: "safeguards-division",
+      name: "Sky Solutions",
+      slug: "sky-solutions",
     },
   });
 
@@ -23,11 +23,11 @@ async function main() {
   // Create admin user (primary demo account)
   const adminPassword = await hash("SkyShield2026!", 12);
   const admin = await prisma.user.upsert({
-    where: { email: "admin@demo.com" },
+    where: { email: "james@skysolutions.com" },
     update: {},
     create: {
-      email: "admin@demo.com",
-      name: "Sarah Mitchell",
+      email: "james@skysolutions.com",
+      name: "James Galang",
       passwordHash: adminPassword,
       role: "ADMIN",
       organizationId: org.id,
@@ -39,11 +39,11 @@ async function main() {
   // Create compliance officer
   const coPassword = await hash("Compliance123!@#$", 12);
   const complianceOfficer = await prisma.user.upsert({
-    where: { email: "compliance@skyshield.gov" },
+    where: { email: "mconklin@skysolutions.com" },
     update: {},
     create: {
-      email: "compliance@skyshield.gov",
-      name: "James Rodriguez",
+      email: "mconklin@skysolutions.com",
+      name: "Michael Conklin",
       passwordHash: coPassword,
       role: "COMPLIANCE_OFFICER",
       organizationId: org.id,
@@ -55,11 +55,11 @@ async function main() {
   // Create auditor
   const auditorPassword = await hash("Auditor123!@#$", 12);
   const auditor = await prisma.user.upsert({
-    where: { email: "auditor@skyshield.gov" },
+    where: { email: "jcambra@skysolutions.com" },
     update: {},
     create: {
-      email: "auditor@skyshield.gov",
-      name: "Emily Chen",
+      email: "jcambra@skysolutions.com",
+      name: "Jared Cambra",
       passwordHash: auditorPassword,
       role: "AUDITOR",
       organizationId: org.id,
@@ -71,11 +71,11 @@ async function main() {
   // Create viewer
   const viewerPassword = await hash("Viewer123!@#$", 12);
   await prisma.user.upsert({
-    where: { email: "viewer@skyshield.gov" },
+    where: { email: "nmatta@skysolutions.com" },
     update: {},
     create: {
-      email: "viewer@skyshield.gov",
-      name: "Michael Thompson",
+      email: "nmatta@skysolutions.com",
+      name: "Nitin Matta",
       passwordHash: viewerPassword,
       role: "VIEWER",
       organizationId: org.id,
@@ -169,7 +169,7 @@ async function main() {
     { action: "SCSEM_ASSESSMENT", userId: complianceOfficer.id, resourceType: "scsem", metadata: { template: "Windows Server 2022" } },
     { action: "INCIDENT_CREATE", userId: complianceOfficer.id, resourceType: "incident" },
     { action: "LOGIN", userId: auditor.id, resourceType: "session" },
-    { action: "USER_CREATE", userId: admin.id, resourceType: "user", metadata: { email: "viewer@skyshield.gov" } },
+    { action: "USER_CREATE", userId: admin.id, resourceType: "user", metadata: { email: "nmatta@skysolutions.com" } },
   ];
 
   for (const log of auditActions) {
@@ -219,10 +219,10 @@ async function main() {
 
   console.log("Created sample conversation");
   console.log("\nSeed complete! Login credentials:");
-  console.log("  Admin:      admin@demo.com / SkyShield2026!");
-  console.log("  Compliance: compliance@skyshield.gov / Compliance123!@#$");
-  console.log("  Auditor:    auditor@skyshield.gov / Auditor123!@#$");
-  console.log("  Viewer:     viewer@skyshield.gov / Viewer123!@#$");
+  console.log("  Admin:      james@skysolutions.com / SkyShield2026!");
+  console.log("  Compliance: mconklin@skysolutions.com / Compliance123!@#$");
+  console.log("  Auditor:    jcambra@skysolutions.com / Auditor123!@#$");
+  console.log("  Viewer:     nmatta@skysolutions.com / Viewer123!@#$");
 }
 
 main()

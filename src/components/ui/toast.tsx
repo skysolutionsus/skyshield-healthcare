@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
 import * as ToastPrimitives from "@radix-ui/react-toast";
@@ -30,7 +30,7 @@ const toastVariants = cva(
     variants: {
       variant: {
         default:
-          "border-gray-200 bg-white text-gray-900 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-50",
+          "border-[var(--sky-border)] bg-white text-gray-900 dark:border-[var(--sky-border)] bg-[var(--sky-navy)] dark:text-gray-50",
         destructive:
           "group border-red-600 bg-red-600 text-white dark:border-red-600 dark:bg-red-600 dark:text-white",
       },
@@ -63,7 +63,7 @@ const ToastAction = React.forwardRef<
   <ToastPrimitives.Action
     ref={ref}
     className={cn(
-      "inline-flex h-8 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-transparent px-3 text-sm font-medium ring-offset-white transition-colors hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 group-[.destructive]:border-gray-100/40 group-[.destructive]:hover:border-red-600/30 group-[.destructive]:hover:bg-red-600 group-[.destructive]:hover:text-white group-[.destructive]:focus:ring-red-600 dark:border-gray-800 dark:ring-offset-gray-950 dark:hover:bg-gray-800 dark:focus:ring-blue-400 dark:group-[.destructive]:border-gray-800/40 dark:group-[.destructive]:hover:border-red-900/30 dark:group-[.destructive]:hover:bg-red-900 dark:group-[.destructive]:hover:text-gray-50 dark:group-[.destructive]:focus:ring-red-900",
+      "inline-flex h-8 shrink-0 items-center justify-center rounded-md border border-[var(--sky-border)] bg-transparent px-3 text-sm font-medium ring-offset-white transition-colors hover:bg-[var(--sky-surface-overlay)] focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)] focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 group-[.destructive]:border-[var(--sky-border)]/40 group-[.destructive]:hover:border-red-600/30 group-[.destructive]:hover:bg-red-600 group-[.destructive]:hover:text-white group-[.destructive]:focus:ring-red-600 dark:border-[var(--sky-border)] dark:ring-offset-gray-950 dark:hover:bg-gray-800 dark:focus:ring-blue-400 dark:group-[.destructive]:border-[var(--sky-border)]/40 dark:group-[.destructive]:hover:border-red-900/30 dark:group-[.destructive]:hover:bg-red-900 dark:group-[.destructive]:hover:text-gray-50 dark:group-[.destructive]:focus:ring-red-900",
       className
     )}
     {...props}
@@ -128,3 +128,4 @@ export {
   ToastClose,
   ToastAction,
 };
+

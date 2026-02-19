@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useCallback, useMemo } from "react";
 import {
@@ -68,9 +68,9 @@ const STATUS_OPTIONS: {
     value: "NOT_APPLICABLE",
     label: "N/A",
     icon: <AlertCircle className="w-4 h-4" />,
-    color: "text-gray-600 dark:text-gray-400",
+    color: "text-[var(--sky-text-secondary)]",
     bgColor:
-      "bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700",
+      "bg-[var(--sky-surface-overlay)] bg-[var(--sky-surface-overlay)] border-[var(--sky-border)] dark:border-gray-600 hover:bg-[var(--sky-surface-overlay)] dark:hover:bg-gray-700",
   },
   {
     value: "IN_PROGRESS",
@@ -267,12 +267,12 @@ export function SCSEMAssessmentWorkflow({
   // No assessment started yet
   if (!assessmentId) {
     return (
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-8 text-center">
+      <div className="bg-[var(--sky-surface)] border border-[var(--sky-border)] rounded-xl p-8 text-center">
         <FileText className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+        <h3 className="text-lg font-medium text-white mb-2">
           No Assessment Started
         </h3>
-        <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto mb-6">
+        <p className="text-[var(--sky-text-secondary)] max-w-md mx-auto mb-6">
           Start an assessment for &quot;{templateName}&quot; to evaluate your
           organization&apos;s compliance with its {controlCount} security
           controls.
@@ -280,7 +280,7 @@ export function SCSEMAssessmentWorkflow({
         <button
           onClick={handleStartAssessment}
           disabled={starting}
-          className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-[var(--sky-royal)] hover:bg-[var(--sky-blue)] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
         >
           {starting ? (
             <>
@@ -306,18 +306,18 @@ export function SCSEMAssessmentWorkflow({
   return (
     <div>
       {/* Toolbar */}
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 mb-4">
+      <div className="bg-[var(--sky-surface)] border border-[var(--sky-border)] rounded-xl p-4 mb-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
             {/* Search */}
             <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--sky-text-muted)]" />
               <input
                 type="text"
                 placeholder="Search controls..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 bg-[var(--sky-surface-overlay)] border border-[var(--sky-border)] rounded-lg text-white placeholder-gray-400 dark:placeholder-[var(--sky-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)] focus:border-transparent"
               />
             </div>
 
@@ -326,7 +326,7 @@ export function SCSEMAssessmentWorkflow({
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="appearance-none pl-8 pr-8 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer"
+                className="appearance-none pl-8 pr-8 py-2 text-sm bg-gray-50 bg-[var(--sky-surface-overlay)] border border-[var(--sky-border)] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)] focus:border-transparent cursor-pointer"
               >
                 <option value="ALL">All Statuses</option>
                 <option value="IN_PROGRESS">In Progress</option>
@@ -334,7 +334,7 @@ export function SCSEMAssessmentWorkflow({
                 <option value="NON_COMPLIANT">Non-Compliant</option>
                 <option value="NOT_APPLICABLE">N/A</option>
               </select>
-              <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--sky-text-muted)] pointer-events-none" />
             </div>
           </div>
 
@@ -344,7 +344,7 @@ export function SCSEMAssessmentWorkflow({
               <span
                 className={`text-sm ${
                   saveMessage.includes("success")
-                    ? "text-green-600 dark:text-green-400"
+                    ? "text-emerald-400"
                     : "text-red-600 dark:text-red-400"
                 }`}
               >
@@ -354,7 +354,7 @@ export function SCSEMAssessmentWorkflow({
             <button
               onClick={handleSave}
               disabled={saving || !hasChanges}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--sky-royal)] hover:bg-[var(--sky-blue)] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
             >
               {saving ? (
                 <>
@@ -372,13 +372,13 @@ export function SCSEMAssessmentWorkflow({
         </div>
 
         {/* Mini Stats Bar */}
-        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
-          <span className="text-xs text-gray-500 dark:text-gray-400">
+        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-[var(--sky-border)]">
+          <span className="text-xs text-[var(--sky-text-secondary)]">
             Score:{" "}
             <span
               className={`font-bold ${
                 complianceStats.score >= 80
-                  ? "text-green-600 dark:text-green-400"
+                  ? "text-emerald-400"
                   : complianceStats.score >= 60
                     ? "text-amber-600 dark:text-amber-400"
                     : "text-red-600 dark:text-red-400"
@@ -387,19 +387,19 @@ export function SCSEMAssessmentWorkflow({
               {complianceStats.score}%
             </span>
           </span>
-          <span className="text-xs text-green-600 dark:text-green-400">
+          <span className="text-xs text-emerald-400">
             {complianceStats.compliant} compliant
           </span>
           <span className="text-xs text-red-600 dark:text-red-400">
             {complianceStats.nonCompliant} non-compliant
           </span>
-          <span className="text-xs text-gray-500 dark:text-gray-400">
+          <span className="text-xs text-[var(--sky-text-secondary)]">
             {complianceStats.na} n/a
           </span>
-          <span className="text-xs text-blue-600 dark:text-blue-400">
+          <span className="text-xs text-[var(--sky-light)] dark:text-blue-400">
             {complianceStats.inProgress} in progress
           </span>
-          <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto">
+          <span className="text-xs text-[var(--sky-text-muted)] ml-auto">
             Showing {filteredControls.length} of {controls.length}
           </span>
         </div>
@@ -408,9 +408,9 @@ export function SCSEMAssessmentWorkflow({
       {/* Control Results List */}
       <div className="space-y-2">
         {filteredControls.length === 0 && (
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-8 text-center">
+          <div className="bg-[var(--sky-surface)] border border-[var(--sky-border)] rounded-xl p-8 text-center">
             <Search className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-[var(--sky-text-secondary)]">
               No controls match your search criteria
             </p>
           </div>
@@ -425,27 +425,27 @@ export function SCSEMAssessmentWorkflow({
           return (
             <div
               key={control.controlId}
-              className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden"
+              className="bg-[var(--sky-surface)] border border-[var(--sky-border)] rounded-xl overflow-hidden"
             >
               {/* Control Header */}
               <div
-                className="flex items-center gap-3 p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                className="flex items-center gap-3 p-4 cursor-pointer hover:bg-white/\[0.03\] transition-colors"
                 onClick={() =>
                   setExpandedControl(isExpanded ? null : control.controlId)
                 }
               >
                 <div className={`shrink-0 ${currentStatus?.color || ""}`}>
                   {currentStatus?.icon || (
-                    <Clock className="w-4 h-4 text-gray-400" />
+                    <Clock className="w-4 h-4 text-[var(--sky-text-muted)]" />
                   )}
                 </div>
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-medium text-gray-500 dark:text-gray-400">
+                    <span className="text-xs font-mono font-medium text-[var(--sky-text-secondary)]">
                       {control.controlId}
                     </span>
-                    <span className="text-sm text-gray-900 dark:text-white truncate">
+                    <span className="text-sm text-white truncate">
                       {control.controlName}
                     </span>
                   </div>
@@ -453,21 +453,21 @@ export function SCSEMAssessmentWorkflow({
 
                 <div className="flex items-center gap-2 shrink-0">
                   <span
-                    className={`text-xs font-medium ${currentStatus?.color || "text-gray-500"}`}
+                    className={`text-xs font-medium ${currentStatus?.color || "text-[var(--sky-text-muted)]"}`}
                   >
                     {currentStatus?.label || control.status}
                   </span>
                   {isExpanded ? (
-                    <ChevronUp className="w-4 h-4 text-gray-400" />
+                    <ChevronUp className="w-4 h-4 text-[var(--sky-text-muted)]" />
                   ) : (
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                    <ChevronDown className="w-4 h-4 text-[var(--sky-text-muted)]" />
                   )}
                 </div>
               </div>
 
               {/* Expanded Detail */}
               {isExpanded && (
-                <div className="px-4 pb-4 border-t border-gray-100 dark:border-gray-800">
+                <div className="px-4 pb-4 border-t border-[var(--sky-border)]">
                   {/* Status Buttons */}
                   <div className="flex flex-wrap gap-2 mt-4 mb-4">
                     {STATUS_OPTIONS.map((option) => (
@@ -482,7 +482,7 @@ export function SCSEMAssessmentWorkflow({
                         className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                           control.status === option.value
                             ? `${option.bgColor} ${option.color} ring-2 ring-offset-1 ring-offset-white dark:ring-offset-gray-900 ring-current`
-                            : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+                            : "bg-white bg-[var(--sky-surface-overlay)] border-[var(--sky-border)] text-[var(--sky-text-secondary)] hover:bg-gray-50 dark:hover:bg-gray-700"
                         }`}
                       >
                         {option.icon}
@@ -493,7 +493,7 @@ export function SCSEMAssessmentWorkflow({
 
                   {/* Notes */}
                   <div className="mb-3">
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-xs font-medium text-[var(--sky-text-secondary)] mb-1">
                       Notes
                     </label>
                     <textarea
@@ -503,13 +503,13 @@ export function SCSEMAssessmentWorkflow({
                       }
                       placeholder="Add notes about this control..."
                       rows={2}
-                      className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                      className="w-full px-3 py-2 text-sm bg-gray-50 bg-[var(--sky-surface-overlay)] border border-[var(--sky-border)] rounded-lg text-white placeholder-gray-400 dark:placeholder-[var(--sky-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)] focus:border-transparent resize-none"
                     />
                   </div>
 
                   {/* Evidence */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-xs font-medium text-[var(--sky-text-secondary)] mb-1">
                       Evidence
                     </label>
                     <textarea
@@ -522,7 +522,7 @@ export function SCSEMAssessmentWorkflow({
                       }
                       placeholder="Document evidence of compliance or non-compliance..."
                       rows={2}
-                      className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                      className="w-full px-3 py-2 text-sm bg-gray-50 bg-[var(--sky-surface-overlay)] border border-[var(--sky-border)] rounded-lg text-white placeholder-gray-400 dark:placeholder-[var(--sky-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)] focus:border-transparent resize-none"
                     />
                   </div>
                 </div>
@@ -535,14 +535,14 @@ export function SCSEMAssessmentWorkflow({
       {/* Floating Save Bar */}
       {hasChanges && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-          <div className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-full shadow-lg px-6 py-3 flex items-center gap-4">
+          <div className="bg-[var(--sky-surface)] dark:bg-white text-white dark:text-gray-900 rounded-full shadow-lg px-6 py-3 flex items-center gap-4">
             <span className="text-sm font-medium">
               You have unsaved changes
             </span>
             <button
               onClick={handleSave}
               disabled={saving}
-              className="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded-full transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-1.5 bg-[var(--sky-royal)] hover:bg-[var(--sky-blue)] disabled:opacity-50 text-white text-sm font-medium rounded-full transition-colors"
             >
               {saving ? (
                 <>
@@ -562,3 +562,4 @@ export function SCSEMAssessmentWorkflow({
     </div>
   );
 }
+

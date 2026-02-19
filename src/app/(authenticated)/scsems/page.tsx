@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import {
   FileSpreadsheet,
   Search,
@@ -41,7 +41,7 @@ const categoryColors: Record<string, string> = {
   Network: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800",
   "UNIX-Linux": "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800",
   Windows: "bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800",
-  MacOS: "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700",
+  MacOS: "bg-[var(--sky-surface-overlay)] bg-[var(--sky-surface-overlay)] text-[var(--sky-text-secondary)] border-[var(--sky-border)]",
   Mainframe: "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800",
   Application: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800",
   Containers: "bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 border-teal-200 dark:border-teal-800",
@@ -75,7 +75,7 @@ function getStatusBadge(status: string) {
       );
     default:
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--sky-surface-overlay)] bg-[var(--sky-surface-overlay)] text-[var(--sky-text-secondary)]">
           Not Started
         </span>
       );
@@ -139,7 +139,7 @@ export default async function SCSEMLibraryPage() {
       },
     });
   } catch {
-    // DB not available — templates stays empty
+    // DB not available â€” templates stays empty
   }
 
   // Group templates by category
@@ -166,10 +166,10 @@ export default async function SCSEMLibraryPage() {
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+        <h1 className="text-2xl font-bold text-white">
           SCSEM Library
         </h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-1">
+        <p className="text-[var(--sky-text-secondary)] mt-1">
           Supplemental Computer Security Evaluation Matrices for IRS Publication
           1075 compliance
         </p>
@@ -177,46 +177,46 @@ export default async function SCSEMLibraryPage() {
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
+        <div className="bg-[var(--sky-surface)] border border-[var(--sky-border)] rounded-xl p-5">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-              <FileSpreadsheet className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <FileSpreadsheet className="w-5 h-5 text-[var(--sky-light)]" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              <p className="text-2xl font-bold text-white">
                 {totalTemplates}
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-xs text-[var(--sky-text-secondary)]">
                 Total Templates
               </p>
             </div>
           </div>
         </div>
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
+        <div className="bg-[var(--sky-surface)] border border-[var(--sky-border)] rounded-xl p-5">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-              <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              <p className="text-2xl font-bold text-white">
                 {assessed}
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-xs text-[var(--sky-text-secondary)]">
                 Completed
               </p>
             </div>
           </div>
         </div>
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
+        <div className="bg-[var(--sky-surface)] border border-[var(--sky-border)] rounded-xl p-5">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
               <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              <p className="text-2xl font-bold text-white">
                 {inProgress}
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-xs text-[var(--sky-text-secondary)]">
                 In Progress
               </p>
             </div>
@@ -226,12 +226,12 @@ export default async function SCSEMLibraryPage() {
 
       {/* Empty State */}
       {templates.length === 0 && (
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-12 text-center">
-          <FileSpreadsheet className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+        <div className="bg-[var(--sky-surface)] border border-[var(--sky-border)] rounded-xl p-12 text-center">
+          <FileSpreadsheet className="w-12 h-12 text-gray-300 text-[var(--sky-text-muted)] mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-white mb-2">
             No SCSEM Templates Loaded
           </h3>
-          <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">
+          <p className="text-[var(--sky-text-secondary)] max-w-md mx-auto">
             SCSEM templates have not been imported yet. Run the seed script to
             load the 58 IRS SCSEM templates into the database.
           </p>
@@ -249,10 +249,10 @@ export default async function SCSEMLibraryPage() {
             >
               {categoryIcons[category] || categoryIcons["Others"]}
             </div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <h2 className="text-lg font-semibold text-white">
               {category}
             </h2>
-            <span className="text-sm text-gray-500 dark:text-gray-400">
+            <span className="text-sm text-[var(--sky-text-secondary)]">
               ({grouped[category].length})
             </span>
           </div>
@@ -264,20 +264,20 @@ export default async function SCSEMLibraryPage() {
                 <Link
                   key={template.id}
                   href={`/scsems/${template.id}`}
-                  className="group bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md transition-all"
+                  className="group bg-[var(--sky-surface)] border border-[var(--sky-border)] rounded-xl p-5 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md transition-all"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                      <h3 className="text-sm font-semibold text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                         {template.name}
                       </h3>
                       {template.version && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                        <p className="text-xs text-[var(--sky-text-secondary)] mt-0.5">
                           Version {template.version}
                         </p>
                       )}
                     </div>
-                    <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-600 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all shrink-0 mt-0.5" />
+                    <ChevronRight className="w-4 h-4 text-gray-400 text-[var(--sky-text-muted)] group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all shrink-0 mt-0.5" />
                   </div>
 
                   <div className="flex items-center justify-between">
@@ -291,7 +291,7 @@ export default async function SCSEMLibraryPage() {
                         {template.category}
                       </span>
                       {template.controlCount > 0 && (
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                        <span className="text-xs text-[var(--sky-text-secondary)]">
                           {template.controlCount} controls
                         </span>
                       )}
@@ -317,3 +317,4 @@ export default async function SCSEMLibraryPage() {
     </div>
   );
 }
+

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -154,8 +154,8 @@ export function IncidentDetailActions({
     <div className="space-y-4">
       {/* Status Change */}
       {nextStatuses.length > 0 && (
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+        <div className="bg-[var(--sky-surface)] border border-[var(--sky-border)] rounded-xl p-6">
+          <h3 className="text-sm font-semibold text-white mb-3">
             Update Status
           </h3>
           <div className="space-y-2">
@@ -193,8 +193,8 @@ export function IncidentDetailActions({
       )}
 
       {/* Add Note */}
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+      <div className="bg-[var(--sky-surface)] border border-[var(--sky-border)] rounded-xl p-6">
+        <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
           <MessageSquare className="w-4 h-4" />
           Add Note
         </h3>
@@ -204,12 +204,12 @@ export function IncidentDetailActions({
             onChange={(e) => setNoteText(e.target.value)}
             placeholder="Add a note or update..."
             rows={3}
-            className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none mb-2"
+            className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface)] text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)] resize-none mb-2"
           />
           <button
             type="submit"
             disabled={submittingNote || !noteText.trim()}
-            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
+            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[var(--sky-royal)] hover:bg-[var(--sky-blue)] disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
           >
             {submittingNote ? (
               <>
@@ -224,10 +224,10 @@ export function IncidentDetailActions({
       </div>
 
       {/* Edit Remediation Plan */}
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+      <div className="bg-[var(--sky-surface)] border border-[var(--sky-border)] rounded-xl p-6">
         <button
           onClick={() => setShowRemediationEdit(!showRemediationEdit)}
-          className="flex items-center justify-between w-full text-sm font-semibold text-gray-900 dark:text-white"
+          className="flex items-center justify-between w-full text-sm font-semibold text-white"
         >
           <span className="flex items-center gap-2">
             <FileText className="w-4 h-4" />
@@ -247,7 +247,7 @@ export function IncidentDetailActions({
               onChange={(e) => setRemediationText(e.target.value)}
               placeholder="Describe the remediation plan..."
               rows={5}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none mb-2"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface)] text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)] resize-none mb-2"
             />
             <div className="flex gap-2">
               <button
@@ -256,14 +256,14 @@ export function IncidentDetailActions({
                   setShowRemediationEdit(false);
                   setRemediationText(remediationPlan);
                 }}
-                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                className="flex-1 px-4 py-2 text-sm font-medium text-[var(--sky-text-secondary)] hover:bg-[var(--sky-surface-overlay)] rounded-lg transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={savingRemediation}
-                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[var(--sky-royal)] hover:bg-[var(--sky-blue)] disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
               >
                 {savingRemediation ? (
                   <>
@@ -281,3 +281,4 @@ export function IncidentDetailActions({
     </div>
   );
 }
+

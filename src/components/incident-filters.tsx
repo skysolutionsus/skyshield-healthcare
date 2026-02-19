@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
@@ -62,7 +62,7 @@ export function IncidentFilters() {
       <select
         value={currentStatus}
         onChange={(e) => updateFilter("status", e.target.value)}
-        className="px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="px-3 py-2 text-sm rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface)] text-white focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)]"
       >
         {STATUSES.map((s) => (
           <option key={s.value} value={s.value}>
@@ -74,7 +74,7 @@ export function IncidentFilters() {
       <select
         value={currentSeverity}
         onChange={(e) => updateFilter("severity", e.target.value)}
-        className="px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="px-3 py-2 text-sm rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface)] text-white focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)]"
       >
         {SEVERITIES.map((s) => (
           <option key={s.value} value={s.value}>
@@ -86,7 +86,7 @@ export function IncidentFilters() {
       <select
         value={currentType}
         onChange={(e) => updateFilter("type", e.target.value)}
-        className="px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="px-3 py-2 text-sm rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface)] text-white focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)]"
       >
         {TYPES.map((t) => (
           <option key={t.value} value={t.value}>
@@ -98,7 +98,7 @@ export function IncidentFilters() {
       {hasFilters && (
         <button
           onClick={clearFilters}
-          className="px-3 py-2 text-sm rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          className="px-3 py-2 text-sm rounded-lg text-[var(--sky-text-secondary)] hover:text-gray-700 dark:hover:text-gray-200 hover:bg-[var(--sky-surface-overlay)] transition-colors"
         >
           Clear filters
         </button>
@@ -106,3 +106,4 @@ export function IncidentFilters() {
     </div>
   );
 }
+

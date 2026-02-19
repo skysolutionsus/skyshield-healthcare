@@ -332,8 +332,18 @@ Section 3.1: General Requirements`;
     });
   } catch (error) {
     console.error("Chat API error:", error);
+
+    // Check if it's a database connection error
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes("DATABASE_URL") || errorMessage.includes("prisma") || errorMessage.includes("connect")) {
+      return NextResponse.json(
+        { error: "Database connection error. Please ensure the database is configured and migrations have been run." },
+        { status: 503 }
+      );
+    }
+
     return NextResponse.json(
-      { error: "Failed to process request" },
+      { error: "Failed to process request. Please try again." },
       { status: 500 }
     );
   }

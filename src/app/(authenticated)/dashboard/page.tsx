@@ -105,26 +105,26 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 const ACTION_COLORS: Record<string, string> = {
-  LOGIN: "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400",
-  AI_QUERY: "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
-  INCIDENT_CREATE: "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400",
-  PII_DETECTED: "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400",
-  SCSEM_ASSESSMENT: "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400",
+  LOGIN: "bg-emerald-500/10 text-emerald-400",
+  AI_QUERY: "bg-sky-500/10 text-sky-400",
+  INCIDENT_CREATE: "bg-amber-500/10 text-amber-400",
+  PII_DETECTED: "bg-red-500/10 text-red-400",
+  SCSEM_ASSESSMENT: "bg-violet-500/10 text-violet-400",
 };
 
 const SEVERITY_COLORS: Record<string, string> = {
-  CRITICAL: "text-red-500",
-  HIGH: "text-orange-500",
-  MEDIUM: "text-yellow-500",
-  LOW: "text-blue-500",
+  CRITICAL: "text-red-400",
+  HIGH: "text-orange-400",
+  MEDIUM: "text-yellow-400",
+  LOW: "text-sky-400",
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  OPEN: "bg-blue-500",
+  OPEN: "bg-sky-500",
   INVESTIGATING: "bg-amber-500",
-  REMEDIATION: "bg-purple-500",
-  RESOLVED: "bg-green-500",
-  CLOSED: "bg-gray-500",
+  REMEDIATION: "bg-violet-500",
+  RESOLVED: "bg-emerald-500",
+  CLOSED: "bg-slate-500",
 };
 
 export default async function DashboardPage() {
@@ -156,8 +156,8 @@ export default async function DashboardPage() {
   // Compute donut chart segments for SCSEM
   const scsemSegments = [
     { label: "Completed", value: data.scsemAssessed, color: "#22c55e" },
-    { label: "In Progress", value: data.scsemInProgress, color: "#3b82f6" },
-    { label: "Not Started", value: scsemNotStarted, color: "#374151" },
+    { label: "In Progress", value: data.scsemInProgress, color: "#2196F3" },
+    { label: "Not Started", value: scsemNotStarted, color: "#1A2E45" },
   ].filter((s) => s.value > 0);
 
   const scsemTotalCount = scsemSegments.reduce((s, v) => s + v.value, 0);
@@ -199,11 +199,11 @@ export default async function DashboardPage() {
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+      <div className="mb-8 animate-in">
+        <h1 className="text-2xl font-bold text-white">
           Dashboard
         </h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-1">
+        <p className="mt-1" style={{ color: 'var(--sky-text-secondary)' }}>
           Publication 1075 compliance overview
         </p>
       </div>
@@ -211,17 +211,17 @@ export default async function DashboardPage() {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {/* Compliance Score */}
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+        <div className="glass-card rounded-xl p-6 slide-up stagger-1">
           <div className="flex items-center justify-between mb-4">
-            <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+            <span className="text-sm font-medium" style={{ color: 'var(--sky-text-secondary)' }}>
               Compliance Score
             </span>
-            <TrendingUp className="w-5 h-5 text-green-500" />
+            <TrendingUp className="w-5 h-5 text-emerald-400" />
           </div>
-          <div className="text-3xl font-bold text-gray-900 dark:text-white">
+          <div className="text-3xl font-bold text-white">
             {data.complianceScore}%
           </div>
-          <div className="mt-3 w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2.5 overflow-hidden">
+          <div className="mt-3 w-full rounded-full h-2.5 overflow-hidden" style={{ background: 'var(--sky-surface-overlay)' }}>
             <div
               className="h-full rounded-full transition-all duration-500"
               style={{
@@ -235,35 +235,35 @@ export default async function DashboardPage() {
               }}
             />
           </div>
-          <p className="text-xs text-gray-500 mt-2">
+          <p className="text-xs mt-2" style={{ color: 'var(--sky-text-muted)' }}>
             {data.complianceScore >= 80 ? "On track" : data.complianceScore > 0 ? "Needs attention" : "No assessments completed"}
           </p>
         </div>
 
         {/* Open Incidents */}
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+        <div className="glass-card rounded-xl p-6 slide-up stagger-2">
           <div className="flex items-center justify-between mb-4">
-            <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+            <span className="text-sm font-medium" style={{ color: 'var(--sky-text-secondary)' }}>
               Open Incidents
             </span>
-            <AlertTriangle className="w-5 h-5 text-amber-500" />
+            <AlertTriangle className="w-5 h-5 text-amber-400" />
           </div>
-          <div className="text-3xl font-bold text-gray-900 dark:text-white">
+          <div className="text-3xl font-bold text-white">
             {data.openIncidents}
           </div>
           <div className="mt-3 flex gap-2 text-xs flex-wrap">
             {data.incidentsBySeverity.CRITICAL ? (
-              <span className="px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 font-medium">
+              <span className="px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 font-medium">
                 {data.incidentsBySeverity.CRITICAL} Critical
               </span>
             ) : null}
             {data.incidentsBySeverity.HIGH ? (
-              <span className="px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 font-medium">
+              <span className="px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-400 font-medium">
                 {data.incidentsBySeverity.HIGH} High
               </span>
             ) : null}
             {data.incidentsBySeverity.MEDIUM ? (
-              <span className="px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 font-medium">
+              <span className="px-2 py-0.5 rounded-full bg-yellow-500/15 text-yellow-400 font-medium">
                 {data.incidentsBySeverity.MEDIUM} Medium
               </span>
             ) : null}
@@ -271,48 +271,48 @@ export default async function DashboardPage() {
         </div>
 
         {/* SCSEM Status */}
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+        <div className="glass-card rounded-xl p-6 slide-up stagger-3">
           <div className="flex items-center justify-between mb-4">
-            <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+            <span className="text-sm font-medium" style={{ color: 'var(--sky-text-secondary)' }}>
               SCSEM Assessments
             </span>
-            <FileSpreadsheet className="w-5 h-5 text-blue-500" />
+            <FileSpreadsheet className="w-5 h-5" style={{ color: 'var(--sky-blue)' }} />
           </div>
-          <div className="text-3xl font-bold text-gray-900 dark:text-white">
+          <div className="text-3xl font-bold text-white">
             {data.scsemAssessed}
-            <span className="text-lg text-gray-400 font-normal">/{data.scsemTotal}</span>
+            <span className="text-lg font-normal" style={{ color: 'var(--sky-text-muted)' }}>/{data.scsemTotal}</span>
           </div>
           <div className="mt-3 flex gap-1.5 text-xs">
-            <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
+            <span className="flex items-center gap-1 text-emerald-400">
               <CheckCircle2 className="w-3 h-3" /> {data.scsemAssessed} done
             </span>
-            <span className="text-gray-300 dark:text-gray-600">|</span>
-            <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
+            <span style={{ color: 'var(--sky-border-bright)' }}>|</span>
+            <span className="flex items-center gap-1" style={{ color: 'var(--sky-light)' }}>
               <Clock className="w-3 h-3" /> {data.scsemInProgress} active
             </span>
           </div>
         </div>
 
         {/* AI Conversations */}
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+        <div className="glass-card rounded-xl p-6 slide-up stagger-4">
           <div className="flex items-center justify-between mb-4">
-            <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+            <span className="text-sm font-medium" style={{ color: 'var(--sky-text-secondary)' }}>
               AI Conversations
             </span>
-            <MessageSquare className="w-5 h-5 text-purple-500" />
+            <MessageSquare className="w-5 h-5 text-violet-400" />
           </div>
-          <div className="text-3xl font-bold text-gray-900 dark:text-white">
+          <div className="text-3xl font-bold text-white">
             {data.totalConversations}
           </div>
-          <p className="text-xs text-gray-500 mt-3">Pub 1075 queries</p>
+          <p className="text-xs mt-3" style={{ color: 'var(--sky-text-muted)' }}>Pub 1075 queries</p>
         </div>
       </div>
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         {/* SCSEM Assessment Donut Chart */}
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+        <div className="glass-card rounded-xl p-6">
+          <h2 className="text-lg font-semibold text-white mb-4">
             SCSEM Coverage
           </h2>
           <div className="flex items-center gap-8">
@@ -324,20 +324,19 @@ export default async function DashboardPage() {
                     cy="50"
                     r="40"
                     fill="none"
-                    stroke="currentColor"
+                    stroke="var(--sky-surface-overlay)"
                     strokeWidth="20"
-                    className="text-gray-200 dark:text-gray-800"
                   />
                 ) : (
                   donutPaths.map((p, i) => (
                     <path key={i} d={p.d} fill={p.color} />
                   ))
                 )}
-                <circle cx="50" cy="50" r="28" className="fill-white dark:fill-gray-900" />
+                <circle cx="50" cy="50" r="28" fill="var(--sky-surface)" />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
-                  <span className="text-xl font-bold text-gray-900 dark:text-white">
+                  <span className="text-xl font-bold text-white">
                     {scsemTotalCount > 0
                       ? Math.round((data.scsemAssessed / scsemTotalCount) * 100)
                       : 0}%
@@ -353,11 +352,11 @@ export default async function DashboardPage() {
                       className="w-3 h-3 rounded-full"
                       style={{ backgroundColor: seg.color }}
                     />
-                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                    <span className="text-sm" style={{ color: 'var(--sky-text-secondary)' }}>
                       {seg.label}
                     </span>
                   </div>
-                  <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                  <span className="text-sm font-semibold text-white">
                     {seg.value}
                   </span>
                 </div>
@@ -367,8 +366,8 @@ export default async function DashboardPage() {
         </div>
 
         {/* Incidents by Severity Bar Chart */}
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+        <div className="glass-card rounded-xl p-6">
+          <h2 className="text-lg font-semibold text-white mb-4">
             Incidents by Severity
           </h2>
           <div className="space-y-4">
@@ -379,19 +378,19 @@ export default async function DashboardPage() {
                 CRITICAL: "bg-red-500",
                 HIGH: "bg-orange-500",
                 MEDIUM: "bg-yellow-500",
-                LOW: "bg-blue-500",
+                LOW: "bg-sky-500",
               };
               return (
                 <div key={sev}>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-sm text-gray-600 dark:text-gray-400 capitalize">
+                    <span className="text-sm capitalize" style={{ color: 'var(--sky-text-secondary)' }}>
                       {sev.charAt(0) + sev.slice(1).toLowerCase()}
                     </span>
                     <span className={`text-sm font-bold ${SEVERITY_COLORS[sev]}`}>
                       {count}
                     </span>
                   </div>
-                  <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2.5 overflow-hidden">
+                  <div className="w-full rounded-full h-2.5 overflow-hidden" style={{ background: 'var(--sky-surface-overlay)' }}>
                     <div
                       className={`h-full rounded-full transition-all duration-500 ${barColors[sev]}`}
                       style={{ width: `${count > 0 ? Math.max(percentage, 8) : 0}%` }}
@@ -403,7 +402,7 @@ export default async function DashboardPage() {
           </div>
           {Object.keys(data.incidentsBySeverity).length === 0 && (
             <div className="flex items-center justify-center py-4">
-              <p className="text-sm text-gray-400">No open incidents</p>
+              <p className="text-sm" style={{ color: 'var(--sky-text-muted)' }}>No open incidents</p>
             </div>
           )}
         </div>
@@ -412,31 +411,33 @@ export default async function DashboardPage() {
       {/* Quick Actions + Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Quick Actions */}
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+        <div className="glass-card rounded-xl p-6">
+          <h2 className="text-lg font-semibold text-white mb-4">
             Quick Actions
           </h2>
           <div className="space-y-3">
             <Link
               href="/agent"
-              className="flex items-center justify-between p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all group"
+              className="flex items-center justify-between p-3 rounded-xl transition-all group hover:glow-sm"
+              style={{ background: 'rgba(33, 150, 243, 0.08)', border: '1px solid rgba(33, 150, 243, 0.15)' }}
             >
               <div className="flex items-center gap-3">
-                <MessageSquare className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                <span className="text-sm font-medium text-blue-900 dark:text-blue-300">
+                <MessageSquare className="w-5 h-5" style={{ color: 'var(--sky-light)' }} />
+                <span className="text-sm font-medium" style={{ color: 'var(--sky-light)' }}>
                   Ask AI Agent
                 </span>
               </div>
-              <ArrowRight className="w-4 h-4 text-blue-400 group-hover:translate-x-0.5 transition-transform" />
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" style={{ color: 'var(--sky-light)' }} />
             </Link>
 
             <Link
               href="/incidents?new=true"
-              className="flex items-center justify-between p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-all group"
+              className="flex items-center justify-between p-3 rounded-xl transition-all group"
+              style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.15)' }}
             >
               <div className="flex items-center gap-3">
-                <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                <span className="text-sm font-medium text-amber-900 dark:text-amber-300">
+                <AlertTriangle className="w-5 h-5 text-amber-400" />
+                <span className="text-sm font-medium text-amber-300">
                   Report Incident
                 </span>
               </div>
@@ -445,22 +446,23 @@ export default async function DashboardPage() {
 
             <Link
               href="/scsems"
-              className="flex items-center justify-between p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/30 transition-all group"
+              className="flex items-center justify-between p-3 rounded-xl transition-all group"
+              style={{ background: 'rgba(34, 197, 94, 0.08)', border: '1px solid rgba(34, 197, 94, 0.15)' }}
             >
               <div className="flex items-center gap-3">
-                <FileSpreadsheet className="w-5 h-5 text-green-600 dark:text-green-400" />
-                <span className="text-sm font-medium text-green-900 dark:text-green-300">
+                <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+                <span className="text-sm font-medium text-emerald-300">
                   Start SCSEM Assessment
                 </span>
               </div>
-              <ArrowRight className="w-4 h-4 text-green-400 group-hover:translate-x-0.5 transition-transform" />
+              <ArrowRight className="w-4 h-4 text-emerald-400 group-hover:translate-x-0.5 transition-transform" />
             </Link>
           </div>
 
           {/* Recent Incidents Mini-List */}
           {data.recentIncidents.length > 0 && (
-            <div className="mt-6 pt-5 border-t border-gray-200 dark:border-gray-800">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+            <div className="mt-6 pt-5" style={{ borderTop: '1px solid var(--sky-border)' }}>
+              <h3 className="text-sm font-semibold text-white mb-3">
                 Latest Incidents
               </h3>
               <div className="space-y-2">
@@ -468,16 +470,17 @@ export default async function DashboardPage() {
                   <Link
                     key={inc.id}
                     href={`/incidents/${inc.id}`}
-                    className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group"
+                    className="flex items-center gap-2 p-2 rounded-lg transition-colors group"
+                    style={{ ['--hover-bg' as string]: 'var(--sky-surface-overlay)' }}
                   >
                     <div
-                      className={`w-2 h-2 rounded-full shrink-0 ${STATUS_COLORS[inc.status] || "bg-gray-400"}`}
+                      className={`w-2 h-2 rounded-full shrink-0 ${STATUS_COLORS[inc.status] || "bg-slate-400"}`}
                     />
-                    <span className="text-xs text-gray-700 dark:text-gray-300 truncate flex-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                    <span className="text-xs truncate flex-1 transition-colors" style={{ color: 'var(--sky-text-secondary)' }}>
                       {inc.title}
                     </span>
                     <span
-                      className={`text-[10px] font-bold ${SEVERITY_COLORS[inc.severity] || "text-gray-400"}`}
+                      className={`text-[10px] font-bold ${SEVERITY_COLORS[inc.severity] || "text-slate-400"}`}
                     >
                       {inc.severity}
                     </span>
@@ -489,20 +492,20 @@ export default async function DashboardPage() {
         </div>
 
         {/* Recent Activity */}
-        <div className="lg:col-span-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+        <div className="lg:col-span-2 glass-card rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <h2 className="text-lg font-semibold text-white">
               Recent Activity
             </h2>
             <Link
               href="/audit-log"
-              className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              className="text-xs hover:underline" style={{ color: 'var(--sky-light)' }}
             >
               View all
             </Link>
           </div>
           {data.recentLogs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+            <div className="flex flex-col items-center justify-center py-12" style={{ color: 'var(--sky-text-muted)' }}>
               <Activity className="w-8 h-8 mb-2" />
               <p className="text-sm">No recent activity</p>
             </div>
@@ -511,23 +514,23 @@ export default async function DashboardPage() {
               {data.recentLogs.map((log: { id: string; action: string; user?: { name: string } | null; createdAt: Date }) => (
                 <div
                   key={log.id}
-                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                  className="flex items-center gap-3 p-3 rounded-lg transition-colors hover:bg-white/[0.03]"
                 >
                   <div
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${ACTION_COLORS[log.action] || "bg-gray-100 dark:bg-gray-800 text-gray-500"
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${ACTION_COLORS[log.action] || "bg-slate-500/10 text-slate-400"
                       }`}
                   >
                     <AlertCircle className="w-4 h-4" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-900 dark:text-gray-100">
-                      <span className="font-medium">{log.user?.name || "System"}</span>{" "}
-                      <span className="text-gray-500 dark:text-gray-400">
+                    <p className="text-sm">
+                      <span className="font-medium text-white">{log.user?.name || "System"}</span>{" "}
+                      <span style={{ color: 'var(--sky-text-secondary)' }}>
                         {ACTION_LABELS[log.action] || log.action.replace(/_/g, " ").toLowerCase()}
                       </span>
                     </p>
                   </div>
-                  <span className="text-xs text-gray-400 shrink-0 tabular-nums">
+                  <span className="text-xs shrink-0 tabular-nums" style={{ color: 'var(--sky-text-muted)' }}>
                     {formatDateTime(log.createdAt)}
                   </span>
                 </div>

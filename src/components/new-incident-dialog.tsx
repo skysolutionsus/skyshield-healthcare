@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -92,7 +92,7 @@ export function NewIncidentDialog() {
     <>
       <button
         onClick={() => setShowDialog(true)}
-        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[var(--sky-royal)] hover:bg-[var(--sky-blue)] rounded-lg transition-colors"
       >
         <Plus className="w-4 h-4" />
         New Incident
@@ -104,14 +104,14 @@ export function NewIncidentDialog() {
             className="fixed inset-0 bg-black/50"
             onClick={handleClose}
           />
-          <div className="relative bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <div className="relative bg-[var(--sky-surface)] border border-[var(--sky-border)] rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-[var(--sky-border)]">
+              <h2 className="text-lg font-semibold text-white">
                 Report New Incident
               </h2>
               <button
                 onClick={handleClose}
-                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                className="p-1 rounded-lg text-[var(--sky-text-muted)] hover:text-gray-600 dark:hover:text-gray-200 hover:bg-[var(--sky-surface-overlay)] transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -125,7 +125,7 @@ export function NewIncidentDialog() {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-[var(--sky-text-secondary)] mb-1">
                   Title <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -133,13 +133,13 @@ export function NewIncidentDialog() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Brief description of the incident"
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface)] text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)]"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-[var(--sky-text-secondary)] mb-1">
                   Description
                 </label>
                 <textarea
@@ -147,19 +147,19 @@ export function NewIncidentDialog() {
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Detailed description of what happened..."
                   rows={4}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface)] text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)] resize-none"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-[var(--sky-text-secondary)] mb-1">
                     Type
                   </label>
                   <select
                     value={type}
                     onChange={(e) => setType(e.target.value)}
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface)] text-white focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)]"
                   >
                     {TYPES.map((t) => (
                       <option key={t.value} value={t.value}>
@@ -170,13 +170,13 @@ export function NewIncidentDialog() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-[var(--sky-text-secondary)] mb-1">
                     Severity
                   </label>
                   <select
                     value={severity}
                     onChange={(e) => setSeverity(e.target.value)}
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface)] text-white focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)]"
                   >
                     {SEVERITIES.map((s) => (
                       <option key={s.value} value={s.value}>
@@ -188,7 +188,7 @@ export function NewIncidentDialog() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-[var(--sky-text-secondary)] mb-1">
                   Affected Systems
                 </label>
                 <input
@@ -196,34 +196,34 @@ export function NewIncidentDialog() {
                   value={affectedSystems}
                   onChange={(e) => setAffectedSystems(e.target.value)}
                   placeholder="Comma-separated list (e.g., Email Server, VPN)"
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface)] text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)]"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-[var(--sky-text-secondary)] mb-1">
                   Date Occurred
                 </label>
                 <input
                   type="datetime-local"
                   value={dateOccurred}
                   onChange={(e) => setDateOccurred(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface)] text-white focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)]"
                 />
               </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-800">
+              <div className="flex justify-end gap-3 pt-4 border-t border-[var(--sky-border)]">
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-[var(--sky-text-secondary)] hover:bg-[var(--sky-surface-overlay)] rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[var(--sky-royal)] hover:bg-[var(--sky-blue)] disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
                 >
                   {submitting ? (
                     <>
@@ -242,3 +242,4 @@ export function NewIncidentDialog() {
     </>
   );
 }
+

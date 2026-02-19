@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+﻿import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { AppShell } from "@/components/app-shell";
 import { SessionProvider } from "@/components/session-provider";
@@ -28,3 +28,4 @@ export default async function AuthenticatedLayout({
     </SessionProvider>
   );
 }
+

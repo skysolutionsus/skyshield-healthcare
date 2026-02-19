@@ -1,4 +1,4 @@
-import { AlertTriangle, Plus, Search } from "lucide-react";
+﻿import { AlertTriangle, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -7,18 +7,18 @@ import { IncidentFilters } from "@/components/incident-filters";
 import { NewIncidentDialog } from "@/components/new-incident-dialog";
 
 const STATUS_STYLES: Record<string, string> = {
-  OPEN: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  INVESTIGATING: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  REMEDIATION: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
-  RESOLVED: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  CLOSED: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400",
+  OPEN: "bg-sky-500/15 text-sky-400",
+  INVESTIGATING: "bg-amber-500/15 text-amber-400",
+  REMEDIATION: "bg-violet-500/15 text-violet-400",
+  RESOLVED: "bg-emerald-500/15 text-emerald-400",
+  CLOSED: "bg-[var(--sky-surface-overlay)] text-gray-700 bg-[var(--sky-surface-overlay)] text-[var(--sky-text-secondary)]",
 };
 
 const SEVERITY_STYLES: Record<string, string> = {
-  CRITICAL: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  HIGH: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-  MEDIUM: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-  LOW: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  CRITICAL: "bg-red-500/15 text-red-400",
+  HIGH: "bg-orange-500/15 text-orange-400",
+  MEDIUM: "bg-yellow-500/15 text-yellow-400",
+  LOW: "bg-sky-500/15 text-sky-400",
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -83,10 +83,10 @@ export default async function IncidentsPage({
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          <h1 className="text-2xl font-bold text-white">
             Incident Tracker
           </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
+          <p className="text-[var(--sky-text-secondary)] mt-1">
             Track and manage security incidents and compliance violations
           </p>
         </div>
@@ -97,14 +97,14 @@ export default async function IncidentsPage({
       <IncidentFilters />
 
       {/* Incidents Table */}
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+      <div className="bg-[var(--sky-surface)] border border-[var(--sky-border)] rounded-xl overflow-hidden">
         {incidents.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-gray-400">
             <AlertTriangle className="w-10 h-10 mb-3" />
-            <p className="text-lg font-medium text-gray-500 dark:text-gray-400">
+            <p className="text-lg font-medium text-[var(--sky-text-secondary)]">
               No incidents found
             </p>
-            <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
+            <p className="text-sm text-[var(--sky-text-muted)] mt-1">
               {params.status || params.severity || params.type
                 ? "Try adjusting your filters"
                 : "No incidents have been reported yet"}
@@ -114,43 +114,43 @@ export default async function IncidentsPage({
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-gray-200 dark:border-gray-800">
-                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <tr className="border-b border-[var(--sky-border)]">
+                  <th className="text-left py-3 px-4 text-xs font-medium text-[var(--sky-text-secondary)] uppercase tracking-wider">
                     Title
                   </th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="text-left py-3 px-4 text-xs font-medium text-[var(--sky-text-secondary)] uppercase tracking-wider">
                     Type
                   </th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="text-left py-3 px-4 text-xs font-medium text-[var(--sky-text-secondary)] uppercase tracking-wider">
                     Severity
                   </th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="text-left py-3 px-4 text-xs font-medium text-[var(--sky-text-secondary)] uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="text-left py-3 px-4 text-xs font-medium text-[var(--sky-text-secondary)] uppercase tracking-wider">
                     Assigned To
                   </th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="text-left py-3 px-4 text-xs font-medium text-[var(--sky-text-secondary)] uppercase tracking-wider">
                     Date
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
+              <tbody className="divide-y divide-[var(--sky-border)]">
                 {incidents.map((incident) => (
                   <tr
                     key={incident.id}
-                    className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                    className="hover:bg-white/[0.03] transition-colors"
                   >
                     <td className="py-3 px-4">
                       <Link
                         href={`/incidents/${incident.id}`}
-                        className="text-sm font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                        className="text-sm font-medium text-white hover:text-[var(--sky-light)] transition-colors"
                       >
                         {incident.title}
                       </Link>
                     </td>
                     <td className="py-3 px-4">
-                      <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                      <span className="text-xs font-medium text-[var(--sky-text-secondary)]">
                         {TYPE_LABELS[incident.type] || incident.type}
                       </span>
                     </td>
@@ -173,12 +173,12 @@ export default async function IncidentsPage({
                       </span>
                     </td>
                     <td className="py-3 px-4">
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                      <span className="text-sm text-[var(--sky-text-secondary)]">
                         {incident.assignedTo?.name || "Unassigned"}
                       </span>
                     </td>
                     <td className="py-3 px-4">
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                      <span className="text-sm text-[var(--sky-text-secondary)]">
                         {formatDate(incident.dateDiscovered || incident.createdAt)}
                       </span>
                     </td>
@@ -192,3 +192,4 @@ export default async function IncidentsPage({
     </div>
   );
 }
+

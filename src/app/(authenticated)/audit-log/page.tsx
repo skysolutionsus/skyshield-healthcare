@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth";
+﻿import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formatDateTime } from "@/lib/utils";
 import {
@@ -78,10 +78,10 @@ export default async function AuditLogPage({
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          <h1 className="text-2xl font-bold text-white">
             Audit Log
           </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
+          <p className="text-[var(--sky-text-secondary)] mt-1">
             All system activity is logged and non-deletable
           </p>
         </div>
@@ -92,33 +92,33 @@ export default async function AuditLogPage({
 
       <AuditLogFilters />
 
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+      <div className="bg-[var(--sky-surface)] border border-[var(--sky-border)] rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-200 dark:border-gray-800">
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <tr className="border-b border-[var(--sky-border)]">
+                <th className="text-left px-4 py-3 text-xs font-medium text-[var(--sky-text-secondary)] uppercase tracking-wider">
                   Timestamp
                 </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th className="text-left px-4 py-3 text-xs font-medium text-[var(--sky-text-secondary)] uppercase tracking-wider">
                   User
                 </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th className="text-left px-4 py-3 text-xs font-medium text-[var(--sky-text-secondary)] uppercase tracking-wider">
                   Action
                 </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th className="text-left px-4 py-3 text-xs font-medium text-[var(--sky-text-secondary)] uppercase tracking-wider">
                   Resource
                 </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th className="text-left px-4 py-3 text-xs font-medium text-[var(--sky-text-secondary)] uppercase tracking-wider">
                   IP Address
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+            <tbody className="divide-y divide-[var(--sky-border)]">
               {logs.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-12 text-center">
-                    <ScrollText className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                    <ScrollText className="w-8 h-8 text-gray-300 text-[var(--sky-text-muted)] mx-auto mb-2" />
                     <p className="text-sm text-gray-500">No audit logs found</p>
                   </td>
                 </tr>
@@ -128,23 +128,23 @@ export default async function AuditLogPage({
                   return (
                     <tr
                       key={log.id}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                      className="hover:bg-white/[0.03] transition-colors"
                     >
-                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                      <td className="px-4 py-3 text-sm text-[var(--sky-text-secondary)] whitespace-nowrap">
                         {formatDateTime(log.createdAt)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 whitespace-nowrap">
+                      <td className="px-4 py-3 text-sm text-[var(--sky-text-primary)] whitespace-nowrap">
                         {log.user?.name || "System"}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <Icon className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-gray-900 dark:text-gray-100">
+                          <span className="text-sm text-[var(--sky-text-primary)]">
                             {log.action.replace(/_/g, " ")}
                           </span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                      <td className="px-4 py-3 text-sm text-[var(--sky-text-secondary)] whitespace-nowrap">
                         {log.resourceType && (
                           <span>
                             {log.resourceType}
@@ -154,8 +154,8 @@ export default async function AuditLogPage({
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 font-mono whitespace-nowrap">
-                        {log.ipAddress || "—"}
+                      <td className="px-4 py-3 text-sm text-[var(--sky-text-secondary)] font-mono whitespace-nowrap">
+                        {log.ipAddress || "â€”"}
                       </td>
                     </tr>
                   );
@@ -167,7 +167,7 @@ export default async function AuditLogPage({
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-800">
+          <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--sky-border)]">
             <p className="text-sm text-gray-500">
               Page {page} of {totalPages}
             </p>
@@ -175,7 +175,7 @@ export default async function AuditLogPage({
               {page > 1 && (
                 <a
                   href={`/audit-log?page=${page - 1}${params.action ? `&action=${params.action}` : ""}`}
-                  className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                  className="px-3 py-1.5 text-sm bg-[var(--sky-surface-overlay)] bg-[var(--sky-surface-overlay)] rounded-lg hover:bg-[var(--sky-surface-overlay)] text-[var(--sky-text-secondary)]"
                 >
                   Previous
                 </a>
@@ -183,7 +183,7 @@ export default async function AuditLogPage({
               {page < totalPages && (
                 <a
                   href={`/audit-log?page=${page + 1}${params.action ? `&action=${params.action}` : ""}`}
-                  className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                  className="px-3 py-1.5 text-sm bg-[var(--sky-surface-overlay)] bg-[var(--sky-surface-overlay)] rounded-lg hover:bg-[var(--sky-surface-overlay)] text-[var(--sky-text-secondary)]"
                 >
                   Next
                 </a>
@@ -195,3 +195,4 @@ export default async function AuditLogPage({
     </div>
   );
 }
+

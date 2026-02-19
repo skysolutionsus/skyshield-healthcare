@@ -4,23 +4,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
-  Shield,
   LayoutDashboard,
   MessageSquare,
   FileSpreadsheet,
   AlertTriangle,
   ScrollText,
-  Settings,
   Users,
   LogOut,
-  Sun,
-  Moon,
   Menu,
   X,
 } from "lucide-react";
-import { useTheme } from "next-themes";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { SkyLogo, SkyLogoFull } from "@/components/sky-logo";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -42,15 +38,14 @@ interface AppShellProps {
 
 export function AppShell({ children, user }: AppShellProps) {
   const pathname = usePathname();
-  const { theme, setTheme } = useTheme();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex" style={{ background: 'var(--sky-navy)' }}>
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden transition-opacity"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -58,25 +53,24 @@ export function AppShell({ children, user }: AppShellProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 dark:bg-gray-950 border-r border-gray-800 transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:z-auto",
+          "fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ease-out lg:translate-x-0 lg:static lg:z-auto",
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
+        style={{
+          background: 'var(--sky-gradient-surface)',
+          borderRight: '1px solid var(--sky-border)',
+        }}
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-800">
-            <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-blue-600">
-              <Shield className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-base font-bold text-white">IRS SkyShield</h1>
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider">
-                Pub 1075 Compliance
-              </p>
-            </div>
+          <div className="flex items-center justify-between px-5 py-4"
+            style={{ borderBottom: '1px solid var(--sky-border)' }}
+          >
+            <SkyLogoFull />
             <button
               onClick={() => setSidebarOpen(false)}
-              className="ml-auto lg:hidden text-gray-400 hover:text-white"
+              className="lg:hidden transition-colors"
+              style={{ color: 'var(--sky-text-muted)' }}
             >
               <X className="w-5 h-5" />
             </button>
@@ -94,37 +88,46 @@ export function AppShell({ children, user }: AppShellProps) {
                   href={item.href}
                   onClick={() => setSidebarOpen(false)}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                    "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative group",
                     isActive
-                      ? "bg-blue-600/10 text-blue-400"
-                      : "text-gray-400 hover:text-white hover:bg-gray-800"
+                      ? "text-white"
+                      : "hover:text-white"
                   )}
+                  style={{
+                    color: isActive ? 'white' : 'var(--sky-text-muted)',
+                    background: isActive ? 'rgba(33, 150, 243, 0.12)' : undefined,
+                  }}
                 >
-                  <item.icon className="w-5 h-5 shrink-0" />
+                  {/* Active indicator bar */}
+                  {isActive && (
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full pulse-glow"
+                      style={{ background: 'var(--sky-blue)' }}
+                    />
+                  )}
+                  <item.icon className={cn(
+                    "w-5 h-5 shrink-0 transition-colors duration-200",
+                  )}
+                    style={{ color: isActive ? 'var(--sky-light)' : undefined }}
+                  />
                   {item.name}
+                  {/* Hover glow effect */}
+                  {!isActive && (
+                    <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
+                      style={{ background: 'rgba(33, 150, 243, 0.05)' }}
+                    />
+                  )}
                 </Link>
               );
             })}
           </nav>
 
           {/* Footer */}
-          <div className="border-t border-gray-800 p-4 space-y-3">
-            {/* Theme toggle */}
-            <button
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
-            >
-              {theme === "dark" ? (
-                <Sun className="w-5 h-5" />
-              ) : (
-                <Moon className="w-5 h-5" />
-              )}
-              {theme === "dark" ? "Light Mode" : "Dark Mode"}
-            </button>
-
+          <div className="p-4 space-y-3" style={{ borderTop: '1px solid var(--sky-border)' }}>
             {/* User info */}
-            <div className="flex items-center gap-3 px-3 py-2">
-              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-xs font-medium text-white">
+            <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl glass">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white"
+                style={{ background: 'var(--sky-gradient-primary)' }}
+              >
                 {user.name
                   ?.split(" ")
                   .map((n) => n[0])
@@ -136,13 +139,14 @@ export function AppShell({ children, user }: AppShellProps) {
                 <p className="text-sm font-medium text-white truncate">
                   {user.name}
                 </p>
-                <p className="text-xs text-gray-500 truncate">
+                <p className="text-xs truncate" style={{ color: 'var(--sky-text-muted)' }}>
                   {user.role?.replace("_", " ")}
                 </p>
               </div>
               <button
                 onClick={() => signOut({ callbackUrl: "/login" })}
-                className="text-gray-500 hover:text-red-400 transition-colors"
+                className="transition-colors duration-200 hover:text-red-400"
+                style={{ color: 'var(--sky-text-muted)' }}
                 title="Sign out"
               >
                 <LogOut className="w-4 h-4" />
@@ -155,16 +159,18 @@ export function AppShell({ children, user }: AppShellProps) {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile header */}
-        <header className="lg:hidden flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
+        <header className="lg:hidden flex items-center gap-3 px-4 py-3 glass"
+          style={{ borderBottom: '1px solid var(--sky-border)' }}
+        >
           <button
             onClick={() => setSidebarOpen(true)}
-            className="text-gray-600 dark:text-gray-400"
+            style={{ color: 'var(--sky-text-secondary)' }}
           >
             <Menu className="w-6 h-6" />
           </button>
           <div className="flex items-center gap-2">
-            <Shield className="w-5 h-5 text-blue-600" />
-            <span className="font-semibold text-gray-900 dark:text-white">
+            <SkyLogo size={20} />
+            <span className="font-semibold text-white">
               SkyShield
             </span>
           </div>

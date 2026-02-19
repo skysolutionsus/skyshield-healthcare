@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
@@ -44,14 +44,14 @@ function TypingIndicator() {
       <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center shrink-0 shadow-sm">
         <Shield className="w-4 h-4 text-white" />
       </div>
-      <div className="bg-gray-100 dark:bg-gray-800/80 rounded-2xl rounded-tl-md p-4 border border-gray-200 dark:border-gray-700/50">
+      <div className="bg-[var(--sky-surface-overlay)] bg-[var(--sky-surface-overlay)] rounded-2xl rounded-tl-md p-4 border border-[var(--sky-border)]/50">
         <div className="flex items-center gap-3">
           <div className="flex gap-1">
             <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
             <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
             <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
           </div>
-          <span className="text-sm text-gray-500 dark:text-gray-400">
+          <span className="text-sm text-[var(--sky-text-secondary)]">
             Analyzing Publication 1075...
           </span>
         </div>
@@ -73,10 +73,10 @@ function MessageBubble({ msg }: { msg: Message }) {
       // Inline code
       processed = processed.replace(
         /`(.+?)`/g,
-        '<code class="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs font-mono">$1</code>'
+        '<code class="px-1.5 py-0.5 bg-[var(--sky-surface-overlay)] bg-[var(--sky-surface-overlay)] rounded text-xs font-mono">$1</code>'
       );
 
-      const isBullet = /^[-•]\s/.test(line) || /^\d+\.\s/.test(line);
+      const isBullet = /^[-â€¢]\s/.test(line) || /^\d+\.\s/.test(line);
 
       return (
         <span
@@ -97,12 +97,12 @@ function MessageBubble({ msg }: { msg: Message }) {
         <div className="flex-1 min-w-0">
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl rounded-tl-md p-5">
             <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />
+              <AlertTriangle className="w-4 h-4 text-red-400" />
               <span className="text-sm font-semibold text-red-700 dark:text-red-300">
-                FTI/PII Detected — Message Blocked
+                FTI/PII Detected â€” Message Blocked
               </span>
             </div>
-            <p className="text-sm text-red-600 dark:text-red-400">
+            <p className="text-sm text-red-400">
               {msg.content}
             </p>
             {msg.piiTypes && msg.piiTypes.length > 0 && (
@@ -121,7 +121,7 @@ function MessageBubble({ msg }: { msg: Message }) {
               An incident has been auto-created. If this was a false positive,
               you can report it.
             </p>
-            <button className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors">
+            <button className="mt-2 flex items-center gap-1.5 text-xs text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors">
               <Flag className="w-3.5 h-3.5" />
               Report False Positive
             </button>
@@ -134,11 +134,11 @@ function MessageBubble({ msg }: { msg: Message }) {
   if (msg.role === "user") {
     return (
       <div className="flex gap-4 max-w-3xl ml-auto flex-row-reverse animate-in slide-in-from-bottom-2 duration-200">
-        <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shrink-0 mt-1 shadow-sm">
+        <div className="w-8 h-8 rounded-lg bg-[var(--sky-royal)] flex items-center justify-center shrink-0 mt-1 shadow-sm">
           <span className="text-xs font-medium text-white">You</span>
         </div>
         <div className="flex-1 min-w-0 text-right">
-          <div className="inline-block text-left bg-blue-600 text-white rounded-2xl rounded-tr-md p-4 shadow-sm">
+          <div className="inline-block text-left bg-[var(--sky-royal)] text-white rounded-2xl rounded-tr-md p-4 shadow-sm">
             <div className="text-sm whitespace-pre-wrap leading-relaxed">
               {msg.content}
             </div>
@@ -154,8 +154,8 @@ function MessageBubble({ msg }: { msg: Message }) {
         <Shield className="w-4 h-4 text-white" />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="bg-gray-100 dark:bg-gray-800/80 rounded-2xl rounded-tl-md p-4 border border-gray-200 dark:border-gray-700/50">
-          <div className="text-sm whitespace-pre-wrap leading-relaxed text-gray-900 dark:text-gray-100">
+        <div className="bg-[var(--sky-surface-overlay)] bg-[var(--sky-surface-overlay)] rounded-2xl rounded-tl-md p-4 border border-[var(--sky-border)]/50">
+          <div className="text-sm whitespace-pre-wrap leading-relaxed text-[var(--sky-text-primary)]">
             {renderContent(msg.content)}
           </div>
         </div>
@@ -355,14 +355,14 @@ export default function AgentPage() {
       {/* Conversation Sidebar */}
       <div
         className={cn(
-          "border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 flex flex-col transition-all duration-200",
+          "border-r border-[var(--sky-border)] bg-[var(--sky-navy)] flex flex-col transition-all duration-200",
           showSidebar ? "w-72" : "w-0 overflow-hidden"
         )}
       >
-        <div className="p-4 border-b border-gray-200 dark:border-gray-800">
+        <div className="p-4 border-b border-[var(--sky-border)]">
           <button
             onClick={startNewConversation}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-medium transition-all active:scale-[0.98] shadow-sm"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[var(--sky-royal)] hover:bg-[var(--sky-blue)] text-white rounded-xl text-sm font-medium transition-all active:scale-[0.98] shadow-sm"
           >
             <Plus className="w-4 h-4" />
             New Conversation
@@ -382,7 +382,7 @@ export default function AgentPage() {
                 "w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all",
                 conversationId === conv.id
                   ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 shadow-sm"
-                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  : "text-[var(--sky-text-secondary)] hover:bg-[var(--sky-surface-overlay)]"
               )}
             >
               <div className="flex items-center gap-2">
@@ -401,7 +401,7 @@ export default function AgentPage() {
       {/* Chat Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Chat Header */}
-        <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
+        <div className="flex items-center justify-between px-6 py-3 border-b border-[var(--sky-border)] bg-[var(--sky-navy)]">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setShowSidebar(!showSidebar)}
@@ -418,11 +418,11 @@ export default function AgentPage() {
                 <Sparkles className="w-3.5 h-3.5 text-white" />
               </div>
               <div>
-                <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
+                <h2 className="text-sm font-semibold text-white">
                   Pub 1075 AI Agent
                 </h2>
                 <p className="text-xs text-gray-500">
-                  Powered by Claude — All responses cite Pub 1075 sections
+                  Powered by Claude â€” All responses cite Pub 1075 sections
                 </p>
               </div>
             </div>
@@ -430,7 +430,7 @@ export default function AgentPage() {
           {conversationId && (
             <button
               onClick={toggleBookmark}
-              className="text-gray-400 hover:text-amber-500 transition-colors p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="text-gray-400 hover:text-amber-500 transition-colors p-1.5 rounded-lg hover:bg-[var(--sky-surface-overlay)]"
               title={bookmarked ? "Remove bookmark" : "Bookmark conversation"}
             >
               {bookmarked ? (
@@ -449,10 +449,10 @@ export default function AgentPage() {
               <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center mb-5 shadow-lg shadow-blue-600/20">
                 <Shield className="w-10 h-10 text-white" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+              <h3 className="text-xl font-bold text-white mb-2">
                 Publication 1075 AI Agent
               </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-8 leading-relaxed">
+              <p className="text-sm text-[var(--sky-text-secondary)] mb-8 leading-relaxed">
                 Ask any question about IRS Publication 1075 compliance
                 requirements. All responses include specific section citations.
               </p>
@@ -461,7 +461,7 @@ export default function AgentPage() {
                   <button
                     key={q}
                     onClick={() => handleSuggestedQuestion(q)}
-                    className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-all text-left border border-transparent hover:border-blue-200 dark:hover:border-blue-800 active:scale-[0.98]"
+                    className="px-4 py-3 text-sm text-[var(--sky-text-secondary)] bg-[var(--sky-surface-overlay)] bg-[var(--sky-surface-overlay)] rounded-xl hover:bg-[var(--sky-surface-overlay)] transition-all text-left border border-transparent hover:border-blue-200 dark:hover:border-blue-800 active:scale-[0.98]"
                   >
                     {q}
                   </button>
@@ -480,7 +480,7 @@ export default function AgentPage() {
         </div>
 
         {/* Input */}
-        <div className="border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-4">
+        <div className="border-t border-[var(--sky-border)] bg-[var(--sky-navy)] p-4">
           <form onSubmit={handleSubmit} className="max-w-3xl mx-auto">
             <div className="flex gap-3 items-end">
               <div className="flex-1 relative">
@@ -491,7 +491,7 @@ export default function AgentPage() {
                   onKeyDown={handleKeyDown}
                   placeholder="Ask about Publication 1075 compliance..."
                   rows={1}
-                  className="w-full resize-none px-4 py-3 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                  className="w-full resize-none px-4 py-3 bg-[var(--sky-surface-overlay)] bg-[var(--sky-surface-overlay)] border border-[var(--sky-border)] rounded-xl text-sm text-white placeholder-[var(--sky-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)]/50 focus:border-blue-500/50 transition-all"
                   style={{ minHeight: "48px", maxHeight: "200px" }}
                   onInput={(e) => {
                     const target = e.target as HTMLTextAreaElement;
@@ -507,8 +507,8 @@ export default function AgentPage() {
                 className={cn(
                   "px-4 py-3 rounded-xl transition-all shadow-sm",
                   input.trim() && !loading
-                    ? "bg-blue-600 hover:bg-blue-500 text-white active:scale-95"
-                    : "bg-gray-200 dark:bg-gray-800 text-gray-400 cursor-not-allowed"
+                    ? "bg-[var(--sky-royal)] hover:bg-[var(--sky-blue)] text-white active:scale-95"
+                    : "bg-[var(--sky-surface-overlay)] bg-[var(--sky-surface-overlay)] text-gray-400 cursor-not-allowed"
                 )}
               >
                 {loading ? (
@@ -528,3 +528,4 @@ export default function AgentPage() {
     </div>
   );
 }
+
