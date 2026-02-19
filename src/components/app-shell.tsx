@@ -41,7 +41,7 @@ export function AppShell({ children, user }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen flex" style={{ background: 'var(--sky-navy)' }}>
+    <div className="h-screen flex overflow-hidden" style={{ background: 'var(--sky-navy)' }}>
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -63,10 +63,10 @@ export function AppShell({ children, user }: AppShellProps) {
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center justify-between px-5 py-4 shrink-0"
+          <div className="flex items-center justify-between px-5 py-5 shrink-0"
             style={{ borderBottom: '1px solid var(--sky-border)' }}
           >
-            <SkyLogo size={48} />
+            <SkyLogo size={120} />
             <button
               onClick={() => setSidebarOpen(false)}
               className="lg:hidden transition-colors"

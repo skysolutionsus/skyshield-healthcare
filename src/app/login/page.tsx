@@ -74,7 +74,7 @@ export default function LoginPage() {
         {/* Branding */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-5">
-            <SkyLogo size={80} className="drop-shadow-lg" />
+            <SkyLogo size={200} className="drop-shadow-lg" />
           </div>
           <p className="text-sm font-medium" style={{ color: 'var(--sky-text-secondary)' }}>
             AI-Powered Publication 1075 Compliance
