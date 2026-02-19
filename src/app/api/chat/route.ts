@@ -7,13 +7,20 @@ import Anthropic from "@anthropic-ai/sdk";
 import { readFileSync } from "fs";
 import { join } from "path";
 
-// Load Pub 1075 text once at module level
+// Allow up to 60s for Anthropic response (Coolify / long-running AI calls)
+export const maxDuration = 60;
+
+// Load Pub 1075 text once at module level — truncated to keep well within token limits
 let pub1075Text: string = "";
+const MAX_PUB_CHARS = 80_000; // ~20K tokens — sufficient for core compliance guidance
 try {
-  pub1075Text = readFileSync(
+  const fullText = readFileSync(
     join(process.cwd(), "data/pub1075/p1075-full-text.md"),
     "utf-8"
   );
+  pub1075Text = fullText.length > MAX_PUB_CHARS
+    ? fullText.substring(0, MAX_PUB_CHARS) + "\n\n[Note: Full text truncated for performance. Additional sections available on request.]"
+    : fullText;
 } catch {
   console.warn("Could not load Publication 1075 text");
 }
