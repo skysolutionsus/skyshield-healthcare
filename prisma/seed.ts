@@ -20,13 +20,13 @@ async function main() {
 
   console.log("Created organization:", org.name);
 
-  // Create admin user
-  const adminPassword = await hash("Admin123!@#$", 12);
+  // Create admin user (primary demo account)
+  const adminPassword = await hash("SkyShield2026!", 12);
   const admin = await prisma.user.upsert({
-    where: { email: "admin@skyshield.gov" },
+    where: { email: "admin@demo.com" },
     update: {},
     create: {
-      email: "admin@skyshield.gov",
+      email: "admin@demo.com",
       name: "Sarah Mitchell",
       passwordHash: adminPassword,
       role: "ADMIN",
@@ -219,7 +219,7 @@ async function main() {
 
   console.log("Created sample conversation");
   console.log("\nSeed complete! Login credentials:");
-  console.log("  Admin:      admin@skyshield.gov / Admin123!@#$");
+  console.log("  Admin:      admin@demo.com / SkyShield2026!");
   console.log("  Compliance: compliance@skyshield.gov / Compliance123!@#$");
   console.log("  Auditor:    auditor@skyshield.gov / Auditor123!@#$");
   console.log("  Viewer:     viewer@skyshield.gov / Viewer123!@#$");
