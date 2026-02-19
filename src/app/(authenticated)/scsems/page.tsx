@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { SyncButton } from "@/components/sync-button";
 
 const categoryIcons: Record<string, React.ReactNode> = {
   Database: <Database className="w-5 h-5" />,
@@ -130,14 +131,17 @@ export default async function SCSEMLibraryPage() {
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-white">
-          SCSEM Library
-        </h1>
-        <p className="text-[var(--sky-text-secondary)] mt-1">
-          Supplemental Computer Security Evaluation Matrices for IRS Publication
-          1075 compliance
-        </p>
+      <div className="mb-8 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-white">
+            SCSEM Library
+          </h1>
+          <p className="text-[var(--sky-text-secondary)] mt-1">
+            Supplemental Computer Security Evaluation Matrices for IRS Publication
+            1075 compliance
+          </p>
+        </div>
+        <SyncButton />
       </div>
 
       {/* Summary Stats */}
