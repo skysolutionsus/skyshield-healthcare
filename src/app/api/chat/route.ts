@@ -256,7 +256,7 @@ export async function POST(request: NextRequest) {
       // Demo mode - return a sample response
       const demoResponse = `Based on Publication 1075, I can provide guidance on your question.
 
-**Note:** This is a demo response. Configure the ANTHROPIC_API_KEY environment variable to enable AI-powered responses with full Publication 1075 analysis.
+**Note:** This is a demo response. Configure the ANTHROPIC_API_KEY environment variable to enable AI powered IRS Office of Safeguards Compliance analysis.
 
 Your question: "${message}"
 

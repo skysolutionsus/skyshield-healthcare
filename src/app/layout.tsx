@@ -7,7 +7,7 @@ import { Toaster } from "@/components/ui/toaster";
 const outfit = Outfit({ subsets: ["latin"], weight: ["300", "400", "500", "600", "700"] });
 
 export const metadata: Metadata = {
-  title: "SkyShield — AI-Powered Publication 1075 Compliance",
+  title: "SkyShield — AI powered IRS Office of Safeguards Compliance",
   description:
     "AI-powered compliance platform for IRS Publication 1075. Get instant, cited guidance, manage SCSEMs, and track incidents.",
   icons: {

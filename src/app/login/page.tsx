@@ -76,12 +76,12 @@ export default function LoginPage() {
           <div className="flex justify-center mb-2">
             <div className="relative">
               <div className="relative p-2">
-                <SkyLogo size={240} light={true} className="drop-shadow-[0_0_15px_rgba(33,150,243,0.3)]" />
+                <SkyLogo size={90} light={true} className="drop-shadow-[0_0_15px_rgba(33,150,243,0.3)]" />
               </div>
             </div>
           </div>
           <p className="text-base font-medium tracking-wide mt-2" style={{ color: 'var(--sky-text-secondary)' }}>
-            AI-Powered Publication 1075 Compliance
+            AI powered IRS Office of Safeguards Compliance
           </p>
         </div>
 
