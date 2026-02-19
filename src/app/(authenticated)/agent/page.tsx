@@ -171,7 +171,7 @@ function TypingIndicator() {
             <span className="w-1.5 h-1.5 bg-[var(--sky-cyan)] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
           </div>
           <span className="text-sm text-[var(--sky-text-secondary)]">
-            Analyzing Publication 1075...
+            Analyzing Office of Safeguards guidelines...
           </span>
         </div>
       </div>
@@ -514,7 +514,7 @@ export default function AgentPage() {
               <AgentAvatar size="sm" />
               <div>
                 <h2 className="text-sm font-semibold text-white">
-                  Pub 1075 AI Agent
+                  Office of Safeguards AI Agent
                 </h2>
                 <p className="text-xs text-[var(--sky-text-muted)]">
                   Powered by Claude &mdash; All responses cite Pub 1075 sections
@@ -543,10 +543,10 @@ export default function AgentPage() {
             <div className="flex flex-col items-center justify-center h-full text-center max-w-lg mx-auto">
               <AgentAvatar size="lg" />
               <h3 className="text-xl font-bold text-white mt-5 mb-2">
-                Publication 1075 AI Agent
+                Office of Safeguards AI Agent
               </h3>
               <p className="text-sm text-[var(--sky-text-secondary)] mb-8 leading-relaxed">
-                Ask any question about IRS Publication 1075 compliance
+                Ask any question about IRS Office of Safeguards compliance
                 requirements. Responses are direct, structured, and cite specific sections.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full text-left">
@@ -582,7 +582,7 @@ export default function AgentPage() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Ask about Publication 1075 compliance..."
+                  placeholder="Ask about Office of Safeguards compliance..."
                   rows={1}
                   className="w-full resize-none px-4 py-3 bg-[var(--sky-surface-overlay)] border border-[var(--sky-border)] rounded-xl text-sm text-white placeholder-[var(--sky-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)]/50 focus:border-[var(--sky-blue)]/50 transition-all"
                   style={{ minHeight: "48px", maxHeight: "200px" }}

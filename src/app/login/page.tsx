@@ -201,7 +201,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <p className="text-center text-xs mt-6" style={{ color: 'var(--sky-text-muted)' }}>
-          IRS Publication 1075 Compliance Platform
+          IRS Office of Safeguards Compliance Platform
         </p>
       </div>
     </div>

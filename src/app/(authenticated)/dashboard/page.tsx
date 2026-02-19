@@ -204,7 +204,7 @@ export default async function DashboardPage() {
           Dashboard
         </h1>
         <p className="mt-1" style={{ color: 'var(--sky-text-secondary)' }}>
-          Publication 1075 compliance overview
+          Office of Safeguards compliance overview
         </p>
       </div>
 
@@ -304,7 +304,7 @@ export default async function DashboardPage() {
           <div className="text-3xl font-bold text-white">
             {data.totalConversations}
           </div>
-          <p className="text-xs mt-3" style={{ color: 'var(--sky-text-muted)' }}>Pub 1075 queries</p>
+          <p className="text-xs mt-3" style={{ color: 'var(--sky-text-muted)' }}>Safeguards queries</p>
         </div>
       </div>
 
