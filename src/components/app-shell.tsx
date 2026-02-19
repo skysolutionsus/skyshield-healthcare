@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { SkyLogo, SkyLogoFull } from "@/components/sky-logo";
+import { SkyLogo } from "@/components/sky-logo";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -63,10 +63,10 @@ export function AppShell({ children, user }: AppShellProps) {
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center justify-between px-5 py-4"
+          <div className="flex items-center justify-between px-5 py-4 shrink-0"
             style={{ borderBottom: '1px solid var(--sky-border)' }}
           >
-            <SkyLogoFull />
+            <SkyLogo size={48} />
             <button
               onClick={() => setSidebarOpen(false)}
               className="lg:hidden transition-colors"
@@ -77,7 +77,7 @@ export function AppShell({ children, user }: AppShellProps) {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto min-h-0">
             {navigation.map((item) => {
               const isActive =
                 pathname === item.href ||
@@ -122,7 +122,7 @@ export function AppShell({ children, user }: AppShellProps) {
           </nav>
 
           {/* Footer */}
-          <div className="p-4 space-y-3" style={{ borderTop: '1px solid var(--sky-border)' }}>
+          <div className="p-4 space-y-3 shrink-0" style={{ borderTop: '1px solid var(--sky-border)' }}>
             {/* User info */}
             <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl glass">
               <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white"
