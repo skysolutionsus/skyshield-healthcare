@@ -67,7 +67,7 @@ export function AppShell({ children, user }: AppShellProps) {
             style={{ borderBottom: '1px solid var(--sky-border)' }}
           >
             <div className="flex-1 flex justify-center lg:justify-start">
-              <SkyLogo size={140} className="drop-shadow-[0_0_10px_rgba(33,150,243,0.15)]" />
+              <SkyLogo size={140} light={true} className="drop-shadow-[0_0_10px_rgba(33,150,243,0.15)]" />
             </div>
             <button
               onClick={() => setSidebarOpen(false)}
@@ -171,7 +171,7 @@ export function AppShell({ children, user }: AppShellProps) {
             <Menu className="w-6 h-6" />
           </button>
           <div className="flex items-center gap-2">
-            <SkyLogo size={20} />
+            <SkyLogo size={20} light={true} />
             <span className="font-semibold text-white">
               SkyShield
             </span>
