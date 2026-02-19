@@ -1,18 +1,14 @@
 /**
  * Sky Solutions logo — uses the actual brand PNG asset
  */
-import Image from "next/image";
-
 export function SkyLogo({ className = "", size = 32 }: { className?: string; size?: number }) {
     return (
-        <Image
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
             src="/logo.png"
             alt="Sky Solutions"
-            width={size * 3}
-            height={size}
+            style={{ height: size, width: "auto" }}
             className={className}
-            style={{ width: "auto", height: size }}
-            priority
         />
     );
 }
@@ -24,3 +20,4 @@ export function SkyLogoFull({ className = "" }: { className?: string }) {
         </div>
     );
 }
+
