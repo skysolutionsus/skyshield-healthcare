@@ -73,10 +73,13 @@ Include exactly 3 controls in the array. Do not include markdown formatting like
             ]
         });
 
-        const responseText = message.content[0].type === "text" ? message.content[0].text : "";
+        let responseText = message.content[0].type === "text" ? message.content[0].text : "";
+
+        // Strip markdown blocks if Claude included them anyway
+        responseText = responseText.replace(/```json/gi, "").replace(/```/g, "").trim();
 
         // Attempt to parse the JSON
-        const payload = JSON.parse(responseText.trim());
+        const payload = JSON.parse(responseText);
 
         // Save to database
         const benchmark = await db.cISBenchmarkVersion.create({
@@ -124,8 +127,10 @@ Include exactly 3 controls in the array. Do not include markdown formatting like
             count: 1
         });
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("CIS Sync error:", error);
-        return NextResponse.json({ error: "Failed to sync CIS benchmarks" }, { status: 500 });
+        return NextResponse.json({
+            error: `Failed to sync CIS benchmarks: ${error.message || "Unknown Error"}`
+        }, { status: 500 });
     }
 }
