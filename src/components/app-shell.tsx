@@ -68,9 +68,9 @@ export function AppShell({ children, user }: AppShellProps) {
           >
             <div className="rounded-2xl px-4 py-3 flex-1"
               style={{
-                background: 'linear-gradient(135deg, rgba(15, 35, 65, 0.8) 0%, rgba(8, 20, 40, 0.9) 100%)',
-                boxShadow: '0 0 24px rgba(33, 150, 243, 0.15), 0 4px 16px rgba(0, 0, 0, 0.3)',
-                border: '1px solid rgba(33, 150, 243, 0.15)',
+                background: 'rgba(255, 255, 255, 0.95)',
+                boxShadow: '0 0 24px rgba(33, 150, 243, 0.1), 0 4px 16px rgba(0, 0, 0, 0.2)',
+                border: '1px solid rgba(255, 255, 255, 0.8)',
               }}
             >
               <SkyLogo size={160} className="drop-shadow-[0_0_12px_rgba(33,150,243,0.25)]" />
