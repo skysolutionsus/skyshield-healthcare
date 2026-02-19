@@ -50,66 +50,37 @@ const categoryColors: Record<string, string> = {
   Others: "bg-slate-100 dark:bg-slate-900/30 text-slate-700 dark:text-slate-400 border-slate-200 dark:border-slate-800",
 };
 
-function getStatusBadge(status: string) {
-  switch (status) {
-    case "COMPLETED":
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
-          <CheckCircle2 className="w-3 h-3" />
-          Completed
-        </span>
-      );
-    case "IN_PROGRESS":
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
-          <Clock className="w-3 h-3" />
-          In Progress
-        </span>
-      );
-    case "REVIEW_NEEDED":
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
-          <AlertCircle className="w-3 h-3" />
-          Review Needed
-        </span>
-      );
-    default:
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--sky-surface-overlay)] bg-[var(--sky-surface-overlay)] text-[var(--sky-text-secondary)]">
-          Not Started
-        </span>
-      );
+function getStatusBadge(isOutdated: boolean, version: string | undefined) {
+  if (isOutdated) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50">
+        <AlertCircle className="w-3 h-3" />
+        CIS {version} Available
+      </span>
+    );
   }
-}
-
-function ComplianceScoreBadge({ score }: { score: number }) {
-  const color =
-    score >= 80
-      ? "text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30"
-      : score >= 60
-        ? "text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30"
-        : "text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30";
-
   return (
-    <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${color}`}
-    >
-      {Math.round(score)}%
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50">
+      <CheckCircle2 className="w-3 h-3" />
+      Up to Date
     </span>
   );
 }
 
-interface TemplateWithAssessment {
+interface TemplateWithUpdates {
   id: string;
   name: string;
   category: string;
   version: string | null;
+  cisTechnology: string | null;
   controlCount: number;
   filePath: string;
-  assessments: {
+  updateReviews: {
     id: string;
     status: string;
-    complianceScore: number | null;
+    benchmark: {
+      currentVersion: string;
+    };
   }[];
 }
 
@@ -120,21 +91,19 @@ export default async function SCSEMLibraryPage() {
   const orgId = (session.user as unknown as { organizationId: string })
     .organizationId;
 
-  let templates: TemplateWithAssessment[] = [];
+  let templates: TemplateWithUpdates[] = [];
 
   try {
     templates = await db.sCSEMTemplate.findMany({
       orderBy: [{ category: "asc" }, { name: "asc" }],
       include: {
-        assessments: {
-          where: { organizationId: orgId },
-          select: {
-            id: true,
-            status: true,
-            complianceScore: true,
-          },
-          take: 1,
-          orderBy: { updatedAt: "desc" },
+        updateReviews: {
+          where: { status: "PENDING" },
+          include: {
+            benchmark: {
+              select: { currentVersion: true }
+            }
+          }
         },
       },
     });
@@ -143,7 +112,7 @@ export default async function SCSEMLibraryPage() {
   }
 
   // Group templates by category
-  const grouped: Record<string, TemplateWithAssessment[]> = {};
+  const grouped: Record<string, TemplateWithUpdates[]> = {};
   for (const tpl of templates) {
     if (!grouped[tpl.category]) {
       grouped[tpl.category] = [];
@@ -155,12 +124,8 @@ export default async function SCSEMLibraryPage() {
 
   // Compute summary stats
   const totalTemplates = templates.length;
-  const assessed = templates.filter(
-    (t) => t.assessments.length > 0 && t.assessments[0].status === "COMPLETED"
-  ).length;
-  const inProgress = templates.filter(
-    (t) => t.assessments.length > 0 && t.assessments[0].status === "IN_PROGRESS"
-  ).length;
+  const outdated = templates.filter((t) => t.updateReviews.length > 0).length;
+  const upToDate = totalTemplates - outdated;
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
@@ -194,15 +159,15 @@ export default async function SCSEMLibraryPage() {
         </div>
         <div className="bg-[var(--sky-surface)] border border-[var(--sky-border)] rounded-xl p-5">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+            <div className="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
             </div>
             <div>
               <p className="text-2xl font-bold text-white">
-                {assessed}
+                {upToDate}
               </p>
               <p className="text-xs text-[var(--sky-text-secondary)]">
-                Completed
+                Up to Date
               </p>
             </div>
           </div>
@@ -210,14 +175,14 @@ export default async function SCSEMLibraryPage() {
         <div className="bg-[var(--sky-surface)] border border-[var(--sky-border)] rounded-xl p-5">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-              <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
             </div>
             <div>
               <p className="text-2xl font-bold text-white">
-                {inProgress}
+                {outdated}
               </p>
               <p className="text-xs text-[var(--sky-text-secondary)]">
-                In Progress
+                Updates Available
               </p>
             </div>
           </div>
@@ -243,9 +208,8 @@ export default async function SCSEMLibraryPage() {
         <div key={category} className="mb-8">
           <div className="flex items-center gap-3 mb-4">
             <div
-              className={`w-8 h-8 rounded-lg border flex items-center justify-center ${
-                categoryColors[category] || categoryColors["Others"]
-              }`}
+              className={`w-8 h-8 rounded-lg border flex items-center justify-center ${categoryColors[category] || categoryColors["Others"]
+                }`}
             >
               {categoryIcons[category] || categoryIcons["Others"]}
             </div>
@@ -259,53 +223,47 @@ export default async function SCSEMLibraryPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {grouped[category].map((template) => {
-              const assessment = template.assessments[0] || null;
+              const pendingReview = template.updateReviews[0] || null;
+              const isOutdated = !!pendingReview;
               return (
                 <Link
                   key={template.id}
                   href={`/scsems/${template.id}`}
-                  className="group bg-[var(--sky-surface)] border border-[var(--sky-border)] rounded-xl p-5 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md transition-all"
+                  className="group bg-[var(--sky-surface)] border border-[var(--sky-border)] rounded-xl p-5 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md transition-all relative overflow-hidden"
                 >
-                  <div className="flex items-start justify-between mb-3">
+                  {isOutdated && (
+                    <div className="absolute top-0 right-0 w-16 h-16 pointer-events-none before:absolute before:content-[''] before:w-1.5 before:h-1.5 before:bg-amber-500 before:rounded-full before:top-4 before:right-4 before:animate-pulse"></div>
+                  )}
+                  <div className="flex items-start justify-between mb-3 pr-4">
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-semibold text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                      <h3 className="text-sm font-semibold text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" title={template.name}>
                         {template.name}
                       </h3>
-                      {template.version && (
-                        <p className="text-xs text-[var(--sky-text-secondary)] mt-0.5">
+                      {template.cisTechnology ? (
+                        <p className="text-xs text-[var(--sky-text-secondary)] mt-1 truncate">
+                          CIS Technology: {template.cisTechnology}
+                        </p>
+                      ) : template.version ? (
+                        <p className="text-xs text-[var(--sky-text-secondary)] mt-1 truncate">
                           Version {template.version}
                         </p>
-                      )}
+                      ) : null}
                     </div>
-                    <ChevronRight className="w-4 h-4 text-gray-400 text-[var(--sky-text-muted)] group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all shrink-0 mt-0.5" />
                   </div>
 
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between mt-4">
                     <div className="flex items-center gap-2">
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${
-                          categoryColors[template.category] ||
+                        className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border uppercase tracking-wide ${categoryColors[template.category] ||
                           categoryColors["Others"]
-                        }`}
+                          }`}
                       >
                         {template.category}
                       </span>
-                      {template.controlCount > 0 && (
-                        <span className="text-xs text-[var(--sky-text-secondary)]">
-                          {template.controlCount} controls
-                        </span>
-                      )}
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      {assessment?.complianceScore != null && (
-                        <ComplianceScoreBadge
-                          score={assessment.complianceScore}
-                        />
-                      )}
-                      {assessment
-                        ? getStatusBadge(assessment.status)
-                        : getStatusBadge("NOT_STARTED")}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {getStatusBadge(isOutdated, pendingReview?.benchmark?.currentVersion)}
                     </div>
                   </div>
                 </Link>

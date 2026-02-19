@@ -21,9 +21,9 @@ export async function GET() {
       db.incident.count({
         where: { organizationId: orgId, status: { not: "CLOSED" } },
       }),
-      db.sCSEMAssessment.count({ where: { organizationId: orgId } }),
-      db.sCSEMAssessment.count({
-        where: { organizationId: orgId, status: "COMPLETED" },
+      db.sCSEMTemplate.count(),
+      db.sCSEMUpdateReview.count({
+        where: { status: "PENDING" },
       }),
       db.auditLog.findMany({
         where: { organizationId: orgId },

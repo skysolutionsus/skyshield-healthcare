@@ -38,18 +38,10 @@ enum IncidentType {
   AUTO_GENERATED
 }
 
-enum ControlStatus {
-  COMPLIANT
-  NON_COMPLIANT
-  NOT_APPLICABLE
-  IN_PROGRESS
-}
-
-enum AssessmentStatus {
-  NOT_STARTED
-  IN_PROGRESS
-  COMPLETED
-  REVIEW_NEEDED
+enum UpdateReviewStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
 }
 
 model Organization {
@@ -62,7 +54,6 @@ model Organization {
 
   users              User[]
   incidents          Incident[]
-  scsemAssessments   SCSEMAssessment[]
   auditLogs          AuditLog[]
   invitations        Invitation[]
 }
@@ -84,9 +75,7 @@ model User {
   incidents          Incident[]          @relation("AssignedIncidents")
   createdIncidents   Incident[]          @relation("CreatedIncidents")
   incidentActivities IncidentActivity[]
-  scsemAssessments   SCSEMAssessment[]
   auditLogs          AuditLog[]
-  controlResults     SCSEMControlResult[] @relation("AssignedControlResults")
 }
 
 model Invitation {
@@ -132,45 +121,26 @@ model SCSEMTemplate {
   version       String?
   effectiveDate String?
   cisVersion    String?
+  cisTechnology String?
   filePath      String
   controlCount  Int      @default(0)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  assessments SCSEMAssessment[]
+  updateReviews SCSEMUpdateReview[]
 }
 
-model SCSEMAssessment {
-  id              String           @id @default(cuid())
-  templateId      String
-  organizationId  String
-  assessedById    String
-  status          AssessmentStatus @default(NOT_STARTED)
-  complianceScore Float?
-  notes           String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+model SCSEMUpdateReview {
+  id               String             @id @default(cuid())
+  templateId       String
+  benchmarkId      String
+  status           UpdateReviewStatus @default(PENDING)
+  suggestedChanges Json
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 
-  template       SCSEMTemplate        @relation(fields: [templateId], references: [id])
-  organization   Organization         @relation(fields: [organizationId], references: [id])
-  assessedBy     User                 @relation(fields: [assessedById], references: [id])
-  controlResults SCSEMControlResult[]
-}
-
-model SCSEMControlResult {
-  id           String        @id @default(cuid())
-  assessmentId String
-  controlId    String
-  controlName  String
-  status       ControlStatus @default(IN_PROGRESS)
-  notes        String?
-  evidence     String?
-  assignedToId String?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-
-  assessment SCSEMAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-  assignedTo User?           @relation("AssignedControlResults", fields: [assignedToId], references: [id])
+  template  SCSEMTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  benchmark CISBenchmarkVersion @relation(fields: [benchmarkId], references: [id], onDelete: Cascade)
 }
 
 model Incident {
@@ -227,11 +197,13 @@ model AuditLog {
 }
 
 model CISBenchmarkVersion {
-  id              String   @id @default(cuid())
-  technology      String
-  currentVersion  String
-  lastChecked     DateTime @default(now())
-  scsemsAffected  Json?    // Array of SCSEM template IDs
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String   @id @default(cuid())
+  technology     String
+  currentVersion String
+  releaseDate    DateTime
+  changesSummary String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  updateReviews  SCSEMUpdateReview[]
 }

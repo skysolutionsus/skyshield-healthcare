@@ -19,7 +19,7 @@ async function getDashboardData(organizationId: string) {
   const [
     incidentCounts,
     totalIncidents,
-    scsemStats,
+    scsemOutdated,
     recentLogs,
     totalConversations,
     recentIncidents,
@@ -32,10 +32,8 @@ async function getDashboardData(organizationId: string) {
     db.incident.count({
       where: { organizationId, status: { not: "CLOSED" } },
     }),
-    db.sCSEMAssessment.groupBy({
-      by: ["status"],
-      where: { organizationId },
-      _count: true,
+    db.sCSEMUpdateReview.count({
+      where: { status: "PENDING" },
     }),
     db.auditLog.findMany({
       where: { organizationId },
@@ -54,38 +52,18 @@ async function getDashboardData(organizationId: string) {
     }),
   ]);
 
-  const completedAssessments = await db.sCSEMAssessment.findMany({
-    where: { organizationId, status: "COMPLETED" },
-    select: { complianceScore: true },
-  });
-
-  const avgCompliance =
-    completedAssessments.length > 0
-      ? completedAssessments.reduce(
-        (sum: number, a: { complianceScore: number | null }) => sum + (a.complianceScore || 0),
-        0
-      ) / completedAssessments.length
-      : 0;
-
   const severityMap: Record<string, number> = {};
   incidentCounts.forEach((ic: { severity: string; _count: number }) => {
     severityMap[ic.severity] = ic._count;
   });
 
-  const statusMap: Record<string, number> = {};
-  scsemStats.forEach((s: { status: string; _count: number }) => {
-    statusMap[s.status] = s._count;
-  });
-
   const totalScsems = await db.sCSEMTemplate.count();
 
   return {
-    complianceScore: Math.round(avgCompliance),
     openIncidents: totalIncidents,
     incidentsBySeverity: severityMap,
     scsemTotal: totalScsems,
-    scsemAssessed: statusMap["COMPLETED"] || 0,
-    scsemInProgress: statusMap["IN_PROGRESS"] || 0,
+    scsemOutdated: scsemOutdated,
     recentLogs,
     recentIncidents,
     totalConversations,
@@ -98,7 +76,6 @@ const ACTION_LABELS: Record<string, string> = {
   AI_QUERY: "asked AI Agent",
   INCIDENT_CREATE: "created incident",
   INCIDENT_UPDATE: "updated incident",
-  SCSEM_ASSESSMENT: "assessed SCSEM",
   USER_CREATE: "invited user",
   PII_DETECTED: "PII detected",
   SETTINGS_UPDATE: "updated settings",
@@ -109,7 +86,6 @@ const ACTION_COLORS: Record<string, string> = {
   AI_QUERY: "bg-sky-500/10 text-sky-400",
   INCIDENT_CREATE: "bg-amber-500/10 text-amber-400",
   PII_DETECTED: "bg-red-500/10 text-red-400",
-  SCSEM_ASSESSMENT: "bg-violet-500/10 text-violet-400",
 };
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -139,28 +115,25 @@ export default async function DashboardPage() {
     data = await getDashboardData(orgId);
   } catch {
     data = {
-      complianceScore: 0,
       openIncidents: 0,
       incidentsBySeverity: {},
       scsemTotal: 58,
-      scsemAssessed: 0,
-      scsemInProgress: 0,
+      scsemOutdated: 0,
       recentLogs: [],
       recentIncidents: [],
       totalConversations: 0,
     };
   }
 
-  const scsemNotStarted = data.scsemTotal - data.scsemAssessed - data.scsemInProgress;
+  const scsemUpToDate = data.scsemTotal - data.scsemOutdated;
 
-  // Compute donut chart segments for SCSEM
+  // Compute donut chart segments for SCSEM Health
   const scsemSegments = [
-    { label: "Completed", value: data.scsemAssessed, color: "#22c55e" },
-    { label: "In Progress", value: data.scsemInProgress, color: "#2196F3" },
-    { label: "Not Started", value: scsemNotStarted, color: "#1A2E45" },
+    { label: "Up to Date", value: scsemUpToDate, color: "#22c55e" },
+    { label: "Updates Available", value: data.scsemOutdated, color: "#f59e0b" },
   ].filter((s) => s.value > 0);
 
-  const scsemTotalCount = scsemSegments.reduce((s, v) => s + v.value, 0);
+  const scsemTotalCount = data.scsemTotal;
 
   // Build donut SVG pie slices
   function computeDonutPaths(segments: { value: number; color: string }[], total: number) {
@@ -210,34 +183,23 @@ export default async function DashboardPage() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {/* Compliance Score */}
+        {/* IRS SCSEM Templates */}
         <div className="glass-card rounded-xl p-6 slide-up stagger-1">
           <div className="flex items-center justify-between mb-4">
             <span className="text-sm font-medium" style={{ color: 'var(--sky-text-secondary)' }}>
-              Compliance Score
+              IRS SCSEM Templates
             </span>
-            <TrendingUp className="w-5 h-5 text-emerald-400" />
+            <Shield className="w-5 h-5 text-emerald-400" />
           </div>
-          <div className="text-3xl font-bold text-white">
-            {data.complianceScore}%
+          <div className="flex items-end gap-2">
+            <span className="text-3xl font-bold text-white">
+              {data.scsemTotal}
+            </span>
+            <span className="text-sm pb-1 text-emerald-400 flex items-center gap-1">
+              Active Formats
+            </span>
           </div>
-          <div className="mt-3 w-full rounded-full h-2.5 overflow-hidden" style={{ background: 'var(--sky-surface-overlay)' }}>
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{
-                width: `${data.complianceScore}%`,
-                background:
-                  data.complianceScore >= 80
-                    ? "#22c55e"
-                    : data.complianceScore >= 50
-                      ? "#eab308"
-                      : "#ef4444",
-              }}
-            />
-          </div>
-          <p className="text-xs mt-2" style={{ color: 'var(--sky-text-muted)' }}>
-            {data.complianceScore >= 80 ? "On track" : data.complianceScore > 0 ? "Needs attention" : "No assessments completed"}
-          </p>
+          <p className="text-xs mt-3" style={{ color: 'var(--sky-text-muted)' }}>Managed directly against CIS Benchmarks</p>
         </div>
 
         {/* Open Incidents */}
@@ -274,21 +236,17 @@ export default async function DashboardPage() {
         <div className="glass-card rounded-xl p-6 slide-up stagger-3">
           <div className="flex items-center justify-between mb-4">
             <span className="text-sm font-medium" style={{ color: 'var(--sky-text-secondary)' }}>
-              SCSEM Assessments
+              SCSEM Health
             </span>
             <FileSpreadsheet className="w-5 h-5" style={{ color: 'var(--sky-blue)' }} />
           </div>
           <div className="text-3xl font-bold text-white">
-            {data.scsemAssessed}
+            {data.scsemOutdated}
             <span className="text-lg font-normal" style={{ color: 'var(--sky-text-muted)' }}>/{data.scsemTotal}</span>
           </div>
-          <div className="mt-3 flex gap-1.5 text-xs">
-            <span className="flex items-center gap-1 text-emerald-400">
-              <CheckCircle2 className="w-3 h-3" /> {data.scsemAssessed} done
-            </span>
-            <span style={{ color: 'var(--sky-border-bright)' }}>|</span>
-            <span className="flex items-center gap-1" style={{ color: 'var(--sky-light)' }}>
-              <Clock className="w-3 h-3" /> {data.scsemInProgress} active
+          <div className="mt-3 flex gap-1.5 text-xs flex-col">
+            <span className="flex items-center gap-1 text-amber-400">
+              <AlertCircle className="w-3 h-3" /> {data.scsemOutdated} flagged for CIS updates
             </span>
           </div>
         </div>
@@ -338,7 +296,7 @@ export default async function DashboardPage() {
                 <div className="text-center">
                   <span className="text-xl font-bold text-white">
                     {scsemTotalCount > 0
-                      ? Math.round((data.scsemAssessed / scsemTotalCount) * 100)
+                      ? Math.round((scsemUpToDate / scsemTotalCount) * 100)
                       : 0}%
                   </span>
                 </div>

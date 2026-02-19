@@ -111,23 +111,92 @@ async function main() {
     const scsemIndex = JSON.parse(fs.readFileSync(scsemIndexPath, "utf-8"));
 
     for (const scsem of scsemIndex) {
+      let cisTech = null;
+      if (scsem.name.includes("Windows Server 2022")) cisTech = "Windows Server 2022";
+      else if (scsem.name.includes("Windows Server 2019")) cisTech = "Windows Server 2019";
+      else if (scsem.name.includes("Windows 10")) cisTech = "Windows 10";
+      else if (scsem.name.includes("Windows 11")) cisTech = "Windows 11";
+      else if (scsem.name.includes("RHEL")) cisTech = "Red Hat Enterprise Linux";
+      else if (scsem.name.includes("Oracle")) cisTech = "Oracle Database";
+      else if (scsem.name.includes("Cisco")) cisTech = "Cisco Network Devices";
+
       await prisma.sCSEMTemplate.upsert({
         where: { id: scsem.name.replace(/\s+/g, "-").toLowerCase() },
         update: {
           name: scsem.name,
           category: scsem.category,
           filePath: scsem.file,
+          cisTechnology: cisTech,
         },
         create: {
           id: scsem.name.replace(/\s+/g, "-").toLowerCase(),
           name: scsem.name,
           category: scsem.category,
           filePath: scsem.file,
+          cisTechnology: cisTech,
         },
       });
     }
     console.log(`Loaded ${scsemIndex.length} SCSEM templates`);
   }
+
+  // Create CIS Benchmarks and map them to our SCSEMs
+  const win2022 = await prisma.cISBenchmarkVersion.create({
+    data: {
+      technology: "Windows Server 2022",
+      currentVersion: "v3.0.0",
+      releaseDate: new Date("2025-01-15T00:00:00Z"),
+      changesSummary: "Updated password complexity, added Defender firewall checks, strict logging requirements.",
+    }
+  });
+
+  const rhel = await prisma.cISBenchmarkVersion.create({
+    data: {
+      technology: "Red Hat Enterprise Linux",
+      currentVersion: "v4.0.0",
+      releaseDate: new Date("2026-02-10T00:00:00Z"),
+      changesSummary: "Added new SELinux enforcements and updated SSH config standards.",
+    }
+  });
+
+  const win2022Template = await prisma.sCSEMTemplate.findFirst({
+    where: { cisTechnology: "Windows Server 2022" }
+  });
+
+  if (win2022Template) {
+    await prisma.sCSEMUpdateReview.create({
+      data: {
+        templateId: win2022Template.id,
+        benchmarkId: win2022.id,
+        status: "PENDING",
+        suggestedChanges: [
+          { controlId: "1.1.4", change: "Ensure password complexity is enabled", current: "Requires 14 chars", proposed: "Requires 15 chars and 2 special chars" },
+          { controlId: "2.3.1", change: "Disable guest account", current: "Disabled", proposed: "Disabled and rename SID" },
+          { controlId: "9.3.2", change: "Enable Windows Defender Firewall", current: "Optional", proposed: "Mandatory for all profiles" }
+        ],
+      }
+    });
+  }
+
+  const rhelTemplate = await prisma.sCSEMTemplate.findFirst({
+    where: { cisTechnology: "Red Hat Enterprise Linux" }
+  });
+
+  if (rhelTemplate) {
+    await prisma.sCSEMUpdateReview.create({
+      data: {
+        templateId: rhelTemplate.id,
+        benchmarkId: rhel.id,
+        status: "PENDING",
+        suggestedChanges: [
+          { controlId: "1.6.1.1", change: "Ensure SELinux is not disabled in bootloader configuration", current: "Not specified", proposed: "SELinux must be configured" },
+          { controlId: "5.2.2", change: "Ensure SSH LogLevel is set to INFO", current: "LogLevel VERBOSE", proposed: "LogLevel INFO" },
+          { controlId: "5.2.3", change: "Ensure SSH MaxAuthTries is set to 4 or less", current: "MaxAuthTries 6", proposed: "MaxAuthTries 4" }
+        ]
+      }
+    });
+  }
+  console.log("Created mock CIS Benchmarks and Pending SCSEM Update Reviews");
 
   // Create sample incidents
   const incidents = [
@@ -187,7 +256,6 @@ async function main() {
   const auditActions = [
     { action: "LOGIN", userId: admin.id, resourceType: "session" },
     { action: "AI_QUERY", userId: complianceOfficer.id, resourceType: "chat", metadata: { questionLength: 45 } },
-    { action: "SCSEM_ASSESSMENT", userId: complianceOfficer.id, resourceType: "scsem", metadata: { template: "Windows Server 2022" } },
     { action: "INCIDENT_CREATE", userId: complianceOfficer.id, resourceType: "incident" },
     { action: "LOGIN", userId: auditor.id, resourceType: "session" },
     { action: "USER_CREATE", userId: admin.id, resourceType: "user", metadata: { email: "nmatta@skysolutions.com" } },
