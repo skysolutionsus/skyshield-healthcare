@@ -4,7 +4,7 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Loader2, Lock, Mail } from "lucide-react";
-import { SkyLogo, SkyLogoFull } from "@/components/sky-logo";
+import { SkyLogo } from "@/components/sky-logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -73,13 +73,8 @@ export default function LoginPage() {
       <div className="w-full max-w-md relative z-10 animate-in">
         {/* Branding */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-5 glow-md"
-            style={{ background: 'var(--sky-gradient-primary)' }}
-          >
-            <SkyLogo size={44} className="drop-shadow-lg" />
-          </div>
-          <div className="flex justify-center mb-3">
-            <SkyLogoFull />
+          <div className="flex justify-center mb-5">
+            <SkyLogo size={80} className="drop-shadow-lg" />
           </div>
           <p className="text-sm font-medium" style={{ color: 'var(--sky-text-secondary)' }}>
             AI-Powered Publication 1075 Compliance

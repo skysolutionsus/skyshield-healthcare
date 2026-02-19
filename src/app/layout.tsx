@@ -10,6 +10,9 @@ export const metadata: Metadata = {
   title: "SkyShield — AI-Powered Publication 1075 Compliance",
   description:
     "AI-powered compliance platform for IRS Publication 1075. Get instant, cited guidance, manage SCSEMs, and track incidents.",
+  icons: {
+    icon: "/icon.png",
+  },
 };
 
 export default function RootLayout({
