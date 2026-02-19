@@ -131,16 +131,14 @@ export default async function IncidentDetailPage({
           </h1>
           <div className="flex items-center gap-2">
             <span
-              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                SEVERITY_STYLES[incident.severity] || ""
-              }`}
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${SEVERITY_STYLES[incident.severity] || ""
+                }`}
             >
               {incident.severity}
             </span>
             <span
-              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                STATUS_STYLES[incident.status] || ""
-              }`}
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_STYLES[incident.status] || ""
+                }`}
             >
               {incident.status.replace("_", " ")}
             </span>
@@ -180,13 +178,12 @@ export default async function IncidentDetailPage({
               <div key={status} className="flex items-center flex-1 last:flex-initial">
                 <div className="flex flex-col items-center">
                   <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-                      isCompleted
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${isCompleted
                         ? "bg-green-500 text-white"
                         : isCurrent
                           ? "bg-blue-600 text-white ring-4 ring-blue-100 dark:ring-blue-900/30"
                           : "bg-gray-200 dark:bg-gray-800 text-gray-400"
-                    }`}
+                      }`}
                   >
                     {isCompleted ? (
                       <CheckCircle2 className="w-4 h-4" />
@@ -195,24 +192,22 @@ export default async function IncidentDetailPage({
                     )}
                   </div>
                   <span
-                    className={`text-[10px] mt-1.5 font-medium ${
-                      isCurrent
+                    className={`text-[10px] mt-1.5 font-medium ${isCurrent
                         ? "text-blue-600 dark:text-blue-400"
                         : isCompleted
                           ? "text-green-600 dark:text-green-400"
                           : "text-gray-400"
-                    }`}
+                      }`}
                   >
                     {status.charAt(0) + status.slice(1).toLowerCase()}
                   </span>
                 </div>
                 {i < statusOrder.length - 1 && (
                   <div
-                    className={`flex-1 h-0.5 mx-2 mt-[-16px] ${
-                      i < currentStatusIndex
+                    className={`flex-1 h-0.5 mx-2 mt-[-16px] ${i < currentStatusIndex
                         ? "bg-green-500"
                         : "bg-gray-200 dark:bg-gray-800"
-                    }`}
+                      }`}
                   />
                 )}
               </div>
@@ -301,7 +296,7 @@ export default async function IncidentDetailPage({
                 <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200 dark:bg-gray-800" />
 
                 <div className="space-y-6">
-                  {incident.activities.map((activity, index) => {
+                  {incident.activities.map((activity: { id: string; action: string; details: string | null; createdAt: Date; user?: { name: string } | null }, index: number) => {
                     const Icon =
                       ACTIVITY_ICONS[activity.action] || AlertTriangle;
                     const colorClass =

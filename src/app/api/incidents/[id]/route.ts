@@ -182,7 +182,7 @@ export async function PUT(
     }
 
     // Perform the update in a transaction
-    const incident = await db.$transaction(async (tx) => {
+    const incident = await db.$transaction(async (tx: Omit<typeof db, '$transaction' | '$connect' | '$disconnect' | '$on' | '$use' | '$extends'>) => {
       // Update the incident if there are field changes
       if (Object.keys(updateData).length > 0) {
         await tx.incident.update({

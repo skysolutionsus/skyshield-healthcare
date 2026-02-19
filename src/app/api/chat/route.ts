@@ -229,7 +229,7 @@ export async function POST(request: NextRequest) {
           take: 20,
           select: { role: true, content: true },
         });
-        previousMessages = dbMessages.map((m) => ({
+        previousMessages = dbMessages.map((m: { role: string; content: string }) => ({
           role: m.role as "user" | "assistant",
           content: m.content,
         }));

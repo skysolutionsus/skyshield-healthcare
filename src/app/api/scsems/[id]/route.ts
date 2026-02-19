@@ -174,10 +174,10 @@ export async function PUT(
     });
 
     const compliantCount = updatedControls.filter(
-      (c) => c.status === "COMPLIANT"
+      (c: { status: string }) => c.status === "COMPLIANT"
     ).length;
     const naCount = updatedControls.filter(
-      (c) => c.status === "NOT_APPLICABLE"
+      (c: { status: string }) => c.status === "NOT_APPLICABLE"
     ).length;
     const applicableCount = updatedControls.length - naCount;
     const complianceScore =
@@ -187,14 +187,14 @@ export async function PUT(
 
     // Determine assessment status based on control results
     const allResolved = updatedControls.every(
-      (c) =>
+      (c: { status: string }) =>
         c.status === "COMPLIANT" ||
         c.status === "NON_COMPLIANT" ||
         c.status === "NOT_APPLICABLE"
     );
 
     const hasNonCompliant = updatedControls.some(
-      (c) => c.status === "NON_COMPLIANT"
+      (c: { status: string }) => c.status === "NON_COMPLIANT"
     );
 
     let assessmentStatus: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "REVIEW_NEEDED";

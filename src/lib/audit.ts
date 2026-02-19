@@ -1,5 +1,4 @@
 import { db } from "@/lib/db";
-import { Prisma } from "@prisma/client";
 
 export interface AuditLogParams {
   organizationId: string;
@@ -7,7 +6,7 @@ export interface AuditLogParams {
   action: string;
   resourceType?: string;
   resourceId?: string;
-  metadata?: Prisma.InputJsonValue;
+  metadata?: Record<string, unknown>;
   ipAddress?: string;
   userAgent?: string;
 }
@@ -32,7 +31,8 @@ export async function logAudit(params: AuditLogParams): Promise<void> {
         action: params.action,
         resourceType: params.resourceType ?? null,
         resourceId: params.resourceId ?? null,
-        metadata: params.metadata ?? undefined,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        metadata: (params.metadata ?? undefined) as any,
         ipAddress: params.ipAddress ?? null,
         userAgent: params.userAgent ?? null,
       },

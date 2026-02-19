@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY package.json package-lock.json* ./
 COPY prisma ./prisma/
-RUN npm ci --legacy-peer-deps
+RUN npm ci
 
 # Stage 2: Build
 FROM node:20-alpine AS builder
@@ -30,7 +30,8 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 # Copy necessary files
-COPY --from=builder /app/public ./public
+# Copy public dir if it exists (optional)
+RUN mkdir -p ./public
 COPY --from=builder /app/data ./data
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/package.json ./package.json

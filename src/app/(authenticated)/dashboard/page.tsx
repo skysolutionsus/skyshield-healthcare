@@ -62,18 +62,18 @@ async function getDashboardData(organizationId: string) {
   const avgCompliance =
     completedAssessments.length > 0
       ? completedAssessments.reduce(
-          (sum, a) => sum + (a.complianceScore || 0),
-          0
-        ) / completedAssessments.length
+        (sum: number, a: { complianceScore: number | null }) => sum + (a.complianceScore || 0),
+        0
+      ) / completedAssessments.length
       : 0;
 
   const severityMap: Record<string, number> = {};
-  incidentCounts.forEach((ic) => {
+  incidentCounts.forEach((ic: { severity: string; _count: number }) => {
     severityMap[ic.severity] = ic._count;
   });
 
   const statusMap: Record<string, number> = {};
-  scsemStats.forEach((s) => {
+  scsemStats.forEach((s: { status: string; _count: number }) => {
     statusMap[s.status] = s._count;
   });
 
@@ -464,7 +464,7 @@ export default async function DashboardPage() {
                 Latest Incidents
               </h3>
               <div className="space-y-2">
-                {data.recentIncidents.slice(0, 3).map((inc) => (
+                {data.recentIncidents.slice(0, 3).map((inc: { id: string; title: string; severity: string; status: string }) => (
                   <Link
                     key={inc.id}
                     href={`/incidents/${inc.id}`}
@@ -508,15 +508,14 @@ export default async function DashboardPage() {
             </div>
           ) : (
             <div className="space-y-1">
-              {data.recentLogs.map((log) => (
+              {data.recentLogs.map((log: { id: string; action: string; user?: { name: string } | null; createdAt: Date }) => (
                 <div
                   key={log.id}
                   className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                 >
                   <div
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                      ACTION_COLORS[log.action] || "bg-gray-100 dark:bg-gray-800 text-gray-500"
-                    }`}
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${ACTION_COLORS[log.action] || "bg-gray-100 dark:bg-gray-800 text-gray-500"
+                      }`}
                   >
                     <AlertCircle className="w-4 h-4" />
                   </div>
