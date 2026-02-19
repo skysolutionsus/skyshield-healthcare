@@ -63,17 +63,11 @@ export function AppShell({ children, user }: AppShellProps) {
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center justify-between px-4 py-5 shrink-0"
+          <div className="flex items-center justify-between px-6 py-6 shrink-0"
             style={{ borderBottom: '1px solid var(--sky-border)' }}
           >
-            <div className="rounded-2xl px-4 py-3 flex-1"
-              style={{
-                background: 'rgba(255, 255, 255, 0.95)',
-                boxShadow: '0 0 24px rgba(33, 150, 243, 0.1), 0 4px 16px rgba(0, 0, 0, 0.2)',
-                border: '1px solid rgba(255, 255, 255, 0.8)',
-              }}
-            >
-              <SkyLogo size={160} className="drop-shadow-[0_0_12px_rgba(33,150,243,0.25)]" />
+            <div className="flex-1 flex justify-center lg:justify-start">
+              <SkyLogo size={140} className="drop-shadow-[0_0_10px_rgba(33,150,243,0.15)]" />
             </div>
             <button
               onClick={() => setSidebarOpen(false)}

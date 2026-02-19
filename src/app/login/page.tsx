@@ -75,18 +75,12 @@ export default function LoginPage() {
         <div className="text-center mb-10">
           <div className="flex justify-center mb-6">
             <div className="relative">
-              {/* Ambient glow behind logo */}
-              <div className="absolute inset-0 rounded-3xl blur-2xl opacity-30"
-                style={{ background: 'radial-gradient(circle, rgba(33, 150, 243, 0.4) 0%, transparent 70%)', transform: 'scale(1.3)' }}
+              {/* Subtle Ambient glow behind logo */}
+              <div className="absolute inset-0 rounded-3xl blur-xl opacity-20"
+                style={{ background: 'radial-gradient(circle, rgba(33, 150, 243, 0.4) 0%, transparent 70%)', transform: 'scale(1.2)' }}
               />
-              <div className="relative rounded-3xl px-8 py-6"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.95)',
-                  boxShadow: '0 0 40px rgba(33, 150, 243, 0.15), 0 8px 32px rgba(0, 0, 0, 0.3)',
-                  border: '1px solid rgba(255, 255, 255, 0.8)',
-                }}
-              >
-                <SkyLogo size={320} className="drop-shadow-[0_0_20px_rgba(33,150,243,0.3)]" />
+              <div className="relative p-2">
+                <SkyLogo size={240} className="drop-shadow-[0_0_15px_rgba(33,150,243,0.2)]" />
               </div>
             </div>
           </div>
