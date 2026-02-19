@@ -8,20 +8,18 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("Seeding database...");
 
-  // Clean up old demo users (from previous branding) so we don't get duplicates
-  const oldEmails = [
-    "admin@demo.com",
-    "compliance@skyshield.gov",
-    "auditor@skyshield.gov",
-    "viewer@skysolutions.com",
+  // Clean up ALL users that aren't in our current seed list
+  const keepEmails = [
+    "james@skysolutions.com",
+    "mconklin@skysolutions.com",
+    "jcambra@skysolutions.com",
+    "nmatta@skysolutions.com",
   ];
-  for (const email of oldEmails) {
-    try {
-      await prisma.user.delete({ where: { email } });
-      console.log(`Removed old user: ${email}`);
-    } catch {
-      // User doesn't exist, skip
-    }
+  const deleted = await prisma.user.deleteMany({
+    where: { email: { notIn: keepEmails } },
+  });
+  if (deleted.count > 0) {
+    console.log(`Removed ${deleted.count} old/stale users`);
   }
 
   // Update existing org if it has the old slug, otherwise create

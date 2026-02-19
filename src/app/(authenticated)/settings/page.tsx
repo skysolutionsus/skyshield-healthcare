@@ -78,7 +78,7 @@ export default async function SettingsPage() {
           User Management
         </h1>
         <p className="text-[var(--sky-text-secondary)] mt-1">
-          {org?.name || "Organization"} â€” Manage users and roles
+          {org?.name || "Organization"} &mdash; Manage users and roles
         </p>
       </div>
 
