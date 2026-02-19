@@ -63,13 +63,21 @@ export function AppShell({ children, user }: AppShellProps) {
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center justify-between px-5 py-5 shrink-0"
+          <div className="flex items-center justify-between px-4 py-5 shrink-0"
             style={{ borderBottom: '1px solid var(--sky-border)' }}
           >
-            <SkyLogo size={120} />
+            <div className="rounded-2xl px-4 py-3 flex-1"
+              style={{
+                background: 'linear-gradient(135deg, rgba(15, 35, 65, 0.8) 0%, rgba(8, 20, 40, 0.9) 100%)',
+                boxShadow: '0 0 24px rgba(33, 150, 243, 0.15), 0 4px 16px rgba(0, 0, 0, 0.3)',
+                border: '1px solid rgba(33, 150, 243, 0.15)',
+              }}
+            >
+              <SkyLogo size={160} className="drop-shadow-[0_0_12px_rgba(33,150,243,0.25)]" />
+            </div>
             <button
               onClick={() => setSidebarOpen(false)}
-              className="lg:hidden transition-colors"
+              className="lg:hidden transition-colors ml-2"
               style={{ color: 'var(--sky-text-muted)' }}
             >
               <X className="w-5 h-5" />

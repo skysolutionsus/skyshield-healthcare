@@ -72,11 +72,25 @@ export default function LoginPage() {
 
       <div className="w-full max-w-md relative z-10 animate-in">
         {/* Branding */}
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-5">
-            <SkyLogo size={200} className="drop-shadow-lg" />
+        <div className="text-center mb-10">
+          <div className="flex justify-center mb-6">
+            <div className="relative">
+              {/* Ambient glow behind logo */}
+              <div className="absolute inset-0 rounded-3xl blur-2xl opacity-40"
+                style={{ background: 'radial-gradient(circle, rgba(33, 150, 243, 0.5) 0%, rgba(13, 71, 161, 0.3) 50%, transparent 70%)', transform: 'scale(1.3)' }}
+              />
+              <div className="relative rounded-3xl px-8 py-6"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(15, 35, 65, 0.9) 0%, rgba(8, 20, 40, 0.95) 100%)',
+                  boxShadow: '0 0 40px rgba(33, 150, 243, 0.2), 0 0 80px rgba(33, 150, 243, 0.1), 0 8px 32px rgba(0, 0, 0, 0.4)',
+                  border: '1px solid rgba(33, 150, 243, 0.2)',
+                }}
+              >
+                <SkyLogo size={320} className="drop-shadow-[0_0_20px_rgba(33,150,243,0.3)]" />
+              </div>
+            </div>
           </div>
-          <p className="text-sm font-medium" style={{ color: 'var(--sky-text-secondary)' }}>
+          <p className="text-base font-medium tracking-wide" style={{ color: 'var(--sky-text-secondary)' }}>
             AI-Powered Publication 1075 Compliance
           </p>
         </div>
