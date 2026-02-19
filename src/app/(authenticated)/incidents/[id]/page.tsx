@@ -1,6 +1,17 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Clock, User, Shield, AlertTriangle } from "lucide-react";
+import {
+  ArrowLeft,
+  Clock,
+  User,
+  Shield,
+  AlertTriangle,
+  CheckCircle2,
+  FileText,
+  MessageSquare,
+  UserCheck,
+  ArrowRight,
+} from "lucide-react";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formatDateTime } from "@/lib/utils";
@@ -8,16 +19,20 @@ import { IncidentDetailActions } from "@/components/incident-detail-actions";
 
 const STATUS_STYLES: Record<string, string> = {
   OPEN: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  INVESTIGATING: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  REMEDIATION: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
-  RESOLVED: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  INVESTIGATING:
+    "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  REMEDIATION:
+    "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+  RESOLVED:
+    "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   CLOSED: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400",
 };
 
 const SEVERITY_STYLES: Record<string, string> = {
   CRITICAL: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
   HIGH: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-  MEDIUM: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+  MEDIUM:
+    "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
   LOW: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
 };
 
@@ -30,12 +45,28 @@ const TYPE_LABELS: Record<string, string> = {
   AUTO_GENERATED: "Auto-Generated",
 };
 
-const ACTIVITY_ICONS: Record<string, string> = {
-  CREATED: "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
-  STATUS_CHANGE: "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400",
-  NOTE_ADDED: "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400",
-  REMEDIATION_UPDATED: "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400",
-  ASSIGNED: "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400",
+const ACTIVITY_ICONS: Record<string, React.ElementType> = {
+  CREATED: CheckCircle2,
+  STATUS_CHANGE: ArrowRight,
+  NOTE_ADDED: MessageSquare,
+  REMEDIATION_UPDATED: FileText,
+  ASSIGNED: UserCheck,
+};
+
+const ACTIVITY_COLORS: Record<string, string> = {
+  CREATED: "bg-blue-500 text-white",
+  STATUS_CHANGE: "bg-amber-500 text-white",
+  NOTE_ADDED: "bg-gray-500 text-white",
+  REMEDIATION_UPDATED: "bg-purple-500 text-white",
+  ASSIGNED: "bg-green-500 text-white",
+};
+
+const ACTIVITY_LABELS: Record<string, string> = {
+  CREATED: "created this incident",
+  STATUS_CHANGE: "changed status",
+  NOTE_ADDED: "added a note",
+  REMEDIATION_UPDATED: "updated remediation plan",
+  ASSIGNED: "was assigned",
 };
 
 export default async function IncidentDetailPage({
@@ -73,7 +104,11 @@ export default async function IncidentDetailPage({
     notFound();
   }
 
-  const relatedSections = (incident.relatedSections as string[] | null) || [];
+  const relatedSections = (incident.relatedSections as Array<{ section: string; text: string }> | null) || [];
+
+  // Status progress steps
+  const statusOrder = ["OPEN", "INVESTIGATING", "REMEDIATION", "RESOLVED", "CLOSED"];
+  const currentStatusIndex = statusOrder.indexOf(incident.status);
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
@@ -89,7 +124,7 @@ export default async function IncidentDetailPage({
       </div>
 
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-6">
         <div className="flex flex-wrap items-start gap-3 mb-3">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
             {incident.title}
@@ -118,7 +153,8 @@ export default async function IncidentDetailPage({
           </span>
           <span className="inline-flex items-center gap-1.5">
             <Clock className="w-4 h-4" />
-            Discovered {formatDateTime(incident.dateDiscovered || incident.createdAt)}
+            Discovered{" "}
+            {formatDateTime(incident.dateDiscovered || incident.createdAt)}
           </span>
           {incident.assignedTo && (
             <span className="inline-flex items-center gap-1.5">
@@ -131,6 +167,57 @@ export default async function IncidentDetailPage({
               Created by {incident.createdBy.name}
             </span>
           )}
+        </div>
+      </div>
+
+      {/* Status Progress Bar */}
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5 mb-6">
+        <div className="flex items-center justify-between">
+          {statusOrder.map((status, i) => {
+            const isCompleted = i < currentStatusIndex;
+            const isCurrent = i === currentStatusIndex;
+            return (
+              <div key={status} className="flex items-center flex-1 last:flex-initial">
+                <div className="flex flex-col items-center">
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                      isCompleted
+                        ? "bg-green-500 text-white"
+                        : isCurrent
+                          ? "bg-blue-600 text-white ring-4 ring-blue-100 dark:ring-blue-900/30"
+                          : "bg-gray-200 dark:bg-gray-800 text-gray-400"
+                    }`}
+                  >
+                    {isCompleted ? (
+                      <CheckCircle2 className="w-4 h-4" />
+                    ) : (
+                      i + 1
+                    )}
+                  </div>
+                  <span
+                    className={`text-[10px] mt-1.5 font-medium ${
+                      isCurrent
+                        ? "text-blue-600 dark:text-blue-400"
+                        : isCompleted
+                          ? "text-green-600 dark:text-green-400"
+                          : "text-gray-400"
+                    }`}
+                  >
+                    {status.charAt(0) + status.slice(1).toLowerCase()}
+                  </span>
+                </div>
+                {i < statusOrder.length - 1 && (
+                  <div
+                    className={`flex-1 h-0.5 mx-2 mt-[-16px] ${
+                      i < currentStatusIndex
+                        ? "bg-green-500"
+                        : "bg-gray-200 dark:bg-gray-800"
+                    }`}
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -176,15 +263,22 @@ export default async function IncidentDetailPage({
                 Related Pub 1075 Sections
               </h2>
               <div className="space-y-2">
-                {relatedSections.map((section, i) => (
+                {relatedSections.map((item, i) => (
                   <div
                     key={i}
-                    className="flex items-center gap-2 p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
+                    className="flex items-start gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
                   >
-                    <Shield className="w-4 h-4 text-blue-500 shrink-0" />
-                    <span className="text-sm text-blue-800 dark:text-blue-300">
-                      {section}
-                    </span>
+                    <Shield className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="text-sm font-medium text-blue-800 dark:text-blue-300">
+                        {item.section}
+                      </span>
+                      {item.text && (
+                        <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-0.5">
+                          {item.text}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -193,45 +287,64 @@ export default async function IncidentDetailPage({
 
           {/* Activity Timeline */}
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
               Activity Timeline
             </h2>
             {incident.activities.length === 0 ? (
-              <p className="text-sm text-gray-400 dark:text-gray-500">
-                No activity recorded yet.
-              </p>
+              <div className="flex flex-col items-center py-8 text-gray-400">
+                <Clock className="w-8 h-8 mb-2" />
+                <p className="text-sm">No activity recorded yet.</p>
+              </div>
             ) : (
-              <div className="space-y-4">
-                {incident.activities.map((activity) => (
-                  <div key={activity.id} className="flex gap-3">
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                        ACTIVITY_ICONS[activity.action] ||
-                        "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
-                      }`}
-                    >
-                      <AlertTriangle className="w-4 h-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">
-                          {activity.user?.name || "System"}
-                        </span>
-                        <span className="text-xs text-gray-400 dark:text-gray-500">
-                          {formatDateTime(activity.createdAt)}
-                        </span>
+              <div className="relative">
+                {/* Timeline line */}
+                <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200 dark:bg-gray-800" />
+
+                <div className="space-y-6">
+                  {incident.activities.map((activity, index) => {
+                    const Icon =
+                      ACTIVITY_ICONS[activity.action] || AlertTriangle;
+                    const colorClass =
+                      ACTIVITY_COLORS[activity.action] ||
+                      "bg-gray-500 text-white";
+
+                    return (
+                      <div key={activity.id} className="relative flex gap-4 pl-0">
+                        {/* Timeline dot */}
+                        <div
+                          className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 z-10 ${colorClass}`}
+                        >
+                          <Icon className="w-3.5 h-3.5" />
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 min-w-0 pb-2">
+                          <div className="flex items-baseline gap-2 flex-wrap">
+                            <span className="text-sm font-medium text-gray-900 dark:text-white">
+                              {activity.user?.name || "System"}
+                            </span>
+                            <span className="text-sm text-gray-500 dark:text-gray-400">
+                              {ACTIVITY_LABELS[activity.action] ||
+                                activity.action
+                                  .replace(/_/g, " ")
+                                  .toLowerCase()}
+                            </span>
+                            <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
+                              {formatDateTime(activity.createdAt)}
+                            </span>
+                          </div>
+                          {activity.details && (
+                            <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700/50">
+                              <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">
+                                {activity.details}
+                              </p>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                        {activity.action.replace(/_/g, " ").toLowerCase()}
-                      </p>
-                      {activity.details && (
-                        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 whitespace-pre-wrap">
-                          {activity.details}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
