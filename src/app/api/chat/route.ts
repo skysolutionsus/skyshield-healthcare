@@ -305,7 +305,7 @@ Section 3.1: General Requirements`;
     apiMessages.push({ role: "user", content: message });
 
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-6-20250929",
+      model: "claude-sonnet-4-6",
       max_tokens: 4096,
       system: SYSTEM_PROMPT,
       messages: apiMessages,
