@@ -8,17 +8,40 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("Seeding database...");
 
-  // Create organization
-  const org = await prisma.organization.upsert({
-    where: { slug: "sky-solutions" },
-    update: {},
-    create: {
-      name: "Sky Solutions",
-      slug: "sky-solutions",
-    },
+  // Clean up old demo users (from previous branding) so we don't get duplicates
+  const oldEmails = [
+    "admin@demo.com",
+    "compliance@skyshield.gov",
+    "auditor@skyshield.gov",
+    "viewer@skysolutions.com",
+  ];
+  for (const email of oldEmails) {
+    try {
+      await prisma.user.delete({ where: { email } });
+      console.log(`Removed old user: ${email}`);
+    } catch {
+      // User doesn't exist, skip
+    }
+  }
+
+  // Update existing org if it has the old slug, otherwise create
+  const existingOrg = await prisma.organization.findFirst({
+    where: { slug: { in: ["safeguards-division", "sky-solutions"] } },
   });
 
-  console.log("Created organization:", org.name);
+  let org;
+  if (existingOrg) {
+    org = await prisma.organization.update({
+      where: { id: existingOrg.id },
+      data: { name: "Sky Solutions", slug: "sky-solutions" },
+    });
+  } else {
+    org = await prisma.organization.create({
+      data: { name: "Sky Solutions", slug: "sky-solutions" },
+    });
+  }
+
+  console.log("Organization:", org.name);
 
   // Create admin user (primary demo account)
   const adminPassword = await hash("SkyShield2026!", 12);
