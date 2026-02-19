@@ -331,19 +331,32 @@ Section 3.1: General Requirements`;
       conversationId: convId,
     });
   } catch (error) {
-    console.error("Chat API error:", error);
-
-    // Check if it's a database connection error
     const errorMessage = error instanceof Error ? error.message : String(error);
-    if (errorMessage.includes("DATABASE_URL") || errorMessage.includes("prisma") || errorMessage.includes("connect")) {
+    console.error("Chat API error:", errorMessage, error);
+
+    if (errorMessage.includes("DATABASE_URL") || errorMessage.includes("prisma") || errorMessage.toLowerCase().includes("connect")) {
       return NextResponse.json(
-        { error: "Database connection error. Please ensure the database is configured and migrations have been run." },
+        { error: `Database error: ${errorMessage}` },
         { status: 503 }
       );
     }
 
+    if (errorMessage.includes("401") || errorMessage.includes("Unauthorized") || errorMessage.includes("auth")) {
+      return NextResponse.json(
+        { error: `Auth error: ${errorMessage}` },
+        { status: 401 }
+      );
+    }
+
+    if (errorMessage.includes("anthropic") || errorMessage.includes("Anthropic") || errorMessage.includes("model") || errorMessage.includes("api_key")) {
+      return NextResponse.json(
+        { error: `AI API error: ${errorMessage}` },
+        { status: 502 }
+      );
+    }
+
     return NextResponse.json(
-      { error: "Failed to process request. Please try again." },
+      { error: `Failed to process request: ${errorMessage}` },
       { status: 500 }
     );
   }
