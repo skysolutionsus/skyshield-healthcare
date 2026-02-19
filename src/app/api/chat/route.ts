@@ -197,6 +197,7 @@ export async function POST(request: NextRequest) {
 
     // Get or create conversation
     let convId = conversationId;
+    let isNewConversation = false;
     if (!convId) {
       try {
         const conv = await db.conversation.create({
@@ -209,6 +210,7 @@ export async function POST(request: NextRequest) {
           },
         });
         convId = conv.id;
+        isNewConversation = true;
       } catch {
         // If DB fails, continue without persistence
       }
@@ -310,12 +312,37 @@ Section 3.1: General Requirements`;
     // Add current message
     apiMessages.push({ role: "user", content: message });
 
-    const response = await anthropic.messages.create({
+    const responsePromise = anthropic.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 4096,
       system: SYSTEM_PROMPT,
       messages: apiMessages,
     });
+
+    let titlePromise: Promise<string | null> = Promise.resolve(null);
+    if (isNewConversation) {
+      titlePromise = anthropic.messages.create({
+        model: "claude-3-haiku-20240307",
+        max_tokens: 15,
+        system: "You are a summarization assistant. Given a user's first message, generate a concise, 3-5 word title describing the topic. Do not include quotes, periods, or intro text. Just the title.",
+        messages: [{ role: "user", content: message }],
+      }).then((res) => {
+        return res.content[0].type === "text" ? res.content[0].text.trim() : null;
+      }).catch((err) => {
+        console.warn("Failed to generate Haiku title:", err);
+        return null;
+      });
+    }
+
+    const [response, newTitle] = await Promise.all([responsePromise, titlePromise]);
+
+    if (newTitle && convId) {
+      // Fire-and-forget DB update so we don't block returning the response
+      db.conversation.update({
+        where: { id: convId, userId: userInfo.id },
+        data: { title: newTitle },
+      }).catch(err => console.warn("Failed to update new conversation title:", err));
+    }
 
     const assistantContent =
       response.content[0].type === "text" ? response.content[0].text : "";
