@@ -46,6 +46,7 @@ COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 # Copy Next.js build output
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
 # Create data directory for SQLite and set ownership
 RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
