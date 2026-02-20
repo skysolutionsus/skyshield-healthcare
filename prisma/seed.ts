@@ -15,6 +15,14 @@ async function main() {
     "jcambra@skysolutions.com",
     "nmatta@skysolutions.com",
   ];
+
+  // Wipe dependent tables first to avoid FK constraint errors
+  await prisma.auditLog.deleteMany({});
+  await prisma.incidentActivity.deleteMany({});
+  await prisma.incident.deleteMany({});
+  await prisma.message.deleteMany({});
+  await prisma.conversation.deleteMany({});
+
   const deleted = await prisma.user.deleteMany({
     where: { email: { notIn: keepEmails } },
   });
