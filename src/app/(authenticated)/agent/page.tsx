@@ -517,7 +517,7 @@ export default function AgentPage() {
                   Office of Safeguards AI Agent
                 </h2>
                 <p className="text-xs text-[var(--sky-text-muted)]">
-                  Powered by Claude &mdash; All responses cite Pub 1075 sections
+                  All responses cite Pub 1075 sections
                 </p>
               </div>
             </div>
