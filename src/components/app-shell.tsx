@@ -17,6 +17,7 @@ import {
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { SkyLogo } from "@/components/sky-logo";
+import { NotificationsMenu } from "@/components/notifications-menu";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -69,6 +70,11 @@ export function AppShell({ children, user }: AppShellProps) {
             <div className="flex-1 flex justify-center lg:justify-start">
               <SkyLogo size={50} light={true} className="drop-shadow-[0_0_10px_rgba(33,150,243,0.15)]" />
             </div>
+
+            <div className="hidden lg:block ml-auto">
+              <NotificationsMenu />
+            </div>
+
             <button
               onClick={() => setSidebarOpen(false)}
               className="lg:hidden transition-colors ml-2"
@@ -161,21 +167,24 @@ export function AppShell({ children, user }: AppShellProps) {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile header */}
-        <header className="lg:hidden flex items-center gap-3 px-4 py-3 glass"
+        <header className="lg:hidden flex items-center justify-between gap-3 px-4 py-3 glass"
           style={{ borderBottom: '1px solid var(--sky-border)' }}
         >
-          <button
-            onClick={() => setSidebarOpen(true)}
-            style={{ color: 'var(--sky-text-secondary)' }}
-          >
-            <Menu className="w-6 h-6" />
-          </button>
-          <div className="flex items-center gap-2">
-            <SkyLogo size={12} light={true} />
-            <span className="font-semibold text-white">
-              SkyShield
-            </span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              style={{ color: 'var(--sky-text-secondary)' }}
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+            <div className="flex items-center gap-2">
+              <SkyLogo size={12} light={true} />
+              <span className="font-semibold text-white">
+                SkyShield
+              </span>
+            </div>
           </div>
+          <NotificationsMenu />
         </header>
 
         <main className="flex-1 overflow-y-auto">{children}</main>
