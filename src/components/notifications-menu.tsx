@@ -50,7 +50,7 @@ export function NotificationsMenu() {
     const [isOpen, setIsOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
     const buttonRef = useRef<HTMLButtonElement>(null);
-    const [dropdownStyles, setDropdownStyles] = useState<{ top: number; right: number; maxHeight: number }>({ top: 0, right: 16, maxHeight: 400 });
+    const [dropdownStyles, setDropdownStyles] = useState<{ top: number; left: number; maxHeight: number }>({ top: 0, left: 16, maxHeight: 400 });
 
     // Close when clicking outside
     useEffect(() => {
@@ -67,15 +67,28 @@ export function NotificationsMenu() {
     const toggleMenu = () => {
         if (!isOpen && buttonRef.current) {
             const rect = buttonRef.current.getBoundingClientRect();
-            // Calculate a safe right-edge offset (distance from viewport right)
-            const rightOffset = Math.max(16, window.innerWidth - rect.right);
-            // Calculate available height below the button, leaving 20px padding at the bottom
+            // Typical max width of our dropdown is 384px (w-96)
+            const dropdownWidth = Math.min(384, window.innerWidth - 32);
+
+            // Try to align to the center of the button, then shift left by half the dropdownWidth
+            let calculatedLeft = rect.left + (rect.width / 2) - Math.floor(dropdownWidth / 2);
+
+            // If it spills off the right edge, shift it inward
+            if (calculatedLeft + dropdownWidth > window.innerWidth - 16) {
+                calculatedLeft = window.innerWidth - 16 - dropdownWidth;
+            }
+
+            // If it spills off the left edge, cap it
+            if (calculatedLeft < 16) {
+                calculatedLeft = 16;
+            }
+
             const availableHeight = window.innerHeight - rect.bottom - 20;
 
             setDropdownStyles({
                 top: rect.bottom + 8,
-                right: rightOffset,
-                maxHeight: Math.min(availableHeight, 600) // Cap max height at 600 or whatever fits
+                left: calculatedLeft,
+                maxHeight: Math.min(availableHeight, 600)
             });
         }
         setIsOpen(!isOpen);
@@ -101,7 +114,7 @@ export function NotificationsMenu() {
                     className="fixed w-[calc(100vw-32px)] sm:w-96 bg-slate-800 rounded-xl border border-slate-600 shadow-2xl z-[9999] overflow-hidden transform transition-all animate-in fade-in slide-in-from-top-2 flex flex-col"
                     style={{
                         top: dropdownStyles.top,
-                        right: dropdownStyles.right,
+                        left: dropdownStyles.left,
                         maxHeight: dropdownStyles.maxHeight
                     }}
                 >
