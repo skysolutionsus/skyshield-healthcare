@@ -49,11 +49,14 @@ const mockNotifications = [
 export function NotificationsMenu() {
     const [isOpen, setIsOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
+    const buttonRef = useRef<HTMLButtonElement>(null);
+    const [dropdownStyles, setDropdownStyles] = useState<{ top: number; right: number; maxHeight: number }>({ top: 0, right: 16, maxHeight: 400 });
 
     // Close when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node) &&
+                buttonRef.current && !buttonRef.current.contains(event.target as Node)) {
                 setIsOpen(false);
             }
         };
@@ -61,11 +64,29 @@ export function NotificationsMenu() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
+    const toggleMenu = () => {
+        if (!isOpen && buttonRef.current) {
+            const rect = buttonRef.current.getBoundingClientRect();
+            // Calculate a safe right-edge offset (distance from viewport right)
+            const rightOffset = Math.max(16, window.innerWidth - rect.right);
+            // Calculate available height below the button, leaving 20px padding at the bottom
+            const availableHeight = window.innerHeight - rect.bottom - 20;
+
+            setDropdownStyles({
+                top: rect.bottom + 8,
+                right: rightOffset,
+                maxHeight: Math.min(availableHeight, 600) // Cap max height at 600 or whatever fits
+            });
+        }
+        setIsOpen(!isOpen);
+    };
+
     return (
-        <div className="relative" ref={menuRef}>
+        <div className="relative">
             {/* Notification Button */}
             <button
-                onClick={() => setIsOpen(!isOpen)}
+                ref={buttonRef}
+                onClick={toggleMenu}
                 className="relative p-2 rounded-full transition-colors hover:bg-slate-800/50 text-slate-400 hover:text-white"
                 aria-label="View notifications"
             >
@@ -76,8 +97,13 @@ export function NotificationsMenu() {
             {/* Dropdown Menu */}
             {isOpen && (
                 <div
-                    className="fixed mt-2 w-80 sm:w-96 bg-slate-800 rounded-xl border border-slate-600 shadow-2xl z-[9999] overflow-hidden transform transition-all animate-in fade-in slide-in-from-top-2"
-                    style={{ top: menuRef.current?.getBoundingClientRect().bottom, right: 16 }}
+                    ref={menuRef}
+                    className="fixed w-[calc(100vw-32px)] sm:w-96 bg-slate-800 rounded-xl border border-slate-600 shadow-2xl z-[9999] overflow-hidden transform transition-all animate-in fade-in slide-in-from-top-2 flex flex-col"
+                    style={{
+                        top: dropdownStyles.top,
+                        right: dropdownStyles.right,
+                        maxHeight: dropdownStyles.maxHeight
+                    }}
                 >
                     {/* Header */}
                     <div className="px-4 py-3 border-b border-slate-700 bg-slate-900/50 flex justify-between items-center">
@@ -88,7 +114,7 @@ export function NotificationsMenu() {
                     </div>
 
                     {/* List */}
-                    <div className="max-h-[70vh] overflow-y-auto">
+                    <div className="overflow-y-auto flex-1 overscroll-contain">
                         {mockNotifications.map((notif) => (
                             <div
                                 key={notif.id}
