@@ -75,9 +75,12 @@ export function NotificationsMenu() {
 
             {/* Dropdown Menu */}
             {isOpen && (
-                <div className="absolute top-full lg:left-0 right-0 mt-2 w-80 sm:w-96 glass rounded-xl border border-slate-700 shadow-2xl z-[100] overflow-hidden transform origin-top-right transition-all animate-in fade-in slide-in-from-top-2">
+                <div
+                    className="fixed mt-2 w-80 sm:w-96 bg-slate-800 rounded-xl border border-slate-600 shadow-2xl z-[9999] overflow-hidden transform transition-all animate-in fade-in slide-in-from-top-2"
+                    style={{ top: menuRef.current?.getBoundingClientRect().bottom, right: 16 }}
+                >
                     {/* Header */}
-                    <div className="px-4 py-3 border-b border-slate-700/50 bg-slate-800/30 flex justify-between items-center">
+                    <div className="px-4 py-3 border-b border-slate-700 bg-slate-900/50 flex justify-between items-center">
                         <h3 className="font-semibold text-white">Notifications</h3>
                         <span className="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-400 font-medium">
                             {mockNotifications.length} New
@@ -110,7 +113,7 @@ export function NotificationsMenu() {
                     </div>
 
                     {/* Footer */}
-                    <div className="p-3 border-t border-slate-700/50 bg-slate-800/30 text-center">
+                    <div className="p-3 border-t border-slate-700 bg-slate-900/50 text-center">
                         <button
                             onClick={() => setIsOpen(false)}
                             className="text-xs text-sky-400 hover:text-sky-300 font-medium transition-colors"
