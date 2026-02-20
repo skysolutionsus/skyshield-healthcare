@@ -57,7 +57,10 @@ Return ONLY valid JSON matching this exact structure:
       "id": "1.1.1 (realistic control ID format)",
       "name": "Ensure something is securely configured",
       "current": "What the old IRS SCSEM standard was (e.g., 'Requires 12 chars')",
-      "proposed": "What the new CIS standard requires (e.g., 'Requires 14 chars and MFA')"
+      "proposed": "What the new CIS standard requires (e.g., 'Requires 14 chars and MFA')",
+      "nistId": "Realistic NIST SP 800-53 mapping (e.g., AC-2(1), IA-5, etc. Use N/A if completely new)",
+      "testId": "Realistic SCSEM Test ID (e.g., Win-10.1, RHEL-4.2, etc. Use New if new)",
+      "criticality": "HIGH, MEDIUM, or LOW"
     }
   ]
 }
@@ -100,7 +103,10 @@ Include exactly 3 controls in the array. Do not include markdown formatting like
                     controlId: c.id,
                     change: c.name,
                     current: c.current,
-                    proposed: c.proposed
+                    proposed: c.proposed,
+                    nistId: c.nistId || "N/A",
+                    testId: c.testId || "New",
+                    criticality: c.criticality || "MEDIUM"
                 }))
             }
         });

@@ -196,9 +196,9 @@ async function main() {
         benchmarkId: win2022.id,
         status: "PENDING",
         suggestedChanges: [
-          { controlId: "1.1.4", change: "Ensure password complexity is enabled", current: "Requires 14 chars", proposed: "Requires 15 chars and 2 special chars" },
-          { controlId: "2.3.1", change: "Disable guest account", current: "Disabled", proposed: "Disabled and rename SID" },
-          { controlId: "9.3.2", change: "Enable Windows Defender Firewall", current: "Optional", proposed: "Mandatory for all profiles" }
+          { controlId: "1.1.4", change: "Ensure password complexity is enabled", current: "Requires 14 chars", proposed: "Requires 15 chars and 2 special chars", nistId: "IA-5(1)", testId: "Win-1.1", criticality: "HIGH" },
+          { controlId: "2.3.1", change: "Disable guest account", current: "Disabled", proposed: "Disabled and rename SID", nistId: "AC-2", testId: "Win-2.3", criticality: "MEDIUM" },
+          { controlId: "9.3.2", change: "Enable Windows Defender Firewall", current: "Optional", proposed: "Mandatory for all profiles", nistId: "SC-7", testId: "Win-9.3", criticality: "CRITICAL" }
         ],
       }
     });
@@ -215,9 +215,9 @@ async function main() {
         benchmarkId: rhel.id,
         status: "PENDING",
         suggestedChanges: [
-          { controlId: "1.6.1.1", change: "Ensure SELinux is not disabled in bootloader configuration", current: "Not specified", proposed: "SELinux must be configured" },
-          { controlId: "5.2.2", change: "Ensure SSH LogLevel is set to INFO", current: "LogLevel VERBOSE", proposed: "LogLevel INFO" },
-          { controlId: "5.2.3", change: "Ensure SSH MaxAuthTries is set to 4 or less", current: "MaxAuthTries 6", proposed: "MaxAuthTries 4" }
+          { controlId: "1.6.1.1", change: "Ensure SELinux is not disabled in bootloader configuration", current: "Not specified", proposed: "SELinux must be configured", nistId: "CM-6", testId: "RHEL-1.6", criticality: "HIGH" },
+          { controlId: "5.2.2", change: "Ensure SSH LogLevel is set to INFO", current: "LogLevel VERBOSE", proposed: "LogLevel INFO", nistId: "AU-2", testId: "RHEL-5.2", criticality: "LOW" },
+          { controlId: "5.2.3", change: "Ensure SSH MaxAuthTries is set to 4 or less", current: "MaxAuthTries 6", proposed: "MaxAuthTries 4", nistId: "AC-7", testId: "RHEL-5.2", criticality: "MEDIUM" }
         ]
       }
     });
@@ -234,8 +234,8 @@ async function main() {
         benchmarkId: win11.id,
         status: "PENDING",
         suggestedChanges: [
-          { controlId: "4.1.1", change: "Ensure BitLocker is enabled on OS volumes with TPM+PIN", current: "TPM only", proposed: "Require TPM and PIN minimum 6 digits" },
-          { controlId: "18.3.1", change: "Turn off Windows Copilot", current: "Not Assessed", proposed: "Enabled Feature Allowed: Disabled" }
+          { controlId: "4.1.1", change: "Ensure BitLocker is enabled on OS volumes with TPM+PIN", current: "TPM only", proposed: "Require TPM and PIN minimum 6 digits", nistId: "SC-28", testId: "Win11-4.1", criticality: "CRITICAL" },
+          { controlId: "18.3.1", change: "Turn off Windows Copilot", current: "Not Assessed", proposed: "Enabled Feature Allowed: Disabled", nistId: "CM-7", testId: "Win11-18.3", criticality: "MEDIUM" }
         ]
       }
     });
@@ -252,8 +252,8 @@ async function main() {
         benchmarkId: oracle.id,
         status: "PENDING",
         suggestedChanges: [
-          { controlId: "2.1", change: "Ensure SEC_CASE_SENSITIVE_LOGON is set to TRUE", current: "FALSE", proposed: "TRUE" },
-          { controlId: "4.5", change: "Ensure FAILED_LOGIN_ATTEMPTS is less than or equal to 5", current: "10", proposed: "5" }
+          { controlId: "2.1", change: "Ensure SEC_CASE_SENSITIVE_LOGON is set to TRUE", current: "FALSE", proposed: "TRUE", nistId: "IA-5", testId: "Ora-2.1", criticality: "HIGH" },
+          { controlId: "4.5", change: "Ensure FAILED_LOGIN_ATTEMPTS is less than or equal to 5", current: "10", proposed: "5", nistId: "AC-7", testId: "Ora-4.5", criticality: "MEDIUM" }
         ]
       }
     });

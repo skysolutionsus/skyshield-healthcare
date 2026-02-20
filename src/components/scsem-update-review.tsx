@@ -9,6 +9,9 @@ interface SuggestedChange {
     change: string;
     current: string;
     proposed: string;
+    nistId?: string;
+    testId?: string;
+    criticality?: string;
 }
 
 interface SCSEMUpdateReviewProps {
@@ -133,6 +136,23 @@ export function SCSEMUpdateReview({ templateId, templateName, review }: SCSEMUpd
 
                             {isExpanded && (
                                 <div className="px-4 pb-4 border-t border-[var(--sky-border)] pt-4">
+                                    <div className="flex flex-wrap gap-2 mb-4">
+                                        <span className="px-2.5 py-1 bg-sky-500/10 text-sky-400 rounded-md text-xs font-mono font-medium border border-sky-500/20">
+                                            NIST ID: {change.nistId || "N/A"}
+                                        </span>
+                                        <span className="px-2.5 py-1 bg-purple-500/10 text-purple-400 rounded-md text-xs font-mono font-medium border border-purple-500/20">
+                                            Test ID: {change.testId || "New"}
+                                        </span>
+                                        <span className={`px-2.5 py-1 rounded-md text-xs font-bold border uppercase tracking-wider ${change.criticality === "CRITICAL"
+                                                ? "bg-red-500/10 text-red-500 border-red-500/20"
+                                                : change.criticality === "HIGH"
+                                                    ? "bg-orange-500/10 text-orange-400 border-orange-500/20"
+                                                    : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                            }`}>
+                                            {change.criticality || "MEDIUM"}
+                                        </span>
+                                    </div>
+
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="bg-red-900/10 border border-red-900/30 rounded-lg p-3">
                                             <span className="text-[10px] font-bold uppercase tracking-wider text-red-400 mb-1 block">Current</span>
