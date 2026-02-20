@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Bell, AlertTriangle, ShieldAlert, FileSpreadsheet, Info } from "lucide-react";
 
 const mockNotifications = [
@@ -51,6 +52,11 @@ export function NotificationsMenu() {
     const menuRef = useRef<HTMLDivElement>(null);
     const buttonRef = useRef<HTMLButtonElement>(null);
     const [dropdownStyles, setDropdownStyles] = useState<{ top: number; left: number; maxHeight: number }>({ top: 0, left: 16, maxHeight: 400 });
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     // Close when clicking outside
     useEffect(() => {
@@ -107,8 +113,8 @@ export function NotificationsMenu() {
                 <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-[var(--sky-navy)]" />
             </button>
 
-            {/* Dropdown Menu */}
-            {isOpen && (
+            {/* Dropdown Menu via Portal */}
+            {isOpen && mounted && createPortal(
                 <div
                     ref={menuRef}
                     className="fixed w-[calc(100vw-32px)] sm:w-96 bg-slate-800 rounded-xl border border-slate-600 shadow-2xl z-[999999] overflow-hidden transform transition-all animate-in fade-in slide-in-from-top-2 flex flex-col"
@@ -160,7 +166,8 @@ export function NotificationsMenu() {
                             Mark all as read
                         </button>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
