@@ -75,7 +75,7 @@ export function NotificationsMenu() {
 
             {/* Dropdown Menu */}
             {isOpen && (
-                <div className="absolute top-full lg:left-0 right-0 mt-2 w-80 sm:w-96 glass rounded-xl border border-slate-700 shadow-2xl z-50 overflow-hidden transform origin-top-right transition-all animate-in fade-in slide-in-from-top-2">
+                <div className="absolute top-full lg:left-0 right-0 mt-2 w-80 sm:w-96 glass rounded-xl border border-slate-700 shadow-2xl z-[100] overflow-hidden transform origin-top-right transition-all animate-in fade-in slide-in-from-top-2">
                     {/* Header */}
                     <div className="px-4 py-3 border-b border-slate-700/50 bg-slate-800/30 flex justify-between items-center">
                         <h3 className="font-semibold text-white">Notifications</h3>
