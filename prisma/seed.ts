@@ -167,6 +167,24 @@ async function main() {
     }
   });
 
+  const win11 = await prisma.cISBenchmarkVersion.create({
+    data: {
+      technology: "Windows 11",
+      currentVersion: "v2.1.0",
+      releaseDate: new Date("2025-11-20T00:00:00Z"),
+      changesSummary: "Updated BitLocker pinning requirements and restricted Copilot data syncing.",
+    }
+  });
+
+  const oracle = await prisma.cISBenchmarkVersion.create({
+    data: {
+      technology: "Oracle Database",
+      currentVersion: "v5.2.0",
+      releaseDate: new Date("2026-01-05T00:00:00Z"),
+      changesSummary: "Strengthened listener security and adjusted TDE master encryption key rotation schedules.",
+    }
+  });
+
   const win2022Template = await prisma.sCSEMTemplate.findFirst({
     where: { cisTechnology: "Windows Server 2022" }
   });
@@ -204,6 +222,43 @@ async function main() {
       }
     });
   }
+
+  const win11Template = await prisma.sCSEMTemplate.findFirst({
+    where: { cisTechnology: "Windows 11" }
+  });
+
+  if (win11Template) {
+    await prisma.sCSEMUpdateReview.create({
+      data: {
+        templateId: win11Template.id,
+        benchmarkId: win11.id,
+        status: "PENDING",
+        suggestedChanges: [
+          { controlId: "4.1.1", change: "Ensure BitLocker is enabled on OS volumes with TPM+PIN", current: "TPM only", proposed: "Require TPM and PIN minimum 6 digits" },
+          { controlId: "18.3.1", change: "Turn off Windows Copilot", current: "Not Assessed", proposed: "Enabled Feature Allowed: Disabled" }
+        ]
+      }
+    });
+  }
+
+  const oracleTemplate = await prisma.sCSEMTemplate.findFirst({
+    where: { cisTechnology: "Oracle Database" }
+  });
+
+  if (oracleTemplate) {
+    await prisma.sCSEMUpdateReview.create({
+      data: {
+        templateId: oracleTemplate.id,
+        benchmarkId: oracle.id,
+        status: "PENDING",
+        suggestedChanges: [
+          { controlId: "2.1", change: "Ensure SEC_CASE_SENSITIVE_LOGON is set to TRUE", current: "FALSE", proposed: "TRUE" },
+          { controlId: "4.5", change: "Ensure FAILED_LOGIN_ATTEMPTS is less than or equal to 5", current: "10", proposed: "5" }
+        ]
+      }
+    });
+  }
+
   console.log("Created mock CIS Benchmarks and Pending SCSEM Update Reviews");
 
   // Create sample incidents
