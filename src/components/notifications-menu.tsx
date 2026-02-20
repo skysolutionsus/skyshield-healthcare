@@ -95,7 +95,7 @@ export function NotificationsMenu() {
     };
 
     return (
-        <div className="relative">
+        <div className="relative z-[999999]">
             {/* Notification Button */}
             <button
                 ref={buttonRef}
@@ -111,7 +111,7 @@ export function NotificationsMenu() {
             {isOpen && (
                 <div
                     ref={menuRef}
-                    className="fixed w-[calc(100vw-32px)] sm:w-96 bg-slate-800 rounded-xl border border-slate-600 shadow-2xl z-[9999] overflow-hidden transform transition-all animate-in fade-in slide-in-from-top-2 flex flex-col"
+                    className="fixed w-[calc(100vw-32px)] sm:w-96 bg-slate-800 rounded-xl border border-slate-600 shadow-2xl z-[999999] overflow-hidden transform transition-all animate-in fade-in slide-in-from-top-2 flex flex-col"
                     style={{
                         top: dropdownStyles.top,
                         left: dropdownStyles.left,
