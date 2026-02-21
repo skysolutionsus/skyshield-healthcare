@@ -81,7 +81,7 @@ interface TemplateWithUpdates {
     status: string;
     benchmark: {
       currentVersion: string;
-    };
+    } | null;
   }[];
 }
 
