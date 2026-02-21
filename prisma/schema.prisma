@@ -147,22 +147,35 @@ model SCSEMSheet {
 }
 
 model SCSEMControl {
-  id              String   @id @default(cuid())
-  sheetId         String
-  rowIndex        Int
-  testId          String
-  nistId          String?
-  nistControlName String?
-  testMethod      String?
-  description     String?
-  testProcedures  String?
-  expectedResults String?
-  actualResults   String?
-  status          String?
-  notesEvidence   String?
-  extraColumns    Json?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                    String   @id @default(cuid())
+  sheetId               String
+  rowIndex              Int
+  testId                String
+  nistId                String?
+  nistControlName       String?
+  testMethod            String?
+  sectionTitle          String?
+  description           String?
+  testProcedures        String?
+  expectedResults       String?
+  actualResults         String?
+  status                String?
+  findingStatement      String?
+  notesEvidence         String?
+  criticality           String?
+  issueCode             String?
+  issueCodeDescription  String?
+  cisBenchmarkRef       String?
+  recommendationNum     String?
+  rationale             String?
+  impact                String?
+  remediationProcedure  String?
+  remediationStatement  String?
+  capRequestStatement   String?
+  riskRating            String?
+  extraColumns          Json?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   sheet SCSEMSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
 }

@@ -17,12 +17,25 @@ export interface ParsedControl {
     nistId: string | null;
     nistControlName: string | null;
     testMethod: string | null;
+    sectionTitle: string | null;
     description: string | null;
     testProcedures: string | null;
     expectedResults: string | null;
     actualResults: string | null;
     status: string | null;
+    findingStatement: string | null;
     notesEvidence: string | null;
+    criticality: string | null;
+    issueCode: string | null;
+    issueCodeDescription: string | null;
+    cisBenchmarkRef: string | null;
+    recommendationNum: string | null;
+    rationale: string | null;
+    impact: string | null;
+    remediationProcedure: string | null;
+    remediationStatement: string | null;
+    capRequestStatement: string | null;
+    riskRating: string | null;
     extraColumns: Record<string, any> | null;
 }
 
@@ -68,98 +81,163 @@ function cellStr(val: any): string | null {
 }
 
 /**
- * Try to parse a date from various formats
+ * Convert Excel serial date to JS Date
+ */
+function excelDateToJS(serial: number): Date {
+    // Excel epoch: Jan 0, 1900 (with the Lotus 1-2-3 bug for Feb 29, 1900)
+    const excelEpoch = new Date(1899, 11, 30);
+    return new Date(excelEpoch.getTime() + serial * 86400000);
+}
+
+/**
+ * Parse a date from various formats, returning a proper Date
  */
 function parseChangeDate(val: any): Date | null {
     if (!val) return null;
-
-    // If it's already a Date or number (Excel serial date)
     if (val instanceof Date) return val;
-    if (typeof val === 'number') {
-        // Excel serial date conversion
-        const excelEpoch = new Date(1899, 11, 30);
-        return new Date(excelEpoch.getTime() + val * 86400000);
-    }
+    if (typeof val === 'number' && val > 1000) return excelDateToJS(val);
 
-    // Try parsing as string
     const str = String(val).trim();
-    const d = new Date(str);
-    if (!isNaN(d.getTime())) return d;
+    if (!str) return null;
 
-    // Try MM/DD/YYYY format
+    // Try ISO/standard date parse
+    const d = new Date(str);
+    if (!isNaN(d.getTime()) && d.getFullYear() > 1990) return d;
+
+    // Try MM/DD/YYYY
     const match = str.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
     if (match) {
         const year = match[3].length === 2 ? 2000 + parseInt(match[3]) : parseInt(match[3]);
         return new Date(year, parseInt(match[1]) - 1, parseInt(match[2]));
     }
 
-    return new Date();
+    return null;
 }
 
 /**
- * Parse a "Test Cases" sheet into structured control records
+ * Known column name → field name mapping for test case sheets.
+ * Keys are lowercase substrings to match; values are ParsedControl field names.
+ */
+const COLUMN_MAP: Record<string, keyof ParsedControl> = {
+    'test id': 'testId',
+    'nist id': 'nistId',
+    'nist control': 'nistControlName',
+    'test method': 'testMethod',
+    'section title': 'sectionTitle',
+    'description': 'description',
+    'test procedure': 'testProcedures',
+    'expected result': 'expectedResults',
+    'actual result': 'actualResults',
+    'status': 'status',
+    'finding statement': 'findingStatement',
+    'notes': 'notesEvidence',
+    'evidence': 'notesEvidence',
+    'criticality': 'criticality',
+    'issue code mapping': 'issueCode',
+    'issue code description': 'issueCodeDescription',
+    'issue code': 'issueCode',
+    'cis benchmark': 'cisBenchmarkRef',
+    'recommendation': 'recommendationNum',
+    'rationale': 'rationale',
+    'impact': 'impact',
+    'remediation procedure': 'remediationProcedure',
+    'remediation statement': 'remediationStatement',
+    'cap request': 'capRequestStatement',
+    'risk rating': 'riskRating',
+};
+
+/**
+ * Match a column header to a known field
+ */
+function matchColumnHeader(header: string): keyof ParsedControl | null {
+    const lower = header.toLowerCase().trim();
+    if (!lower || lower.startsWith('column')) return null;
+
+    // Try exact-ish matches first (longer patterns first for specificity)
+    const sortedKeys = Object.keys(COLUMN_MAP).sort((a, b) => b.length - a.length);
+    for (const pattern of sortedKeys) {
+        if (lower.includes(pattern)) {
+            return COLUMN_MAP[pattern];
+        }
+    }
+    return null;
+}
+
+/**
+ * Parse a "Test Cases" sheet into structured control records using dynamic header detection
  */
 function parseTestCaseSheet(ws: XLSX.WorkSheet): ParsedControl[] {
     const data = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '' }) as any[][];
     const controls: ParsedControl[] = [];
 
-    // Find the header row (contains "Test ID" in first column)
+    // Find the header row (look for "Test ID" somewhere in first 5 rows)
     let headerRow = -1;
-    let extraHeaders: string[] = [];
+    let columnMapping: Map<number, keyof ParsedControl> = new Map();
+    let unmappedHeaders: Map<number, string> = new Map();
 
-    for (let i = 0; i < Math.min(10, data.length); i++) {
-        const firstCell = cellStr(data[i][0]);
-        if (firstCell && (firstCell.toLowerCase().includes('test id') || firstCell.toLowerCase() === 'test id')) {
+    for (let i = 0; i < Math.min(5, data.length); i++) {
+        const row = data[i] as any[];
+        const firstCell = cellStr(row[0]);
+        if (firstCell && firstCell.toLowerCase().includes('test id')) {
             headerRow = i;
-            // Capture any extra column headers beyond the standard 10
-            if (data[i].length > 10) {
-                extraHeaders = data[i].slice(10).map((h: any) => cellStr(h) || `Column ${data[i].indexOf(h)}`);
+
+            // Build column mapping from headers
+            for (let j = 0; j < row.length; j++) {
+                const header = cellStr(row[j]);
+                if (!header) continue;
+
+                const field = matchColumnHeader(header);
+                if (field) {
+                    // Don't overwrite if already mapped (first match wins for duplicates)
+                    if (![...columnMapping.values()].includes(field)) {
+                        columnMapping.set(j, field);
+                    }
+                } else if (!header.toLowerCase().startsWith('column')) {
+                    unmappedHeaders.set(j, header);
+                }
             }
             break;
         }
     }
 
-    if (headerRow === -1) {
-        // No header found — try to parse from row 1 assuming row 0 is a title
-        headerRow = 0;
-    }
+    if (headerRow === -1) return controls;
 
     // Parse all data rows after the header
     for (let i = headerRow + 1; i < data.length; i++) {
-        const row = data[i];
+        const row = data[i] as any[];
         const testId = cellStr(row[0]);
 
-        // Skip empty rows or rows that are just spacing
         if (!testId) continue;
-        // Skip if it looks like a section header (no NIST ID, no description)
         if (testId.toLowerCase() === 'test cases' || testId.toLowerCase() === 'test id') continue;
 
         const control: ParsedControl = {
             rowIndex: i,
-            testId: testId,
-            nistId: cellStr(row[1]),
-            nistControlName: cellStr(row[2]),
-            testMethod: cellStr(row[3]),
-            description: cellStr(row[4]),
-            testProcedures: cellStr(row[5]),
-            expectedResults: cellStr(row[6]),
-            actualResults: cellStr(row[7]),
-            status: cellStr(row[8]),
-            notesEvidence: cellStr(row[9]),
-            extraColumns: null,
+            testId,
+            nistId: null, nistControlName: null, testMethod: null, sectionTitle: null,
+            description: null, testProcedures: null, expectedResults: null, actualResults: null,
+            status: null, findingStatement: null, notesEvidence: null, criticality: null,
+            issueCode: null, issueCodeDescription: null, cisBenchmarkRef: null,
+            recommendationNum: null, rationale: null, impact: null,
+            remediationProcedure: null, remediationStatement: null, capRequestStatement: null,
+            riskRating: null, extraColumns: null,
         };
 
-        // Capture extra columns if any
-        if (row.length > 10 && extraHeaders.length > 0) {
-            const extra: Record<string, any> = {};
-            for (let j = 10; j < row.length; j++) {
-                const header = extraHeaders[j - 10] || `Column ${j}`;
-                const val = cellStr(row[j]);
-                if (val) extra[header] = val;
+        // Fill mapped columns
+        for (const [colIdx, field] of columnMapping) {
+            const val = cellStr(row[colIdx]);
+            if (val && field !== 'rowIndex' && field !== 'extraColumns') {
+                (control as any)[field] = val;
             }
-            if (Object.keys(extra).length > 0) {
-                control.extraColumns = extra;
-            }
+        }
+
+        // Collect unmapped columns with data
+        const extra: Record<string, any> = {};
+        for (const [colIdx, header] of unmappedHeaders) {
+            const val = cellStr(row[colIdx]);
+            if (val) extra[header] = val;
+        }
+        if (Object.keys(extra).length > 0) {
+            control.extraColumns = extra;
         }
 
         controls.push(control);
@@ -181,7 +259,7 @@ function parseChangeLogSheet(ws: XLSX.WorkSheet): ParsedChangeLog[] {
 
     for (let i = 0; i < Math.min(10, data.length); i++) {
         let foundHeaderCols = 0;
-        for (let j = 0; j < data[i].length; j++) {
+        for (let j = 0; j < (data[i] as any[]).length; j++) {
             const val = cellStr(data[i][j])?.toLowerCase();
             if (!val) continue;
             if (val === 'date' || val === 'release date') { dateCol = j; foundHeaderCols++; }
@@ -195,16 +273,12 @@ function parseChangeLogSheet(ws: XLSX.WorkSheet): ParsedChangeLog[] {
         }
     }
 
-    // Fallback: assume standard 4-column layout (Version, Date, Description, Author)
+    // Fallback: detect by looking for a row with numeric version + serial date
     if (headerRow === -1) {
-        // Try to detect by looking for a row with a number (version) followed by a serial date
         for (let i = 0; i < Math.min(10, data.length); i++) {
             if (typeof data[i][0] === 'number' && typeof data[i][1] === 'number' && data[i][1] > 30000) {
                 headerRow = i - 1;
-                versionCol = 0;
-                dateCol = 1;
-                descCol = 2;
-                authorCol = 3;
+                versionCol = 0; dateCol = 1; descCol = 2; authorCol = 3;
                 break;
             }
         }
@@ -212,20 +286,18 @@ function parseChangeLogSheet(ws: XLSX.WorkSheet): ParsedChangeLog[] {
 
     if (headerRow === -1) return entries;
 
-    // Default column positions if not all were found
     if (versionCol === -1) versionCol = 0;
     if (dateCol === -1) dateCol = 1;
     if (descCol === -1) descCol = 2;
     if (authorCol === -1) authorCol = 3;
 
     for (let i = headerRow + 1; i < data.length; i++) {
-        const row = data[i];
+        const row = data[i] as any[];
         const dateVal = row[dateCol];
         const versionVal = cellStr(row[versionCol]);
         const descVal = cellStr(row[descCol]);
         const authorVal = cellStr(row[authorCol]);
 
-        // Skip empty rows
         if (!dateVal && !versionVal && !descVal) continue;
 
         const changeDate = parseChangeDate(dateVal);
@@ -246,11 +318,11 @@ function parseChangeLogSheet(ws: XLSX.WorkSheet): ParsedChangeLog[] {
  * Extract dashboard metadata from the Dashboard sheet
  */
 function parseDashboardMetadata(ws: XLSX.WorkSheet): ParsedSCSEM['metadata'] {
-    const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as any[][];
+    const data = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '' }) as any[][];
     const metadata: ParsedSCSEM['metadata'] = { subject: null, version: null, effectiveDate: null };
 
     for (const row of data.slice(0, 20)) {
-        for (const cell of row) {
+        for (const cell of (row as any[])) {
             const str = cellStr(cell);
             if (!str) continue;
             if (str.includes('SCSEM Subject:')) {
@@ -267,18 +339,6 @@ function parseDashboardMetadata(ws: XLSX.WorkSheet): ParsedSCSEM['metadata'] {
     }
 
     return metadata;
-}
-
-/**
- * Safely read a sheet as JSON array, filtering out blank rows and capping size
- */
-function safeSheetToJson(ws: XLSX.WorkSheet, maxRows: number = 500): any[][] {
-    const data = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '' }) as any[][];
-    // Filter out rows that are entirely empty strings
-    const filtered = data.filter(row =>
-        row.some((cell: any) => cell !== '' && cell !== null && cell !== undefined)
-    );
-    return filtered.slice(0, maxRows);
 }
 
 /**
@@ -310,7 +370,7 @@ export function parseSCSEMFile(filePath: string): ParsedSCSEM {
             changeLogEntries: [],
         };
 
-        // Only parse sheets we actually need data from — skip raw data to save memory
+        // Only parse sheets we actually need structured data from
         if (sheetType === 'dashboard') {
             metadata = parseDashboardMetadata(ws);
         } else if (sheetType === 'test_cases') {
@@ -319,7 +379,6 @@ export function parseSCSEMFile(filePath: string): ParsedSCSEM {
         } else if (sheetType === 'changelog') {
             parsed.changeLogEntries = parseChangeLogSheet(ws);
         }
-        // All other sheets: just record their existence (name, type, index)
 
         sheets.push(parsed);
     }

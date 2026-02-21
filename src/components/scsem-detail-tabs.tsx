@@ -9,12 +9,25 @@ interface SCSEMControl {
     nistId: string | null;
     nistControlName: string | null;
     testMethod: string | null;
+    sectionTitle: string | null;
     description: string | null;
     testProcedures: string | null;
     expectedResults: string | null;
     actualResults: string | null;
     status: string | null;
+    findingStatement: string | null;
     notesEvidence: string | null;
+    criticality: string | null;
+    issueCode: string | null;
+    issueCodeDescription: string | null;
+    cisBenchmarkRef: string | null;
+    recommendationNum: string | null;
+    rationale: string | null;
+    impact: string | null;
+    remediationProcedure: string | null;
+    remediationStatement: string | null;
+    capRequestStatement: string | null;
+    riskRating: string | null;
 }
 
 interface SCSEMSheet {
@@ -40,6 +53,16 @@ interface SCSEMDetailData {
     changeLogs: SCSEMChangeLogEntry[];
 }
 
+function formatDate(dateStr: string): string {
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+    } catch {
+        return dateStr;
+    }
+}
+
 export function SCSEMDetailTabs({ templateId }: { templateId: string }) {
     const [data, setData] = useState<SCSEMDetailData | null>(null);
     const [loading, setLoading] = useState(true);
@@ -53,7 +76,6 @@ export function SCSEMDetailTabs({ templateId }: { templateId: string }) {
                 if (res.ok) {
                     const json = await res.json();
                     setData({ sheets: json.sheets, changeLogs: json.changeLogs });
-                    // Default to first test_cases sheet or first sheet
                     const testSheet = json.sheets.find((s: SCSEMSheet) => s.sheetType === "test_cases");
                     setActiveTab(testSheet?.id || json.sheets[0]?.id || "");
                 }
@@ -133,21 +155,20 @@ export function SCSEMDetailTabs({ templateId }: { templateId: string }) {
                             key={sheet.id}
                             onClick={() => setActiveTab(sheet.id)}
                             className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${activeTab === sheet.id
-                                    ? "border-blue-500 text-blue-400 bg-[var(--sky-surface)]"
-                                    : "border-transparent text-[var(--sky-text-secondary)] hover:text-white hover:border-[var(--sky-border)]"
+                                ? "border-blue-500 text-blue-400 bg-[var(--sky-surface)]"
+                                : "border-transparent text-[var(--sky-text-secondary)] hover:text-white hover:border-[var(--sky-border)]"
                                 }`}
                         >
                             {getSheetIcon(sheet.sheetType)}
                             {getSheetLabel(sheet)}
                         </button>
                     ))}
-                    {/* Changelog tab */}
                     {data.changeLogs.length > 0 && (
                         <button
                             onClick={() => setActiveTab("changelog")}
                             className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${activeTab === "changelog"
-                                    ? "border-blue-500 text-blue-400 bg-[var(--sky-surface)]"
-                                    : "border-transparent text-[var(--sky-text-secondary)] hover:text-white hover:border-[var(--sky-border)]"
+                                ? "border-blue-500 text-blue-400 bg-[var(--sky-surface)]"
+                                : "border-transparent text-[var(--sky-text-secondary)] hover:text-white hover:border-[var(--sky-border)]"
                                 }`}
                         >
                             <Clock className="w-3.5 h-3.5" />
@@ -166,11 +187,9 @@ export function SCSEMDetailTabs({ templateId }: { templateId: string }) {
                             expandedControls={expandedControls}
                             onToggle={toggleControl}
                         />
-                    ) : activeSheet?.rawData ? (
-                        <RawDataView rawData={activeSheet.rawData} />
                     ) : (
                         <div className="text-center py-8 text-[var(--sky-text-secondary)]">
-                            No content available for this sheet.
+                            Sheet metadata recorded. Controls and changelog are shown in their respective tabs.
                         </div>
                     )}
                 </div>
@@ -202,6 +221,7 @@ function ControlsTable({
                         <th className="py-2 px-3 text-xs font-semibold text-[var(--sky-text-secondary)] uppercase tracking-wider">NIST ID</th>
                         <th className="py-2 px-3 text-xs font-semibold text-[var(--sky-text-secondary)] uppercase tracking-wider">Control Name</th>
                         <th className="py-2 px-3 text-xs font-semibold text-[var(--sky-text-secondary)] uppercase tracking-wider">Method</th>
+                        <th className="py-2 px-3 text-xs font-semibold text-[var(--sky-text-secondary)] uppercase tracking-wider">Criticality</th>
                         <th className="py-2 px-3 text-xs font-semibold text-[var(--sky-text-secondary)] uppercase tracking-wider">Status</th>
                     </tr>
                 </thead>
@@ -209,9 +229,8 @@ function ControlsTable({
                     {controls.map((control) => {
                         const isExpanded = expandedControls.has(control.id);
                         return (
-                            <>
+                            <tbody key={control.id}>
                                 <tr
-                                    key={control.id}
                                     onClick={() => onToggle(control.id)}
                                     className="border-b border-[var(--sky-border)]/50 hover:bg-[var(--sky-bg)] cursor-pointer transition-colors"
                                 >
@@ -222,16 +241,22 @@ function ControlsTable({
                                     </td>
                                     <td className="py-2.5 px-3 font-mono text-blue-400 text-xs">{control.testId}</td>
                                     <td className="py-2.5 px-3 font-mono text-xs text-[var(--sky-text-secondary)]">{control.nistId || "—"}</td>
-                                    <td className="py-2.5 px-3 text-white text-xs max-w-[300px] truncate">{control.nistControlName || "—"}</td>
+                                    <td className="py-2.5 px-3 text-white text-xs max-w-[250px] truncate">{control.nistControlName || "—"}</td>
                                     <td className="py-2.5 px-3 text-xs text-[var(--sky-text-secondary)]">{control.testMethod || "—"}</td>
+                                    <td className="py-2.5 px-3">
+                                        <CriticalityBadge criticality={control.criticality} />
+                                    </td>
                                     <td className="py-2.5 px-3">
                                         <StatusBadge status={control.status} />
                                     </td>
                                 </tr>
                                 {isExpanded && (
-                                    <tr key={`${control.id}-detail`} className="bg-[var(--sky-bg)]/50">
-                                        <td colSpan={6} className="p-4">
+                                    <tr className="bg-[var(--sky-bg)]/50">
+                                        <td colSpan={7} className="p-4">
                                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 text-xs">
+                                                {control.sectionTitle && (
+                                                    <DetailField label="Section Title" value={control.sectionTitle} />
+                                                )}
                                                 {control.description && (
                                                     <DetailField label="Description" value={control.description} />
                                                 )}
@@ -244,14 +269,47 @@ function ControlsTable({
                                                 {control.actualResults && (
                                                     <DetailField label="Actual Results" value={control.actualResults} />
                                                 )}
+                                                {control.findingStatement && (
+                                                    <DetailField label="Finding Statement" value={control.findingStatement} />
+                                                )}
                                                 {control.notesEvidence && (
                                                     <DetailField label="Notes / Evidence" value={control.notesEvidence} />
+                                                )}
+                                                {control.issueCode && (
+                                                    <DetailField label="Issue Code Mapping" value={control.issueCode} />
+                                                )}
+                                                {control.issueCodeDescription && (
+                                                    <DetailField label="Issue Code Description" value={control.issueCodeDescription} />
+                                                )}
+                                                {control.cisBenchmarkRef && (
+                                                    <DetailField label="CIS Benchmark Section" value={control.cisBenchmarkRef} />
+                                                )}
+                                                {control.recommendationNum && (
+                                                    <DetailField label="Recommendation #" value={control.recommendationNum} />
+                                                )}
+                                                {control.rationale && (
+                                                    <DetailField label="Rationale" value={control.rationale} />
+                                                )}
+                                                {control.impact && (
+                                                    <DetailField label="Impact" value={control.impact} />
+                                                )}
+                                                {control.remediationProcedure && (
+                                                    <DetailField label="Remediation Procedure" value={control.remediationProcedure} />
+                                                )}
+                                                {control.remediationStatement && (
+                                                    <DetailField label="Remediation Statement" value={control.remediationStatement} />
+                                                )}
+                                                {control.capRequestStatement && (
+                                                    <DetailField label="CAP Request Statement" value={control.capRequestStatement} />
+                                                )}
+                                                {control.riskRating && (
+                                                    <DetailField label="Risk Rating" value={control.riskRating} />
                                                 )}
                                             </div>
                                         </td>
                                     </tr>
                                 )}
-                            </>
+                            </tbody>
                         );
                     })}
                 </tbody>
@@ -266,6 +324,26 @@ function DetailField({ label, value }: { label: string; value: string }) {
             <div className="font-semibold text-[var(--sky-text-secondary)] uppercase tracking-wider mb-1">{label}</div>
             <div className="text-white/80 whitespace-pre-wrap leading-relaxed">{value}</div>
         </div>
+    );
+}
+
+function CriticalityBadge({ criticality }: { criticality: string | null }) {
+    if (!criticality) return <span className="text-xs text-[var(--sky-text-secondary)]">—</span>;
+
+    const colors: Record<string, string> = {
+        Critical: "bg-red-500/20 text-red-400 border-red-500/30",
+        Significant: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+        Moderate: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+        Limited: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+        Informational: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+    };
+
+    const colorClass = colors[criticality] || "bg-gray-500/20 text-gray-400 border-gray-500/30";
+
+    return (
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${colorClass}`}>
+            {criticality}
+        </span>
     );
 }
 
@@ -311,16 +389,16 @@ function ChangeLogView({ entries }: { entries: SCSEMChangeLogEntry[] }) {
                             <tr key={entry.id} className="border-b border-[var(--sky-border)]/50 hover:bg-[var(--sky-bg)]">
                                 <td className="py-2 px-3 font-mono text-blue-400 text-xs">{entry.version}</td>
                                 <td className="py-2 px-3 text-xs text-[var(--sky-text-secondary)]">
-                                    {new Date(entry.changeDate).toLocaleDateString()}
+                                    {formatDate(entry.changeDate)}
                                 </td>
                                 <td className="py-2 px-3 text-xs text-white/80">{entry.description}</td>
                                 <td className="py-2 px-3 text-xs text-[var(--sky-text-secondary)]">{entry.changedBy || "—"}</td>
                                 <td className="py-2 px-3">
                                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${entry.source === "cis_sync"
-                                            ? "bg-purple-500/20 text-purple-400 border-purple-500/30"
-                                            : entry.source === "xlsx_import"
-                                                ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
-                                                : "bg-gray-500/20 text-gray-400 border-gray-500/30"
+                                        ? "bg-purple-500/20 text-purple-400 border-purple-500/30"
+                                        : entry.source === "xlsx_import"
+                                            ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
+                                            : "bg-gray-500/20 text-gray-400 border-gray-500/30"
                                         }`}>
                                         {entry.source === "xlsx_import" ? "XLSX" : entry.source === "cis_sync" ? "CIS Sync" : entry.source}
                                     </span>
@@ -330,35 +408,6 @@ function ChangeLogView({ entries }: { entries: SCSEMChangeLogEntry[] }) {
                     </tbody>
                 </table>
             </div>
-        </div>
-    );
-}
-
-function RawDataView({ rawData }: { rawData: any[][] }) {
-    if (!rawData || rawData.length === 0) {
-        return <div className="text-sm text-[var(--sky-text-secondary)]">No data available.</div>;
-    }
-
-    return (
-        <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
-            <table className="w-full text-xs">
-                <tbody>
-                    {rawData.slice(0, 100).map((row, i) => (
-                        <tr key={i} className="border-b border-[var(--sky-border)]/30 hover:bg-[var(--sky-bg)]">
-                            {(row as any[]).slice(0, 12).map((cell, j) => (
-                                <td key={j} className="py-1.5 px-2 text-white/70 max-w-[200px] truncate whitespace-nowrap">
-                                    {cell !== null && cell !== undefined && cell !== "" ? String(cell) : ""}
-                                </td>
-                            ))}
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-            {rawData.length > 100 && (
-                <div className="text-center py-2 text-[var(--sky-text-secondary)] text-xs">
-                    Showing first 100 of {rawData.length} rows
-                </div>
-            )}
         </div>
     );
 }
