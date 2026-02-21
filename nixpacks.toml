@@ -1,0 +1,7 @@
+[phases.build]
+cmds = [
+  "npm run build",
+]
+
+[start]
+cmd = "chmod +x start.sh && ./start.sh"
