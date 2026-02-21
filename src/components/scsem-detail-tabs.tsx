@@ -79,8 +79,10 @@ export function SCSEMDetailTabs({ templateId }: { templateId: string }) {
                 if (res.ok) {
                     const json = await res.json();
                     setData({ sheets: json.sheets, changeLogs: json.changeLogs });
-                    const testSheet = json.sheets.find((s: SCSEMSheet) => s.sheetType === "test_cases");
-                    setActiveTab(testSheet?.id || json.sheets[0]?.id || "");
+                    // Default to: test_cases with controls > any sheet with controls > first sheet
+                    const testSheet = json.sheets.find((s: SCSEMSheet) => s.sheetType === "test_cases" && s.controls.length > 0);
+                    const anyWithControls = json.sheets.find((s: SCSEMSheet) => s.controls.length > 0);
+                    setActiveTab(testSheet?.id || anyWithControls?.id || json.sheets[0]?.id || "");
                 }
             } catch (err) {
                 console.error("Failed to fetch SCSEM detail:", err);
@@ -184,7 +186,7 @@ export function SCSEMDetailTabs({ templateId }: { templateId: string }) {
                 <div className="p-4">
                     {activeTab === "changelog" ? (
                         <ChangeLogView entries={data.changeLogs} />
-                    ) : activeSheet?.sheetType === "test_cases" ? (
+                    ) : activeSheet && activeSheet.controls.length > 0 ? (
                         <ControlsTable
                             controls={activeSheet.controls}
                             expandedControls={expandedControls}
@@ -192,7 +194,8 @@ export function SCSEMDetailTabs({ templateId }: { templateId: string }) {
                         />
                     ) : (
                         <div className="text-center py-8 text-[var(--sky-text-secondary)]">
-                            Sheet metadata recorded. Controls and changelog are shown in their respective tabs.
+                            <p>This sheet ({activeSheet?.sheetName || "unknown"}) has no control data.</p>
+                            <p className="text-xs mt-1 opacity-70">Try selecting a different sheet tab above, or check the Change Log.</p>
                         </div>
                     )}
                 </div>
@@ -236,8 +239,8 @@ function ControlsTable({
                                 <tr
                                     onClick={() => onToggle(control.id)}
                                     className={`border-b border-[var(--sky-border)]/50 hover:bg-[var(--sky-bg)] cursor-pointer transition-colors ${control.updateHighlight
-                                            ? "border-l-2 border-l-amber-400 bg-amber-500/5"
-                                            : ""
+                                        ? "border-l-2 border-l-amber-400 bg-amber-500/5"
+                                        : ""
                                         }`}
                                 >
                                     <td className="py-2.5 px-3 text-[var(--sky-text-secondary)]">
