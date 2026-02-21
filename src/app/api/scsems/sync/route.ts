@@ -41,10 +41,10 @@ export async function POST(request: Request) {
         }
 
         // Step 2: Identify Pending Templates
-        // Find a template that has a cisVersion mapped, but does NOT have a pending review
+        // Find a template that has a cisTechnology mapped, but does NOT have a pending review
         const templates = await db.sCSEMTemplate.findMany({
             where: {
-                cisVersion: { not: null },
+                cisTechnology: { not: null },
             },
             take: 20
         });
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
                 console.log(`Received ${allBenchmarks.length} benchmarks from CIS WorkBench.`);
 
                 // Fuzzy match: find a benchmark whose title contains the template's cisVersion
-                const templateTech = (targetTemplate.cisVersion || "").toLowerCase();
+                const templateTech = (targetTemplate.cisTechnology || "").toLowerCase();
                 const matchedBenchmark = allBenchmarks.find(b =>
                     b.benchmarkTitle.toLowerCase().includes(templateTech) ||
                     templateTech.includes(b.benchmarkTitle.toLowerCase().replace("cis ", "").replace(" benchmark", "").trim())
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
                         cisBenchmarkData = partialMatch;
                         console.log(`Partial match: "${targetTemplate.name}" → CIS "${partialMatch.benchmarkTitle}" v${partialMatch.benchmarkVersion}`);
                     } else {
-                        console.log(`No CIS benchmark match found for "${targetTemplate.cisVersion}". Using first available.`);
+                        console.log(`No CIS benchmark match found for "${targetTemplate.cisTechnology}". Using first available.`);
                         cisBenchmarkData = allBenchmarks[0];
                     }
                 }
@@ -105,7 +105,7 @@ export async function POST(request: Request) {
                 profiles: cisBenchmarkData.profile?.map((p: any) => p.profileTitle) || []
             }, null, 2)
             : JSON.stringify({
-                benchmark_title: `CIS ${targetTemplate.cisVersion} Benchmark`,
+                benchmark_title: `CIS ${targetTemplate.cisTechnology} Benchmark`,
                 latest_version: "v1.5.0",
                 status_date: "2026-02-15",
                 status: "accepted",
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
             }, null, 2);
 
         const prompt = `You are a cybersecurity expert. The IRS is syncing its SCSEM compliance templates.
-Technology: ${targetTemplate.cisVersion}
+Technology: ${targetTemplate.cisTechnology}
 
 We just pulled the following raw benchmark metadata from the official CIS WorkBench API (authenticated via SecureSuite license.xml):
 ${cisPayload}
@@ -159,7 +159,7 @@ Include exactly 3 controls in the array. Do not include markdown formatting like
         // Save to database
         const benchmark = await db.cISBenchmarkVersion.create({
             data: {
-                technology: targetTemplate.cisVersion || "Unknown",
+                technology: targetTemplate.cisTechnology || "Unknown",
                 currentVersion: payload.version,
                 releaseDate: new Date(payload.releaseDate || new Date().toISOString()),
                 changesSummary: payload.summary,
