@@ -7,12 +7,12 @@ echo "=== SkyShield Start ==="
 echo "Running prisma db push..."
 npx prisma db push --skip-generate 2>&1 || echo "Warning: prisma db push issue"
 
-# Check if SCSEM sheet data exists
+# Check if SCSEM control data actually exists (not just sheets)
 NEEDS_SEED=$(node -e "
 const { PrismaClient } = require('@prisma/client');
 const p = new PrismaClient();
-p.sCSEMSheet.count()
-  .then(c => { console.log(c === 0 ? 'yes' : 'no'); return p.\$disconnect(); })
+p.sCSEMControl.count()
+  .then(c => { console.log(c < 10 ? 'yes' : 'no'); return p.\$disconnect(); })
   .catch(() => { console.log('yes'); return p.\$disconnect(); });
 " 2>/dev/null)
 
