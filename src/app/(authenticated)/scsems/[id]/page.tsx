@@ -108,11 +108,12 @@ export default async function SCSEMDetailPage({
             review={{
               id: reviewRecord.id,
               status: reviewRecord.status,
+              source: (reviewRecord as any).source,
               suggestedChanges: reviewRecord.suggestedChanges as any,
-              benchmark: {
+              benchmark: reviewRecord.benchmark ? {
                 currentVersion: reviewRecord.benchmark.currentVersion,
                 changesSummary: reviewRecord.benchmark.changesSummary,
-              }
+              } : null
             }}
           />
         </div>
