@@ -73,8 +73,9 @@ function extractCitations(
   if (citationBlock) {
     const lines = citationBlock[1].trim().split("\n");
     for (const line of lines) {
+      // Match: "Section 4.18: ...", "Section SC-28: ...", "Section 2.B.6: ...", "Exhibit 7: ..."
       const match = line.match(
-        /^(Section\s+[\d.]+|Exhibit\s+\d+):\s*(.+)/i
+        /^(Section\s+[\w.\-]+(?:\s*,\s*[\w.\-]+)?|Exhibit\s+\d+):\s*(.+)/i
       );
       if (match) {
         citations.push({ section: match[1], text: match[2].trim() });
@@ -82,9 +83,10 @@ function extractCitations(
     }
   }
 
-  // Also extract inline [Section X.X.X] references
+  // Extract inline [Section X.X.X] and [Section SC-28] references
+  // Handles: [Section 4.18], [Section SC-28], [Section 4.18, SC-28], [Section AC-19], [Section 2.B.6]
   const inlineRefs = response.matchAll(
-    /\[(Section\s+[\d.]+(?:\.\d+)*|Exhibit\s+\d+)(?:,\s*Page\s+\d+)?\]/gi
+    /\[(Section\s+[\w.\-]+(?:\s*,\s*[\w.\-]+)?|Exhibit\s+\d+)(?:\s*,\s*Page\s+\d+)?\]/gi
   );
   for (const match of inlineRefs) {
     const section = match[1];
