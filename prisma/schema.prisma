@@ -124,6 +124,8 @@ model SCSEMTemplate {
   cisTechnology String?
   filePath      String
   controlCount  Int      @default(0)
+  lastCisBenchmarkVersion String?
+  lastSyncedAt            DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -174,6 +176,9 @@ model SCSEMControl {
   capRequestStatement   String?
   riskRating            String?
   extraColumns          Json?
+  lastSyncedAt          DateTime?
+  lastSyncedVersion     String?
+  updateHighlight       Boolean  @default(false)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 

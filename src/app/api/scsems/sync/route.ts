@@ -10,9 +10,8 @@ const anthropic = new Anthropic({
 
 export async function POST(request: Request) {
     try {
-        // Support Coolify CRON auth bypass using Bearer token
+        // Auth: support CRON Bearer token or session
         const authHeader = request.headers.get("authorization");
-        // If CRON_SECRET is not set, we accept any Bearer token for local demo purposes
         const expectedSecret = process.env.CRON_SECRET || "demo-secret";
         const isCron = authHeader === `Bearer ${expectedSecret}`;
 
@@ -29,187 +28,226 @@ export async function POST(request: Request) {
             : "system-cron";
         const userId = session?.user?.id || "system";
 
-        // Step 1: Authenticate with Official CIS WorkBench API
+        // Step 1: Authenticate with CIS WorkBench API
         let cisToken = "";
         try {
             console.log("Authenticating with CIS WorkBench via license.xml...");
             cisToken = await getCISToken();
-            console.log(`Successfully authenticated with CIS WorkBench. Token received [${cisToken.substring(0, 15)}...]`);
+            console.log(`CIS Auth OK. Token: ${cisToken.substring(0, 15)}...`);
         } catch (error: any) {
-            console.error("CIS Auth Warning:", error.message);
-            console.log("Proceeding with secondary fallback logic for demonstration purposes.");
+            console.error("CIS Auth failed:", error.message);
+            return NextResponse.json({ error: "CIS authentication failed" }, { status: 502 });
         }
 
-        // Step 2: Identify Pending Templates
-        // Find a template that has a cisTechnology mapped, but does NOT have a pending review
+        // Step 2: Fetch all CIS benchmarks
+        console.log("Fetching CIS benchmark catalog...");
+        const allBenchmarks = await fetchAllBenchmarks(cisToken);
+        console.log(`Received ${allBenchmarks.length} benchmarks from CIS.`);
+
+        // Step 3: Find SCSEM templates that need updates
         const templates = await db.sCSEMTemplate.findMany({
-            where: {
-                cisTechnology: { not: null },
-            },
-            take: 20
+            where: { cisTechnology: { not: null } },
         });
 
         if (templates.length === 0) {
-            return NextResponse.json({ message: "All tracked SCSEMs are currently up to date.", count: 0 });
+            return NextResponse.json({ message: "No templates with CIS technology mapping.", count: 0 });
         }
 
-        // Pick a random template to "sync" an update for
-        const targetTemplate = templates[Math.floor(Math.random() * templates.length)];
+        let updatesGenerated = 0;
 
-        // Step 3: Fetch real CIS Benchmark data and match to template
-        let cisBenchmarkData: any = null;
-        if (cisToken) {
-            try {
-                console.log("Fetching live CIS benchmark catalog...");
-                const allBenchmarks = await fetchAllBenchmarks(cisToken);
-                console.log(`Received ${allBenchmarks.length} benchmarks from CIS WorkBench.`);
+        for (const template of templates) {
+            const templateTech = (template.cisTechnology || "").toLowerCase();
 
-                // Fuzzy match: find a benchmark whose title contains the template's cisVersion
-                const templateTech = (targetTemplate.cisTechnology || "").toLowerCase();
-                const matchedBenchmark = allBenchmarks.find(b =>
-                    b.benchmarkTitle.toLowerCase().includes(templateTech) ||
-                    templateTech.includes(b.benchmarkTitle.toLowerCase().replace("cis ", "").replace(" benchmark", "").trim())
-                );
+            // Find the best matching CIS benchmark
+            const matched = allBenchmarks.find(b =>
+                b.benchmarkTitle.toLowerCase().includes(templateTech) ||
+                templateTech.includes(b.benchmarkTitle.toLowerCase().replace("cis ", "").replace(" benchmark", "").trim())
+            ) || allBenchmarks.find(b =>
+                templateTech.split(" ").some(word => word.length > 3 && b.benchmarkTitle.toLowerCase().includes(word))
+            );
 
-                if (matchedBenchmark) {
-                    cisBenchmarkData = matchedBenchmark;
-                    console.log(`Matched template "${targetTemplate.name}" → CIS "${matchedBenchmark.benchmarkTitle}" v${matchedBenchmark.benchmarkVersion}`);
-                } else {
-                    // If no exact match, pick the first benchmark that partially matches
-                    const partialMatch = allBenchmarks.find(b =>
-                        templateTech.split(" ").some(word => word.length > 3 && b.benchmarkTitle.toLowerCase().includes(word))
-                    );
-                    if (partialMatch) {
-                        cisBenchmarkData = partialMatch;
-                        console.log(`Partial match: "${targetTemplate.name}" → CIS "${partialMatch.benchmarkTitle}" v${partialMatch.benchmarkVersion}`);
-                    } else {
-                        console.log(`No CIS benchmark match found for "${targetTemplate.cisTechnology}". Using first available.`);
-                        cisBenchmarkData = allBenchmarks[0];
-                    }
-                }
-            } catch (fetchErr: any) {
-                console.error("Failed to fetch live benchmarks:", fetchErr.message);
+            if (!matched) {
+                console.log(`  No CIS match for "${template.cisTechnology}". Skipping.`);
+                continue;
             }
-        }
 
-        // Build the CIS payload for the AI prompt — use real data if available
-        const cisPayload = cisBenchmarkData
-            ? JSON.stringify({
-                benchmark_title: cisBenchmarkData.benchmarkTitle,
-                workbench_id: cisBenchmarkData.workbenchId,
-                latest_version: cisBenchmarkData.benchmarkVersion,
-                status: cisBenchmarkData.benchmarkStatus?.status || "published",
-                status_date: cisBenchmarkData.benchmarkStatus?.statusDate || new Date().toISOString(),
-                assessment_status: cisBenchmarkData.assessmentStatus,
-                available_formats: cisBenchmarkData.availableFormats,
-                profiles: cisBenchmarkData.profile?.map((p: any) => p.profileTitle) || []
-            }, null, 2)
-            : JSON.stringify({
-                benchmark_title: `CIS ${targetTemplate.cisTechnology} Benchmark`,
-                latest_version: "v1.5.0",
-                status_date: "2026-02-15",
-                status: "accepted",
-                assessment_status: "Automated"
-            }, null, 2);
+            const cisBenchmarkVersion = matched.benchmarkVersion;
 
-        const prompt = `You are a cybersecurity expert. The IRS is syncing its SCSEM compliance templates.
-Technology: ${targetTemplate.cisTechnology}
+            // Skip if we're already on this version
+            if (template.lastCisBenchmarkVersion === cisBenchmarkVersion) {
+                console.log(`  ${template.name}: already on CIS v${cisBenchmarkVersion}. Skipping.`);
+                continue;
+            }
 
-We just pulled the following raw benchmark metadata from the official CIS WorkBench API (authenticated via SecureSuite license.xml):
-${cisPayload}
+            // Check for existing pending review
+            const existingReview = await db.sCSEMUpdateReview.findFirst({
+                where: { templateId: template.id, status: "PENDING" },
+            });
+            if (existingReview) {
+                console.log(`  ${template.name}: pending review already exists. Skipping.`);
+                continue;
+            }
 
-Translate this update into a strictly formatted JSON payload to be saved into the IRS SkyShield SCSEM database.
-Return ONLY valid JSON matching this exact structure:
+            // Step 4: Load actual SCSEM controls for this template
+            const controls = await db.sCSEMControl.findMany({
+                where: { sheet: { templateId: template.id } },
+                select: {
+                    id: true,
+                    testId: true,
+                    nistId: true,
+                    nistControlName: true,
+                    testMethod: true,
+                    sectionTitle: true,
+                    description: true,
+                    testProcedures: true,
+                    expectedResults: true,
+                    criticality: true,
+                    cisBenchmarkRef: true,
+                    recommendationNum: true,
+                    rationale: true,
+                    remediationProcedure: true,
+                },
+                take: 50, // Sample to keep prompt manageable
+            });
+
+            if (controls.length === 0) {
+                console.log(`  ${template.name}: no controls loaded. Skipping.`);
+                continue;
+            }
+
+            // Build a concise summary of existing controls
+            const controlSummary = controls.map(c =>
+                `${c.testId} | NIST: ${c.nistId || "—"} | CIS Ref: ${c.cisBenchmarkRef || "—"} | ${c.nistControlName || c.sectionTitle || "—"} | Criticality: ${c.criticality || "—"}`
+            ).join("\n");
+
+            // Step 5: Ask Claude to generate grounded update suggestions
+            const prompt = `You are a cybersecurity compliance expert analyzing CIS Benchmark updates for IRS Safeguards SCSEMs.
+
+CONTEXT:
+- Technology: ${template.cisTechnology}
+- Current SCSEM version: ${template.version || "unknown"}
+- CIS Benchmark title: ${matched.benchmarkTitle}
+- CIS Benchmark NEW version: ${cisBenchmarkVersion}
+- CIS Benchmark status: ${matched.benchmarkStatus?.status || "published"} (${matched.benchmarkStatus?.statusDate || "recent"})
+- Previous CIS version tracked: ${template.lastCisBenchmarkVersion || "none"}
+- Assessment type: ${matched.assessmentStatus || "unknown"}
+- Profiles: ${matched.profile?.map(p => p.profileTitle).join(", ") || "N/A"}
+
+EXISTING SCSEM CONTROLS (sample):
+${controlSummary}
+
+TASK: Based on the CIS Benchmark version update, identify which EXISTING controls need updates. These should reflect realistic changes that occur between CIS Benchmark versions (e.g., tighter password requirements, new audit rules, deprecated settings, added controls).
+
+Return ONLY valid JSON with this structure:
 {
-  "version": "The version string from the payload",
-  "releaseDate": "The status_date from the payload",
-  "summary": "A 1-2 sentence high level summary of what this benchmark version covers and any major security changes.",
-  "controls": [
+  "summary": "2-3 sentence summary of what changed in this CIS version update",
+  "changes": [
     {
-      "id": "1.1.1 (realistic control ID format)",
-      "name": "Ensure something is securely configured",
-      "current": "What the old IRS SCSEM standard was (e.g., 'Requires 12 chars')",
-      "proposed": "What the new CIS standard requires based on the payload",
-      "nistId": "Realistic NIST SP 800-53 mapping (e.g., AC-2(1), IA-5, etc. Use N/A if completely new)",
-      "testId": "Realistic SCSEM Test ID (e.g., Win-10.1, RHEL-4.2, etc. Use New if new)",
-      "criticality": "HIGH, MEDIUM, or LOW"
+      "testId": "MUST be an exact Test ID from the list above",
+      "field": "testProcedures|expectedResults|remediationProcedure|description|rationale",
+      "currentValue": "Brief summary of what the control currently says",
+      "proposedValue": "The updated text reflecting the new CIS benchmark requirements",
+      "reason": "Why this change is needed (e.g., 'CIS v${cisBenchmarkVersion} requires...')"
     }
   ]
 }
-Include exactly 3 controls in the array. Do not include markdown formatting like \`\`\`json. Return strictly the JSON object.`;
 
-        const message = await anthropic.messages.create({
-            model: "claude-3-haiku-20240307",
-            max_tokens: 1000,
-            temperature: 0.7,
-            system: "You generate realistic compliance benchmark JSON payloads.",
-            messages: [
-                { role: "user", content: prompt }
-            ]
-        });
+RULES:
+- Only reference Test IDs that appear in the EXISTING SCSEM CONTROLS list above
+- Include 3-5 realistic changes
+- Each change must specify which field is being updated
+- proposedValue must be the FULL replacement text for that field, not a diff
+- Do NOT invent new Test IDs
+- Do NOT include markdown formatting`;
 
-        let responseText = message.content[0].type === "text" ? message.content[0].text : "";
+            const message = await anthropic.messages.create({
+                model: "claude-3-haiku-20240307",
+                max_tokens: 2000,
+                temperature: 0.3,
+                system: "You generate precise, realistic CIS benchmark update payloads referencing real control IDs.",
+                messages: [{ role: "user", content: prompt }],
+            });
 
-        // Strip markdown blocks if Claude included them anyway
-        responseText = responseText.replace(/```json/gi, "").replace(/```/g, "").trim();
+            let responseText = message.content[0].type === "text" ? message.content[0].text : "";
+            responseText = responseText.replace(/```json/gi, "").replace(/```/g, "").trim();
 
-        // Attempt to parse the JSON
-        const payload = JSON.parse(responseText);
-
-        // Save to database
-        const benchmark = await db.cISBenchmarkVersion.create({
-            data: {
-                technology: targetTemplate.cisTechnology || "Unknown",
-                currentVersion: payload.version,
-                releaseDate: new Date(payload.releaseDate || new Date().toISOString()),
-                changesSummary: payload.summary,
+            let payload;
+            try {
+                payload = JSON.parse(responseText);
+            } catch {
+                console.error(`  ${template.name}: failed to parse AI response.`);
+                continue;
             }
-        });
 
-        const review = await db.sCSEMUpdateReview.create({
-            data: {
-                templateId: targetTemplate.id,
-                benchmarkId: benchmark.id,
-                status: "PENDING",
-                suggestedChanges: payload.controls.map((c: any) => ({
-                    controlId: c.id,
-                    change: c.name,
-                    current: c.current,
-                    proposed: c.proposed,
-                    nistId: c.nistId || "N/A",
-                    testId: c.testId || "New",
-                    criticality: c.criticality || "MEDIUM"
-                }))
-            }
-        });
+            // Validate that suggested testIds actually exist
+            const existingTestIds = new Set(controls.map(c => c.testId));
+            const validChanges = (payload.changes || []).filter((c: any) => existingTestIds.has(c.testId));
 
-        // Log the sync
-        await db.auditLog.create({
-            data: {
-                organizationId: orgId,
-                userId: userId,
-                action: "CIS Benchmark Sync",
-                resourceType: "SCSEMUpdateReview",
-                resourceId: review.id,
-                metadata: {
-                    technology: benchmark.technology,
-                    version: benchmark.currentVersion,
-                    autoGenerated: true,
-                    authenticatedBy: "license.xml"
-                }
+            if (validChanges.length === 0) {
+                console.log(`  ${template.name}: AI suggested no valid changes. Skipping.`);
+                continue;
             }
-        });
+
+            // Step 6: Store benchmark + review
+            const benchmark = await db.cISBenchmarkVersion.create({
+                data: {
+                    technology: template.cisTechnology || "Unknown",
+                    currentVersion: cisBenchmarkVersion,
+                    releaseDate: (() => {
+                        const d = new Date(matched.benchmarkStatus?.statusDate || new Date().toISOString());
+                        return isNaN(d.getTime()) ? new Date() : d;
+                    })(),
+                    changesSummary: payload.summary || `CIS ${template.cisTechnology} updated to v${cisBenchmarkVersion}`,
+                },
+            });
+
+            const review = await db.sCSEMUpdateReview.create({
+                data: {
+                    templateId: template.id,
+                    benchmarkId: benchmark.id,
+                    status: "PENDING",
+                    suggestedChanges: validChanges.map((c: any) => ({
+                        testId: c.testId,
+                        field: c.field,
+                        currentValue: c.currentValue,
+                        proposedValue: c.proposedValue,
+                        reason: c.reason,
+                    })),
+                },
+            });
+
+            // Log the sync
+            await db.auditLog.create({
+                data: {
+                    organizationId: orgId,
+                    userId: userId,
+                    action: "CIS Benchmark Sync",
+                    resourceType: "SCSEMUpdateReview",
+                    resourceId: review.id,
+                    metadata: {
+                        templateName: template.name,
+                        technology: benchmark.technology,
+                        version: benchmark.currentVersion,
+                        previousVersion: template.lastCisBenchmarkVersion,
+                        changesCount: validChanges.length,
+                    },
+                },
+            });
+
+            console.log(`  ✓ ${template.name}: ${validChanges.length} changes proposed (CIS ${template.lastCisBenchmarkVersion || "none"} → v${cisBenchmarkVersion})`);
+            updatesGenerated++;
+        }
 
         return NextResponse.json({
             success: true,
-            message: `Authenticated & Downloaded CIS ${benchmark.currentVersion} for ${benchmark.technology}`,
-            count: 1
+            message: `Synced ${updatesGenerated} template(s) with CIS benchmark updates.`,
+            count: updatesGenerated,
         });
 
     } catch (error: any) {
         console.error("CIS Sync error:", error);
         return NextResponse.json({
-            error: `Failed to sync CIS benchmarks: ${error.message || "Unknown Error"}`
+            error: `Failed to sync CIS benchmarks: ${error.message || "Unknown Error"}`,
         }, { status: 500 });
     }
 }

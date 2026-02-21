@@ -28,6 +28,9 @@ interface SCSEMControl {
     remediationStatement: string | null;
     capRequestStatement: string | null;
     riskRating: string | null;
+    updateHighlight: boolean;
+    lastSyncedAt: string | null;
+    lastSyncedVersion: string | null;
 }
 
 interface SCSEMSheet {
@@ -232,7 +235,10 @@ function ControlsTable({
                             <tbody key={control.id}>
                                 <tr
                                     onClick={() => onToggle(control.id)}
-                                    className="border-b border-[var(--sky-border)]/50 hover:bg-[var(--sky-bg)] cursor-pointer transition-colors"
+                                    className={`border-b border-[var(--sky-border)]/50 hover:bg-[var(--sky-bg)] cursor-pointer transition-colors ${control.updateHighlight
+                                            ? "border-l-2 border-l-amber-400 bg-amber-500/5"
+                                            : ""
+                                        }`}
                                 >
                                     <td className="py-2.5 px-3 text-[var(--sky-text-secondary)]">
                                         {isExpanded
