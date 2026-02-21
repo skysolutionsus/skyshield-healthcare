@@ -56,7 +56,7 @@ export async function PUT(
                 const updateData: any = {
                     updateHighlight: true,
                     lastSyncedAt: new Date(),
-                    lastSyncedVersion: review.benchmark.currentVersion,
+                    lastSyncedVersion: review.benchmark?.currentVersion || "synced",
                 };
 
                 // Map the field name to the actual DB column
@@ -107,7 +107,7 @@ export async function PUT(
             if (isPub1075) {
                 templateUpdate.lastPub1075Version = "Rev. 11-2021";
             } else if (review.benchmark) {
-                templateUpdate.lastCisBenchmarkVersion = review.benchmark.currentVersion;
+                templateUpdate.lastCisBenchmarkVersion = review.benchmark?.currentVersion || versionLabel;
             }
 
             await db.sCSEMTemplate.update({
@@ -128,7 +128,7 @@ export async function PUT(
                 resourceId: review.id,
                 metadata: {
                     templateName: review.template.name,
-                    benchmarkVersion: review.benchmark.currentVersion,
+                    benchmarkVersion: review.benchmark?.currentVersion || "N/A",
                     status,
                 },
             },
