@@ -3,9 +3,13 @@ set -e
 
 echo "=== SkyShield Start ==="
 
-# Ensure schema is up to date
+# Ensure schema is up to date (--accept-data-loss needed for non-interactive deploys)
 echo "Running prisma db push..."
-npx prisma db push --skip-generate 2>&1 || echo "Warning: prisma db push issue"
+npx prisma db push --accept-data-loss 2>&1
+DB_PUSH_STATUS=$?
+if [ $DB_PUSH_STATUS -ne 0 ]; then
+  echo "ERROR: prisma db push failed with exit code $DB_PUSH_STATUS"
+fi
 
 # Check if SCSEM control data actually exists (not just sheets)
 NEEDS_SEED=$(node -e "
