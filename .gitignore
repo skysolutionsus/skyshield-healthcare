@@ -141,3 +141,11 @@ vite.config.ts.timestamp-*
 # SQLite database
 *.sqlite
 *.sqlite-journal
+
+# Test scripts
+test-cis-*.ts
+test-prisma-*.ts
+update-template.ts
+run_test.js
+test-cis-correct.ts
+test-cis-v7.ts
