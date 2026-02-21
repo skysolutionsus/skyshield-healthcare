@@ -310,22 +310,16 @@ export function parseSCSEMFile(filePath: string): ParsedSCSEM {
             changeLogEntries: [],
         };
 
+        // Only parse sheets we actually need data from — skip raw data to save memory
         if (sheetType === 'dashboard') {
             metadata = parseDashboardMetadata(ws);
-            parsed.rawData = safeSheetToJson(ws, 100);
         } else if (sheetType === 'test_cases') {
             parsed.controls = parseTestCaseSheet(ws);
             totalControls += parsed.controls.length;
         } else if (sheetType === 'changelog') {
             parsed.changeLogEntries = parseChangeLogSheet(ws);
-            parsed.rawData = safeSheetToJson(ws, 200);
-        } else if (sheetType === 'issue_codes') {
-            // Issue code tables can be huge — skip raw data, just note the type
-            parsed.rawData = null;
-        } else {
-            // Results, Instructions, Appendix — store capped raw data
-            parsed.rawData = safeSheetToJson(ws, 200);
         }
+        // All other sheets: just record their existence (name, type, index)
 
         sheets.push(parsed);
     }

@@ -182,7 +182,7 @@ async function main() {
               sheetName: sheet.sheetName,
               sheetType: sheet.sheetType,
               sheetIndex: sheet.sheetIndex,
-              rawData: sheet.rawData as any,
+              rawData: null, // Skip rawData to save memory during seed
             },
           });
 
