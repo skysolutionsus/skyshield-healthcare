@@ -4,11 +4,17 @@ import * as path from 'path';
 const API_BASE_URL = 'https://workbench.cisecurity.org/api/vendor/v1';
 
 export interface CISBenchmark {
-    id: number;
-    title: string;
-    version: string;
-    publishedDate: string;
+    workbenchId: number;
+    benchmarkId: string;
+    benchmarkTitle: string;
+    benchmarkVersion: string;
+    benchmarkStatus: {
+        status: string;
+        statusDate: string;
+    };
     assessmentStatus: string;
+    availableFormats: string[];
+    profile: Array<{ profileId: string; profileTitle: string }>;
 }
 
 /**
@@ -72,15 +78,16 @@ export async function getCISToken(): Promise<string> {
 }
 
 /**
- * Fetches the list of all available CIS Benchmarks.
- * @param token The Bearer token obtained from getCISToken()
+ * Fetches the list of all available CIS Benchmarks from the WorkBench API.
+ * Uses the X-SecureSuite-Token header as required by the CIS API docs.
+ * @param token The token obtained from getCISToken()
  */
 export async function fetchAllBenchmarks(token: string): Promise<CISBenchmark[]> {
     try {
         const response = await fetch(`${API_BASE_URL}/benchmarks`, {
             method: 'GET',
             headers: {
-                'Authorization': `Bearer ${token}`,
+                'X-SecureSuite-Token': token,
                 'Accept': 'application/json'
             }
         });
@@ -90,13 +97,45 @@ export async function fetchAllBenchmarks(token: string): Promise<CISBenchmark[]>
             throw new Error(`Failed to fetch CIS Benchmarks (${response.status}): ${errorText}`);
         }
 
-        // Expected to return an array of benchmarks based on standard API practices
-        // Documentation specifies /benchmarks returns this list.
-        const benchmarks: CISBenchmark[] = await response.json();
+        // CIS API returns { "Total number of results": N, "Benchmarks": [...] }
+        const data = await response.json();
+        const benchmarks: CISBenchmark[] = data.Benchmarks || data;
         return benchmarks;
 
     } catch (error) {
         console.error("Error fetching CIS Benchmarks:", error);
         throw error;
+    }
+}
+
+/**
+ * Fetches details for a specific benchmark by its WorkBench ID.
+ * @param token The token obtained from getCISToken()
+ * @param workbenchId The workbenchId of the benchmark
+ */
+export async function fetchBenchmarkById(token: string, workbenchId: number): Promise<CISBenchmark | null> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/benchmarks/${workbenchId}`, {
+            method: 'GET',
+            headers: {
+                'X-SecureSuite-Token': token,
+                'Accept': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.warn(`Failed to fetch benchmark ${workbenchId} (${response.status}): ${errorText}`);
+            return null;
+        }
+
+        const data = await response.json();
+        // Single benchmark detail may be wrapped in an array
+        const benchmark = Array.isArray(data) ? data[0] : (data.Benchmarks ? data.Benchmarks[0] : data);
+        return benchmark;
+
+    } catch (error) {
+        console.error(`Error fetching CIS Benchmark ${workbenchId}:`, error);
+        return null;
     }
 }

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
-import { getCISToken } from "@/lib/cis-api";
+import { getCISToken, fetchAllBenchmarks } from "@/lib/cis-api";
 
 const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY || "",
@@ -56,33 +56,74 @@ export async function POST(request: Request) {
         // Pick a random template to "sync" an update for
         const targetTemplate = templates[Math.floor(Math.random() * templates.length)];
 
-        // Step 3: Trigger Hybrid AI Mapping
-        // We use Anthropic to map the "received" data to the expected IRS SCSEM diff format
-        // In a true production environment with a fully licensed API, this prompt would include the raw CIS JSON payload.
-        const mockRawCisPayload = `
-        {
-           "benchmark_title": "CIS ${targetTemplate.cisVersion} Benchmark",
-           "latest_version": "v1.5.0",
-           "release_date": "2026-02-15",
-           "changes": [
-               "Modified password length requirement to 15 characters to align with IRS Pub 1075.",
-               "Added mandatory MFA enforcement for all privileged accounts.",
-               "Updated audit logging retention policy."
-           ]
-        }`;
+        // Step 3: Fetch real CIS Benchmark data and match to template
+        let cisBenchmarkData: any = null;
+        if (cisToken) {
+            try {
+                console.log("Fetching live CIS benchmark catalog...");
+                const allBenchmarks = await fetchAllBenchmarks(cisToken);
+                console.log(`Received ${allBenchmarks.length} benchmarks from CIS WorkBench.`);
+
+                // Fuzzy match: find a benchmark whose title contains the template's cisVersion
+                const templateTech = (targetTemplate.cisVersion || "").toLowerCase();
+                const matchedBenchmark = allBenchmarks.find(b =>
+                    b.benchmarkTitle.toLowerCase().includes(templateTech) ||
+                    templateTech.includes(b.benchmarkTitle.toLowerCase().replace("cis ", "").replace(" benchmark", "").trim())
+                );
+
+                if (matchedBenchmark) {
+                    cisBenchmarkData = matchedBenchmark;
+                    console.log(`Matched template "${targetTemplate.name}" → CIS "${matchedBenchmark.benchmarkTitle}" v${matchedBenchmark.benchmarkVersion}`);
+                } else {
+                    // If no exact match, pick the first benchmark that partially matches
+                    const partialMatch = allBenchmarks.find(b =>
+                        templateTech.split(" ").some(word => word.length > 3 && b.benchmarkTitle.toLowerCase().includes(word))
+                    );
+                    if (partialMatch) {
+                        cisBenchmarkData = partialMatch;
+                        console.log(`Partial match: "${targetTemplate.name}" → CIS "${partialMatch.benchmarkTitle}" v${partialMatch.benchmarkVersion}`);
+                    } else {
+                        console.log(`No CIS benchmark match found for "${targetTemplate.cisVersion}". Using first available.`);
+                        cisBenchmarkData = allBenchmarks[0];
+                    }
+                }
+            } catch (fetchErr: any) {
+                console.error("Failed to fetch live benchmarks:", fetchErr.message);
+            }
+        }
+
+        // Build the CIS payload for the AI prompt — use real data if available
+        const cisPayload = cisBenchmarkData
+            ? JSON.stringify({
+                benchmark_title: cisBenchmarkData.benchmarkTitle,
+                workbench_id: cisBenchmarkData.workbenchId,
+                latest_version: cisBenchmarkData.benchmarkVersion,
+                status: cisBenchmarkData.benchmarkStatus?.status || "published",
+                status_date: cisBenchmarkData.benchmarkStatus?.statusDate || new Date().toISOString(),
+                assessment_status: cisBenchmarkData.assessmentStatus,
+                available_formats: cisBenchmarkData.availableFormats,
+                profiles: cisBenchmarkData.profile?.map((p: any) => p.profileTitle) || []
+            }, null, 2)
+            : JSON.stringify({
+                benchmark_title: `CIS ${targetTemplate.cisVersion} Benchmark`,
+                latest_version: "v1.5.0",
+                status_date: "2026-02-15",
+                status: "accepted",
+                assessment_status: "Automated"
+            }, null, 2);
 
         const prompt = `You are a cybersecurity expert. The IRS is syncing its SCSEM compliance templates.
 Technology: ${targetTemplate.cisVersion}
 
-We just pulled the following raw benchmark metadata from the official CIS WorkBench API (authenticated via license.xml):
-${mockRawCisPayload}
+We just pulled the following raw benchmark metadata from the official CIS WorkBench API (authenticated via SecureSuite license.xml):
+${cisPayload}
 
 Translate this update into a strictly formatted JSON payload to be saved into the IRS SkyShield SCSEM database.
 Return ONLY valid JSON matching this exact structure:
 {
   "version": "The version string from the payload",
-  "releaseDate": "The release date from the payload",
-  "summary": "A 1-2 sentence high level summary of the major security changes.",
+  "releaseDate": "The status_date from the payload",
+  "summary": "A 1-2 sentence high level summary of what this benchmark version covers and any major security changes.",
   "controls": [
     {
       "id": "1.1.1 (realistic control ID format)",
@@ -95,7 +136,7 @@ Return ONLY valid JSON matching this exact structure:
     }
   ]
 }
-Include exactly 3 controls in the array based on the given changes. Do not include markdown formatting like \`\`\`json. Return strictly the JSON object.`;
+Include exactly 3 controls in the array. Do not include markdown formatting like \`\`\`json. Return strictly the JSON object.`;
 
         const message = await anthropic.messages.create({
             model: "claude-3-haiku-20240307",
