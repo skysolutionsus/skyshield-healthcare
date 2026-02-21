@@ -12,18 +12,14 @@ if [ $DB_PUSH_STATUS -ne 0 ]; then
 fi
 
 # Check if SCSEM control data needs seeding
-# Force re-seed if: no controls, or controls exist but missing new fields (stale seed)
+# Force re-seed if total controls < 9000 (parser v2 auto-detects tech-specific sheets → ~10600 controls)
 NEEDS_SEED=$(node -e "
 const { PrismaClient } = require('@prisma/client');
 const p = new PrismaClient();
 (async () => {
   try {
     const total = await p.sCSEMControl.count();
-    if (total < 10) { console.log('yes'); return; }
-    // Check if controls have the new criticality field populated (added in XLSX completeness update)
-    const withCrit = await p.sCSEMControl.count({ where: { criticality: { not: null } } });
-    if (withCrit === 0) { console.log('yes'); return; } // stale seed
-    console.log('no');
+    console.log(total < 9000 ? 'yes' : 'no');
   } catch(e) { console.log('yes'); }
   finally { await p.\$disconnect(); }
 })();

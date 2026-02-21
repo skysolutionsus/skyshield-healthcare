@@ -378,6 +378,21 @@ export function parseSCSEMFile(filePath: string): ParsedSCSEM {
             totalControls += parsed.controls.length;
         } else if (sheetType === 'changelog') {
             parsed.changeLogEntries = parseChangeLogSheet(ws);
+        } else if (sheetType === 'other') {
+            // Auto-detect: probe sheet content for test case headers
+            // Many SCSEM files have technology-specific sheets (e.g. "Tomcat9", "IIS10", "Docker")
+            // that are test case sheets but don't have "test case" in their name
+            const probeData = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '' }) as any[][];
+            for (let r = 0; r < Math.min(5, probeData.length); r++) {
+                const firstCell = cellStr(probeData[r]?.[0]);
+                if (firstCell && firstCell.toLowerCase().includes('test id')) {
+                    // This is actually a test case sheet
+                    parsed.sheetType = 'test_cases';
+                    parsed.controls = parseTestCaseSheet(ws);
+                    totalControls += parsed.controls.length;
+                    break;
+                }
+            }
         }
 
         sheets.push(parsed);
