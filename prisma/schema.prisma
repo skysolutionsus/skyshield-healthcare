@@ -125,6 +125,7 @@ model SCSEMTemplate {
   filePath      String
   controlCount  Int      @default(0)
   lastCisBenchmarkVersion String?
+  lastPub1075Version      String?
   lastSyncedAt            DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -201,14 +202,15 @@ model SCSEMChangeLog {
 model SCSEMUpdateReview {
   id               String             @id @default(cuid())
   templateId       String
-  benchmarkId      String
+  benchmarkId      String?
+  source           String             @default("cis") // "cis" | "pub1075"
   status           UpdateReviewStatus @default(PENDING)
   suggestedChanges Json
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
 
   template  SCSEMTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  benchmark CISBenchmarkVersion @relation(fields: [benchmarkId], references: [id], onDelete: Cascade)
+  benchmark CISBenchmarkVersion? @relation(fields: [benchmarkId], references: [id], onDelete: Cascade)
 }
 
 model Incident {

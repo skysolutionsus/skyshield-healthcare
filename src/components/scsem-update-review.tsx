@@ -18,11 +18,12 @@ interface SCSEMUpdateReviewProps {
     review: {
         id: string;
         status: string;
+        source?: string;
         suggestedChanges: SuggestedChange[];
         benchmark: {
             currentVersion: string;
             changesSummary: string;
-        };
+        } | null;
     } | null;
 }
 
@@ -78,12 +79,13 @@ export function SCSEMUpdateReview({ templateId, templateName, review }: SCSEMUpd
     }
 
     if (review.status === "ACCEPTED") {
+        const sourceLabel = review.source === "pub1075" ? "Pub 1075" : `CIS ${review.benchmark?.currentVersion || ""}`;
         return (
             <div className="bg-emerald-900/20 border border-emerald-800/50 rounded-xl p-6">
                 <div className="flex items-center gap-3 mb-2">
                     <CheckCircle2 className="w-5 h-5 text-emerald-400" />
                     <h3 className="text-base font-semibold text-emerald-400">
-                        CIS {review.benchmark.currentVersion} — Applied
+                        {sourceLabel} — Applied
                     </h3>
                 </div>
                 <p className="text-sm text-emerald-300/70">
@@ -94,12 +96,13 @@ export function SCSEMUpdateReview({ templateId, templateName, review }: SCSEMUpd
     }
 
     if (review.status === "REJECTED") {
+        const sourceLabel = review.source === "pub1075" ? "Pub 1075" : `CIS ${review.benchmark?.currentVersion || ""}`;
         return (
             <div className="bg-red-900/20 border border-red-800/50 rounded-xl p-6">
                 <div className="flex items-center gap-3 mb-2">
                     <XCircle className="w-5 h-5 text-red-400" />
                     <h3 className="text-base font-semibold text-red-400">
-                        CIS {review.benchmark.currentVersion} — Rejected
+                        {sourceLabel} — Rejected
                     </h3>
                 </div>
                 <p className="text-sm text-red-300/70">
@@ -110,14 +113,31 @@ export function SCSEMUpdateReview({ templateId, templateName, review }: SCSEMUpd
     }
 
     // PENDING state
+    const isPub1075 = review.source === "pub1075";
+    const headerLabel = isPub1075
+        ? "Pub 1075 Compliance Review"
+        : `CIS ${review.benchmark?.currentVersion || ""} Update Available`;
+    const headerColor = isPub1075
+        ? "bg-indigo-900/20 border-indigo-800/50"
+        : "bg-amber-900/20 border-amber-800/50";
+    const headerTextColor = isPub1075 ? "text-indigo-400" : "text-amber-400";
+    const subtitleColor = isPub1075 ? "text-indigo-300/70" : "text-amber-300/70";
+
     return (
         <div>
-            <div className="bg-amber-900/20 border border-amber-800/50 rounded-xl p-6 mb-6">
-                <h2 className="text-lg font-semibold text-amber-400 mb-2">
-                    CIS {review.benchmark.currentVersion} Update Available
-                </h2>
-                <p className="text-sm text-amber-300/70 mb-4">
-                    {review.benchmark.changesSummary}
+            <div className={`${headerColor} border rounded-xl p-6 mb-6`}>
+                <div className="flex items-center gap-2 mb-2">
+                    {isPub1075 && (
+                        <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-400 rounded text-[10px] font-bold uppercase border border-indigo-500/30">
+                            Pub 1075
+                        </span>
+                    )}
+                    <h2 className={`text-lg font-semibold ${headerTextColor}`}>
+                        {headerLabel}
+                    </h2>
+                </div>
+                <p className={`text-sm ${subtitleColor} mb-4`}>
+                    {review.benchmark?.changesSummary || "Review the proposed changes below for Pub 1075 compliance."}
                 </p>
                 <div className="flex items-center gap-3">
                     <button

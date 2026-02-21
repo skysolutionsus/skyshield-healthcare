@@ -84,28 +84,38 @@ export async function PUT(
                 appliedCount++;
             }
 
+            // Determine source-specific values
+            const isPub1075 = (review as any).source === "pub1075";
+            const versionLabel = isPub1075
+                ? "Pub 1075 Rev. 11-2021"
+                : review.benchmark?.currentVersion || "Unknown";
+
             // Create a changelog entry
             await db.sCSEMChangeLog.create({
                 data: {
                     templateId,
-                    version: review.benchmark.currentVersion,
+                    version: versionLabel,
                     changeDate: new Date(),
-                    description: `CIS Benchmark update to v${review.benchmark.currentVersion}: ${appliedCount} control(s) updated. ${(review.suggestedChanges as any[]).map((c: any) => c.testId).join(", ")}`,
+                    description: `${isPub1075 ? "Pub 1075" : "CIS Benchmark"} update (${versionLabel}): ${appliedCount} control(s) updated. ${(review.suggestedChanges as any[]).map((c: any) => c.testId).join(", ")}`,
                     changedBy: session.user.name || session.user.email || "SkyShield Sync",
-                    source: "cis_sync",
+                    source: isPub1075 ? "pub1075_sync" : "cis_sync",
                 },
             });
 
-            // Update the template's tracked CIS version
+            // Update the template's tracked version
+            const templateUpdate: any = { lastSyncedAt: new Date() };
+            if (isPub1075) {
+                templateUpdate.lastPub1075Version = "Rev. 11-2021";
+            } else if (review.benchmark) {
+                templateUpdate.lastCisBenchmarkVersion = review.benchmark.currentVersion;
+            }
+
             await db.sCSEMTemplate.update({
                 where: { id: templateId },
-                data: {
-                    lastCisBenchmarkVersion: review.benchmark.currentVersion,
-                    lastSyncedAt: new Date(),
-                },
+                data: templateUpdate,
             });
 
-            console.log(`Applied ${appliedCount} CIS updates to ${review.template.name}`);
+            console.log(`Applied ${appliedCount} ${isPub1075 ? "Pub 1075" : "CIS"} updates to ${review.template.name}`);
         }
 
         // Log the action
