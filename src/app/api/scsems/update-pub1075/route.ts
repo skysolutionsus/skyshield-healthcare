@@ -36,7 +36,8 @@ export async function POST(request: Request) {
         writeFileSync(PDF_PATH, pdfBuffer);
 
         // Step 2: Parse PDF to text
-        const pdfParse = (await import("pdf-parse")).default;
+        const pdfParseModule = await import("pdf-parse") as any;
+        const pdfParse = pdfParseModule.default || pdfParseModule;
         const parsed = await pdfParse(pdfBuffer);
 
         const pageCount = parsed.numpages;
