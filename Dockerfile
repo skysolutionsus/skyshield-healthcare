@@ -43,6 +43,14 @@ COPY --from=builder /app/node_modules ./node_modules
 # Create data directory for SQLite and set ownership
 RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
 
+# Copy assets needed for seed (license.xml, SCSEM XLSX files)
+COPY --from=builder /app/assets ./assets
+COPY --from=builder /app/src/lib/xlsx-parser.ts ./src/lib/xlsx-parser.ts
+
+# Copy entrypoint script
+COPY --from=builder /app/entrypoint.sh ./entrypoint.sh
+USER root
+RUN chmod +x /app/entrypoint.sh
 USER nextjs
 
 EXPOSE 3000
@@ -55,4 +63,4 @@ ENV DATABASE_URL="file:/app/data/db.sqlite"
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/api/health || exit 1
 
-CMD ["npm", "start"]
+ENTRYPOINT ["/app/entrypoint.sh"]
