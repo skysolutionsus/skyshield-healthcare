@@ -9,6 +9,7 @@ export default auth((req) => {
     pathname.startsWith("/login") ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/health") ||
+    pathname.startsWith("/api/scsems/sync") ||
     pathname === "/"
   ) {
     return NextResponse.next();
