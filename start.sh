@@ -11,15 +11,18 @@ if [ $DB_PUSH_STATUS -ne 0 ]; then
   echo "ERROR: prisma db push failed with exit code $DB_PUSH_STATUS"
 fi
 
-# Check if SCSEM control data needs seeding
-# Force re-seed if total controls < 9000 (parser v2 auto-detects tech-specific sheets → ~10600 controls)
+# Check if SCSEM data needs seeding
+# Force re-seed if: controls < 9000 OR sheets lack rawData (v3 parser stores all sheet data)
 NEEDS_SEED=$(node -e "
 const { PrismaClient } = require('@prisma/client');
 const p = new PrismaClient();
 (async () => {
   try {
     const total = await p.sCSEMControl.count();
-    console.log(total < 9000 ? 'yes' : 'no');
+    if (total < 9000) { console.log('yes'); return; }
+    const withRaw = await p.sCSEMSheet.count({ where: { rawData: { not: null } } });
+    if (withRaw === 0) { console.log('yes'); return; }
+    console.log('no');
   } catch(e) { console.log('yes'); }
   finally { await p.\$disconnect(); }
 })();
