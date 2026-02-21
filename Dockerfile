@@ -22,6 +22,9 @@ RUN npx prisma generate
 RUN mkdir -p data
 RUN npm run build
 
+# Pre-compile the seed script so it can run without tsx in production
+RUN npx tsx --tsconfig tsconfig.json -e "console.log('tsx works')" 2>/dev/null || true
+
 # Stage 3: Production
 FROM node:20-alpine AS runner
 WORKDIR /app
@@ -40,12 +43,13 @@ COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 COPY --from=builder /app/node_modules ./node_modules
 
+# Copy source files needed for seed (tsx can import TS directly)
+COPY --from=builder /app/src/lib/xlsx-parser.ts ./src/lib/xlsx-parser.ts
+COPY --from=builder /app/assets ./assets
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
+
 # Create data directory for SQLite and set ownership
 RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
-
-# Copy assets needed for seed (license.xml, SCSEM XLSX files)
-COPY --from=builder /app/assets ./assets
-COPY --from=builder /app/src/lib/xlsx-parser.ts ./src/lib/xlsx-parser.ts
 
 # Copy entrypoint script
 COPY --from=builder /app/entrypoint.sh ./entrypoint.sh

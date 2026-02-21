@@ -2,25 +2,31 @@
 set -e
 
 echo "=== SkyShield Entrypoint ==="
+echo "DATABASE_URL: ${DATABASE_URL}"
 
 # Run Prisma db push to ensure schema is up to date
 echo "Running prisma db push..."
-npx prisma db push --skip-generate 2>&1 || echo "prisma db push failed (may already be in sync)"
+npx prisma db push --skip-generate 2>&1 || echo "Warning: prisma db push encountered an issue"
 
-# Check if seed data exists by looking for SCSEMSheet records
-SHEET_COUNT=$(node -e "
+# Check if seed data exists
+echo "Checking if database needs seeding..."
+NEEDS_SEED=$(node -e "
 const { PrismaClient } = require('@prisma/client');
 const p = new PrismaClient();
-p.sCSEMSheet.count().then(c => { console.log(c); p.\$disconnect(); }).catch(() => { console.log(0); p.\$disconnect(); });
-" 2>/dev/null || echo "0")
+p.sCSEMSheet.count()
+  .then(c => { console.log(c === 0 ? 'yes' : 'no'); return p.\$disconnect(); })
+  .catch(e => { console.log('yes'); return p.\$disconnect(); });
+" 2>/dev/null)
 
-if [ "$SHEET_COUNT" = "0" ] || [ "$SHEET_COUNT" = "" ]; then
-  echo "No SCSEM sheet data found. Running seed..."
-  NODE_OPTIONS="--max-old-space-size=4096" npx prisma db seed 2>&1 || echo "Seed failed, app will start anyway"
+echo "Needs seed: ${NEEDS_SEED}"
+
+if [ "$NEEDS_SEED" = "yes" ] || [ -z "$NEEDS_SEED" ]; then
+  echo "Seeding database with SCSEM XLSX data (this may take 2-3 minutes)..."
+  NODE_OPTIONS="--max-old-space-size=4096" npx tsx prisma/seed.ts 2>&1 || echo "Warning: Seed encountered an issue"
   echo "Seed complete."
 else
-  echo "Database already seeded ($SHEET_COUNT sheets found). Skipping seed."
+  echo "Database already has SCSEM data. Skipping seed."
 fi
 
-echo "Starting Next.js..."
+echo "Starting Next.js server..."
 exec npm start
