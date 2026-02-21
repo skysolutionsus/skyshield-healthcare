@@ -146,120 +146,94 @@ async function main() {
       });
     }
     console.log(`Loaded ${scsemIndex.length} SCSEM templates`);
-  }
 
-  // Create CIS Benchmarks and map them to our SCSEMs
-  const win2022 = await prisma.cISBenchmarkVersion.create({
-    data: {
-      technology: "Windows Server 2022",
-      currentVersion: "v3.0.0",
-      releaseDate: new Date("2025-01-15T00:00:00Z"),
-      changesSummary: "Updated password complexity, added Defender firewall checks, strict logging requirements.",
-    }
-  });
+    // Import XLSX data for each template
+    console.log("\nParsing SCSEM XLSX files...");
+    const { parseSCSEMFile } = await import("../src/lib/xlsx-parser");
 
-  const rhel = await prisma.cISBenchmarkVersion.create({
-    data: {
-      technology: "Red Hat Enterprise Linux",
-      currentVersion: "v4.0.0",
-      releaseDate: new Date("2026-02-10T00:00:00Z"),
-      changesSummary: "Added new SELinux enforcements and updated SSH config standards.",
-    }
-  });
+    let totalControlsImported = 0;
+    let totalChangeLogsImported = 0;
 
-  const win11 = await prisma.cISBenchmarkVersion.create({
-    data: {
-      technology: "Windows 11",
-      currentVersion: "v2.1.0",
-      releaseDate: new Date("2025-11-20T00:00:00Z"),
-      changesSummary: "Updated BitLocker pinning requirements and restricted Copilot data syncing.",
-    }
-  });
+    for (const scsem of scsemIndex) {
+      const templateId = scsem.name.replace(/\s+/g, "-").toLowerCase();
 
-  const oracle = await prisma.cISBenchmarkVersion.create({
-    data: {
-      technology: "Oracle Database",
-      currentVersion: "v5.2.0",
-      releaseDate: new Date("2026-01-05T00:00:00Z"),
-      changesSummary: "Strengthened listener security and adjusted TDE master encryption key rotation schedules.",
-    }
-  });
+      try {
+        const parsed = parseSCSEMFile(scsem.file);
 
-  const win2022Template = await prisma.sCSEMTemplate.findFirst({
-    where: { cisTechnology: "Windows Server 2022" }
-  });
+        // Update template with metadata from Dashboard
+        await prisma.sCSEMTemplate.update({
+          where: { id: templateId },
+          data: {
+            version: parsed.metadata.version,
+            effectiveDate: parsed.metadata.effectiveDate,
+            controlCount: parsed.totalControls,
+          },
+        });
 
-  if (win2022Template) {
-    await prisma.sCSEMUpdateReview.create({
-      data: {
-        templateId: win2022Template.id,
-        benchmarkId: win2022.id,
-        status: "PENDING",
-        suggestedChanges: [
-          { controlId: "1.1.4", change: "Ensure password complexity is enabled", current: "Requires 14 chars", proposed: "Requires 15 chars and 2 special chars", nistId: "IA-5(1)", testId: "Win-1.1", criticality: "HIGH" },
-          { controlId: "2.3.1", change: "Disable guest account", current: "Disabled", proposed: "Disabled and rename SID", nistId: "AC-2", testId: "Win-2.3", criticality: "MEDIUM" },
-          { controlId: "9.3.2", change: "Enable Windows Defender Firewall", current: "Optional", proposed: "Mandatory for all profiles", nistId: "SC-7", testId: "Win-9.3", criticality: "CRITICAL" }
-        ],
+        // Clear existing sheets/controls for this template (idempotent re-seed)
+        await prisma.sCSEMSheet.deleteMany({ where: { templateId } });
+        await prisma.sCSEMChangeLog.deleteMany({ where: { templateId } });
+
+        // Import each sheet
+        for (const sheet of parsed.sheets) {
+          const dbSheet = await prisma.sCSEMSheet.create({
+            data: {
+              templateId,
+              sheetName: sheet.sheetName,
+              sheetType: sheet.sheetType,
+              sheetIndex: sheet.sheetIndex,
+              rawData: sheet.rawData as any,
+            },
+          });
+
+          // Import controls for test_cases sheets
+          if (sheet.controls.length > 0) {
+            await prisma.sCSEMControl.createMany({
+              data: sheet.controls.map((c) => ({
+                sheetId: dbSheet.id,
+                rowIndex: c.rowIndex,
+                testId: c.testId,
+                nistId: c.nistId,
+                nistControlName: c.nistControlName,
+                testMethod: c.testMethod,
+                description: c.description,
+                testProcedures: c.testProcedures,
+                expectedResults: c.expectedResults,
+                actualResults: c.actualResults,
+                status: c.status,
+                notesEvidence: c.notesEvidence,
+                extraColumns: c.extraColumns as any,
+              })),
+            });
+            totalControlsImported += sheet.controls.length;
+          }
+
+          // Import changelog entries
+          if (sheet.changeLogEntries.length > 0) {
+            await prisma.sCSEMChangeLog.createMany({
+              data: sheet.changeLogEntries.map((cl) => ({
+                templateId,
+                version: cl.version,
+                changeDate: cl.changeDate,
+                description: cl.description,
+                changedBy: cl.changedBy,
+                source: "xlsx_import",
+              })),
+            });
+            totalChangeLogsImported += sheet.changeLogEntries.length;
+          }
+        }
+
+        console.log(`  ✓ ${scsem.name}: ${parsed.totalControls} controls, ${parsed.sheets.length} sheets`);
+      } catch (err: any) {
+        console.error(`  ✗ ${scsem.name}: ${err.message}`);
       }
-    });
+    }
+
+    console.log(`\nImported ${totalControlsImported} total controls and ${totalChangeLogsImported} changelog entries`);
   }
 
-  const rhelTemplate = await prisma.sCSEMTemplate.findFirst({
-    where: { cisTechnology: "Red Hat Enterprise Linux" }
-  });
-
-  if (rhelTemplate) {
-    await prisma.sCSEMUpdateReview.create({
-      data: {
-        templateId: rhelTemplate.id,
-        benchmarkId: rhel.id,
-        status: "PENDING",
-        suggestedChanges: [
-          { controlId: "1.6.1.1", change: "Ensure SELinux is not disabled in bootloader configuration", current: "Not specified", proposed: "SELinux must be configured", nistId: "CM-6", testId: "RHEL-1.6", criticality: "HIGH" },
-          { controlId: "5.2.2", change: "Ensure SSH LogLevel is set to INFO", current: "LogLevel VERBOSE", proposed: "LogLevel INFO", nistId: "AU-2", testId: "RHEL-5.2", criticality: "LOW" },
-          { controlId: "5.2.3", change: "Ensure SSH MaxAuthTries is set to 4 or less", current: "MaxAuthTries 6", proposed: "MaxAuthTries 4", nistId: "AC-7", testId: "RHEL-5.2", criticality: "MEDIUM" }
-        ]
-      }
-    });
-  }
-
-  const win11Template = await prisma.sCSEMTemplate.findFirst({
-    where: { cisTechnology: "Windows 11" }
-  });
-
-  if (win11Template) {
-    await prisma.sCSEMUpdateReview.create({
-      data: {
-        templateId: win11Template.id,
-        benchmarkId: win11.id,
-        status: "PENDING",
-        suggestedChanges: [
-          { controlId: "4.1.1", change: "Ensure BitLocker is enabled on OS volumes with TPM+PIN", current: "TPM only", proposed: "Require TPM and PIN minimum 6 digits", nistId: "SC-28", testId: "Win11-4.1", criticality: "CRITICAL" },
-          { controlId: "18.3.1", change: "Turn off Windows Copilot", current: "Not Assessed", proposed: "Enabled Feature Allowed: Disabled", nistId: "CM-7", testId: "Win11-18.3", criticality: "MEDIUM" }
-        ]
-      }
-    });
-  }
-
-  const oracleTemplate = await prisma.sCSEMTemplate.findFirst({
-    where: { cisTechnology: "Oracle Database" }
-  });
-
-  if (oracleTemplate) {
-    await prisma.sCSEMUpdateReview.create({
-      data: {
-        templateId: oracleTemplate.id,
-        benchmarkId: oracle.id,
-        status: "PENDING",
-        suggestedChanges: [
-          { controlId: "2.1", change: "Ensure SEC_CASE_SENSITIVE_LOGON is set to TRUE", current: "FALSE", proposed: "TRUE", nistId: "IA-5", testId: "Ora-2.1", criticality: "HIGH" },
-          { controlId: "4.5", change: "Ensure FAILED_LOGIN_ATTEMPTS is less than or equal to 5", current: "10", proposed: "5", nistId: "AC-7", testId: "Ora-4.5", criticality: "MEDIUM" }
-        ]
-      }
-    });
-  }
-
-  console.log("Created mock CIS Benchmarks and Pending SCSEM Update Reviews");
+  console.log("SCSEM data import complete");
 
   // Create sample incidents
   const incidents = [

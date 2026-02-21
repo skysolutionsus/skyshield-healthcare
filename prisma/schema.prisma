@@ -128,6 +128,56 @@ model SCSEMTemplate {
   updatedAt     DateTime @updatedAt
 
   updateReviews SCSEMUpdateReview[]
+  sheets        SCSEMSheet[]
+  changeLogs    SCSEMChangeLog[]
+}
+
+model SCSEMSheet {
+  id         String   @id @default(cuid())
+  templateId String
+  sheetName  String
+  sheetType  String   // "test_cases" | "dashboard" | "results" | "instructions" | "changelog" | "appendix" | "other"
+  sheetIndex Int
+  rawData    Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  template SCSEMTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  controls SCSEMControl[]
+}
+
+model SCSEMControl {
+  id              String   @id @default(cuid())
+  sheetId         String
+  rowIndex        Int
+  testId          String
+  nistId          String?
+  nistControlName String?
+  testMethod      String?
+  description     String?
+  testProcedures  String?
+  expectedResults String?
+  actualResults   String?
+  status          String?
+  notesEvidence   String?
+  extraColumns    Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  sheet SCSEMSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+}
+
+model SCSEMChangeLog {
+  id          String   @id @default(cuid())
+  templateId  String
+  version     String
+  changeDate  DateTime
+  description String
+  changedBy   String?
+  source      String   // "xlsx_import" | "cis_sync" | "manual"
+  createdAt   DateTime @default(now())
+
+  template SCSEMTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
 }
 
 model SCSEMUpdateReview {
