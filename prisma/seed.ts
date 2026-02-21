@@ -182,6 +182,7 @@ async function main() {
               sheetName: sheet.sheetName,
               sheetType: sheet.sheetType,
               sheetIndex: sheet.sheetIndex,
+              rawData: sheet.rawData as any,
             },
           });
 

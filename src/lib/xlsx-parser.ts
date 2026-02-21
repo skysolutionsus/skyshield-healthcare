@@ -68,7 +68,7 @@ function classifySheet(name: string): ParsedSheet['sheetType'] {
     if (lower.includes('change log') || lower.includes('changelog')) return 'changelog';
     if (lower === 'appendix') return 'appendix';
     if (lower.includes('issue code')) return 'issue_codes';
-    if (lower.includes('new release')) return 'changelog';
+    // 'New Release Changes' is kept as its own sheet, not merged with changelog
     return 'other';
 }
 
@@ -359,18 +359,21 @@ export function parseSCSEMFile(filePath: string): ParsedSCSEM {
     for (let idx = 0; idx < wb.SheetNames.length; idx++) {
         const sheetName = wb.SheetNames[idx];
         const ws = wb.Sheets[sheetName];
-        const sheetType = classifySheet(sheetName);
+        let sheetType = classifySheet(sheetName);
+
+        // Always capture raw data for every sheet so nothing is lost
+        const allRows = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '' }) as any[][];
 
         const parsed: ParsedSheet = {
             sheetName,
             sheetType,
             sheetIndex: idx,
-            rawData: null,
+            rawData: allRows,
             controls: [],
             changeLogEntries: [],
         };
 
-        // Only parse sheets we actually need structured data from
+        // Parse structured data where applicable
         if (sheetType === 'dashboard') {
             metadata = parseDashboardMetadata(ws);
         } else if (sheetType === 'test_cases') {
@@ -379,14 +382,11 @@ export function parseSCSEMFile(filePath: string): ParsedSCSEM {
         } else if (sheetType === 'changelog') {
             parsed.changeLogEntries = parseChangeLogSheet(ws);
         } else if (sheetType === 'other') {
-            // Auto-detect: probe sheet content for test case headers
+            // Auto-detect: probe content for test case headers
             // Many SCSEM files have technology-specific sheets (e.g. "Tomcat9", "IIS10", "Docker")
-            // that are test case sheets but don't have "test case" in their name
-            const probeData = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '' }) as any[][];
-            for (let r = 0; r < Math.min(5, probeData.length); r++) {
-                const firstCell = cellStr(probeData[r]?.[0]);
+            for (let r = 0; r < Math.min(5, allRows.length); r++) {
+                const firstCell = cellStr(allRows[r]?.[0]);
                 if (firstCell && firstCell.toLowerCase().includes('test id')) {
-                    // This is actually a test case sheet
                     parsed.sheetType = 'test_cases';
                     parsed.controls = parseTestCaseSheet(ws);
                     totalControls += parsed.controls.length;

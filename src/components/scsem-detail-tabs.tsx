@@ -168,34 +168,21 @@ export function SCSEMDetailTabs({ templateId }: { templateId: string }) {
                             {getSheetLabel(sheet)}
                         </button>
                     ))}
-                    {data.changeLogs.length > 0 && (
-                        <button
-                            onClick={() => setActiveTab("changelog")}
-                            className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${activeTab === "changelog"
-                                ? "border-blue-500 text-blue-400 bg-[var(--sky-surface)]"
-                                : "border-transparent text-[var(--sky-text-secondary)] hover:text-white hover:border-[var(--sky-border)]"
-                                }`}
-                        >
-                            <Clock className="w-3.5 h-3.5" />
-                            Change Log ({data.changeLogs.length})
-                        </button>
-                    )}
                 </div>
 
                 {/* Active Sheet Content */}
                 <div className="p-4">
-                    {activeTab === "changelog" ? (
-                        <ChangeLogView entries={data.changeLogs} />
-                    ) : activeSheet && activeSheet.controls.length > 0 ? (
+                    {activeSheet && activeSheet.controls.length > 0 ? (
                         <ControlsTable
                             controls={activeSheet.controls}
                             expandedControls={expandedControls}
                             onToggle={toggleControl}
                         />
+                    ) : activeSheet && activeSheet.rawData && activeSheet.rawData.length > 0 ? (
+                        <RawDataTable rows={activeSheet.rawData} />
                     ) : (
                         <div className="text-center py-8 text-[var(--sky-text-secondary)]">
-                            <p>This sheet ({activeSheet?.sheetName || "unknown"}) has no control data.</p>
-                            <p className="text-xs mt-1 opacity-70">Try selecting a different sheet tab above, or check the Change Log.</p>
+                            <p>This sheet ({activeSheet?.sheetName || "unknown"}) has no data.</p>
                         </div>
                     )}
                 </div>
@@ -420,3 +407,126 @@ function ChangeLogView({ entries }: { entries: SCSEMChangeLogEntry[] }) {
         </div>
     );
 }
+
+/**
+ * Generic raw data table renderer for any XLSX sheet
+ * Renders the raw cell data exactly as it appears in the spreadsheet
+ */
+function RawDataTable({ rows }: { rows: any[][] }) {
+    if (!rows || rows.length === 0) return null;
+
+    // Format cell values for display
+    const formatCell = (val: any): string => {
+        if (val === null || val === undefined || val === '') return '';
+        // Detect Excel serial dates (numbers between 30000-50000 that aren't regular numbers)
+        if (typeof val === 'number' && val > 30000 && val < 60000) {
+            try {
+                const d = new Date((val - 25569) * 86400000);
+                if (!isNaN(d.getTime())) {
+                    return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+                }
+            } catch { }
+        }
+        return String(val);
+    };
+
+    // Find the max number of columns across all rows
+    const maxCols = Math.max(...rows.map(r => (r as any[]).length));
+
+    // Find header-like row: first row where multiple cells have content
+    let headerIdx = -1;
+    for (let i = 0; i < Math.min(3, rows.length); i++) {
+        const nonEmpty = (rows[i] as any[]).filter(c => c !== '' && c !== null && c !== undefined).length;
+        if (nonEmpty >= 2) {
+            headerIdx = i;
+            break;
+        }
+    }
+
+    // Rows before the header are title/metadata rows
+    const preHeaderRows = headerIdx > 0 ? rows.slice(0, headerIdx) : [];
+    const headerRow = headerIdx >= 0 ? rows[headerIdx] as any[] : null;
+    const dataRows = headerIdx >= 0 ? rows.slice(headerIdx + 1) : rows;
+
+    // Filter out columns that are entirely empty in data rows
+    const activeCols: number[] = [];
+    for (let c = 0; c < maxCols; c++) {
+        const hasData = dataRows.some(r => {
+            const val = (r as any[])[c];
+            return val !== '' && val !== null && val !== undefined;
+        }) || (headerRow && formatCell(headerRow[c]));
+        if (hasData) activeCols.push(c);
+    }
+
+    // If very few active columns or rows, show as a simple key-value layout
+    if (activeCols.length <= 2 && dataRows.length <= 1) {
+        return (
+            <div className="space-y-2">
+                {preHeaderRows.map((row, i) => {
+                    const text = (row as any[]).filter(c => c !== '' && c !== null).map(c => formatCell(c)).join(' ');
+                    if (!text) return null;
+                    return (
+                        <div key={i} className="text-sm text-white/80 font-medium">{text}</div>
+                    );
+                })}
+                {rows.filter(r => {
+                    const cells = (r as any[]).filter(c => c !== '' && c !== null);
+                    return cells.length > 0;
+                }).map((row, i) => {
+                    const cells = (row as any[]).filter(c => c !== '' && c !== null);
+                    return (
+                        <div key={i} className="text-sm text-white/70">{cells.map(c => formatCell(c)).join(': ')}</div>
+                    );
+                })}
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-3">
+            {/* Pre-header title rows */}
+            {preHeaderRows.map((row, i) => {
+                const text = (row as any[]).filter(c => c !== '' && c !== null).map(c => formatCell(c)).join(' — ');
+                if (!text) return null;
+                return (
+                    <div key={i} className="text-sm font-semibold text-white/80">{text}</div>
+                );
+            })}
+
+            {/* Main data table */}
+            <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                    {headerRow && (
+                        <thead>
+                            <tr className="border-b border-[var(--sky-border)]">
+                                {activeCols.map(c => (
+                                    <th key={c} className="py-2 px-3 text-left text-xs font-semibold text-[var(--sky-text-secondary)] uppercase tracking-wider whitespace-nowrap">
+                                        {formatCell(headerRow[c]) || ''}
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+                    )}
+                    <tbody>
+                        {dataRows.map((row, i) => {
+                            const cells = row as any[];
+                            // Skip completely empty rows
+                            const hasContent = activeCols.some(c => cells[c] !== '' && cells[c] !== null && cells[c] !== undefined);
+                            if (!hasContent) return null;
+                            return (
+                                <tr key={i} className="border-b border-[var(--sky-border)]/30 hover:bg-[var(--sky-bg)]">
+                                    {activeCols.map(c => (
+                                        <td key={c} className="py-2 px-3 text-xs text-white/80 whitespace-pre-wrap max-w-[400px]">
+                                            {formatCell(cells[c])}
+                                        </td>
+                                    ))}
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
