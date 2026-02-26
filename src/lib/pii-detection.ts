@@ -15,7 +15,10 @@ export type PiiType =
   | "TAX_FORM"
   | "FINANCIAL_DATA"
   | "CREDIT_CARD"
-  | "BANK_ACCOUNT";
+  | "BANK_ACCOUNT"
+  | "PERSON_NAME"
+  | "AGENCY_NAME"
+  | "IDENTIFIER";
 
 export interface PiiMatch {
   type: PiiType;
@@ -353,6 +356,206 @@ function detectBankAccounts(text: string): PiiMatch[] {
 }
 
 // ---------------------------------------------------------------------------
+// Person Name Detection
+// ---------------------------------------------------------------------------
+// Detects names via:
+//   - Titles: Mr./Mrs./Ms./Dr./Rev./Prof. followed by a capitalized word
+//   - Labeled patterns: "Name:", "Taxpayer:", "Client:", "Employee:" followed by words
+//   - Full names (First Last) near PII-context keywords
+
+const TITLED_NAME_RE =
+  /\b((?:Mr|Mrs|Ms|Miss|Dr|Rev|Prof|Hon|Sgt|Cpl|Pvt|Lt|Capt|Maj|Col|Gen|Cmdr|Adm)\.?)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\b/g;
+
+const LABELED_NAME_RE =
+  /\b(?:(?:full\s+)?name|taxpayer|client|employee|applicant|complainant|respondent|beneficiary|claimant|patient|subject|individual|person|contact)\s*[:=]\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})/gi;
+
+const FULL_NAME_NEAR_CONTEXT_RE =
+  /\b([A-Z][a-z]{1,15}\s+(?:[A-Z]\.\s+)?[A-Z][a-z]{1,20})\b/g;
+
+const NAME_CONTEXT_KEYWORDS = [
+  "ssn", "social security", "taxpayer", "account", "client", "employee",
+  "badge", "id number", "case", "file", "docket", "permit",
+  "license", "patient", "applicant", "beneficiary",
+];
+
+function detectPersonNames(text: string): PiiMatch[] {
+  const matches: PiiMatch[] = [];
+  const lowerText = text.toLowerCase();
+
+  // Titled names — high confidence
+  for (const m of text.matchAll(TITLED_NAME_RE)) {
+    matches.push({
+      type: "PERSON_NAME",
+      pattern: `[TITLED NAME: ${redact(m[0])}]`,
+      position: m.index!,
+      confidence: "HIGH",
+    });
+  }
+
+  // Labeled names — high confidence
+  for (const m of text.matchAll(LABELED_NAME_RE)) {
+    matches.push({
+      type: "PERSON_NAME",
+      pattern: `[LABELED NAME: ${redact(m[1])}]`,
+      position: m.index!,
+      confidence: "HIGH",
+    });
+  }
+
+  // Full names near context keywords — medium confidence
+  for (const m of text.matchAll(FULL_NAME_NEAR_CONTEXT_RE)) {
+    const windowStart = Math.max(0, m.index! - 100);
+    const windowEnd = Math.min(text.length, m.index! + m[0].length + 100);
+    const context = lowerText.slice(windowStart, windowEnd);
+
+    // Must be near a PII context keyword
+    if (!NAME_CONTEXT_KEYWORDS.some((kw) => context.includes(kw))) continue;
+
+    // Skip common non-name capitalized phrases (section titles, pub refs)
+    const before = lowerText.slice(Math.max(0, m.index! - 15), m.index!);
+    if (/(?:section|pub|publication|chapter|form|schedule|exhibit)\s*$/i.test(before)) continue;
+
+    matches.push({
+      type: "PERSON_NAME",
+      pattern: `[NAME: ${redact(m[0])}]`,
+      position: m.index!,
+      confidence: "MEDIUM",
+    });
+  }
+
+  return matches;
+}
+
+// ---------------------------------------------------------------------------
+// Agency Name Detection
+// ---------------------------------------------------------------------------
+// Detects federal/state agency names and department patterns
+
+const KNOWN_AGENCIES = [
+  // Federal agencies (only flag when they appear with identifying context)
+  "Social Security Administration",
+  "Department of the Treasury",
+  "Department of Justice",
+  "Department of Homeland Security",
+  "Department of Defense",
+  "Department of Veterans Affairs",
+  "Department of Health and Human Services",
+  "Department of Education",
+  "Department of Labor",
+  "Department of Energy",
+  "Centers for Medicare and Medicaid Services",
+  "Federal Bureau of Investigation",
+  "Drug Enforcement Administration",
+  "Bureau of Alcohol Tobacco Firearms and Explosives",
+  "U.S. Customs and Border Protection",
+  "U.S. Immigration and Customs Enforcement",
+  "U.S. Secret Service",
+  "U.S. Marshals Service",
+  "National Security Agency",
+  "Defense Intelligence Agency",
+  "Government Accountability Office",
+  "Office of Personnel Management",
+];
+
+const STATE_DEPT_RE =
+  /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+(?:Department|Dept\.?)\s+of\s+(?:Revenue|Taxation|Finance|Tax(?:es)?|Treasury)\b/gi;
+
+const AGENCY_CONTEXT_KEYWORDS = [
+  "taxpayer", "client", "agency", "contract", "case", "file",
+  "report", "employee", "office", "field", "assigned", "responsible",
+];
+
+function detectAgencyNames(text: string): PiiMatch[] {
+  const matches: PiiMatch[] = [];
+  const lowerText = text.toLowerCase();
+
+  // Known agency names near identifying context
+  for (const agency of KNOWN_AGENCIES) {
+    const agencyLower = agency.toLowerCase();
+    let searchStart = 0;
+    while (true) {
+      const idx = lowerText.indexOf(agencyLower, searchStart);
+      if (idx === -1) break;
+      searchStart = idx + agencyLower.length;
+
+      const windowStart = Math.max(0, idx - 100);
+      const windowEnd = Math.min(text.length, idx + agencyLower.length + 100);
+      const context = lowerText.slice(windowStart, windowEnd);
+
+      if (AGENCY_CONTEXT_KEYWORDS.some((kw) => context.includes(kw))) {
+        matches.push({
+          type: "AGENCY_NAME",
+          pattern: `[AGENCY: ${agency}]`,
+          position: idx,
+          confidence: "MEDIUM",
+        });
+      }
+    }
+  }
+
+  // State department patterns — high confidence
+  for (const m of text.matchAll(STATE_DEPT_RE)) {
+    matches.push({
+      type: "AGENCY_NAME",
+      pattern: `[STATE AGENCY: ${redact(m[0])}]`,
+      position: m.index!,
+      confidence: "HIGH",
+    });
+  }
+
+  return matches;
+}
+
+// ---------------------------------------------------------------------------
+// Identifier Detection
+// ---------------------------------------------------------------------------
+// Detects case numbers, employee/badge IDs, permit/license numbers, docket refs
+
+const IDENTIFIER_PATTERNS: Array<{ re: RegExp; label: string; confidence: "HIGH" | "MEDIUM" }> = [
+  // Case/File numbers: "Case #12345", "File No. ABC-123", "Case Number: 2024-FL-001"
+  {
+    re: /\b(?:case|file|docket|claim|reference|ref)\s*(?:number|num|no\.?|#)[:.\s]*([A-Z0-9][A-Z0-9\-/]{2,20})/gi,
+    label: "CASE/FILE NUMBER",
+    confidence: "HIGH",
+  },
+  // Employee/Badge IDs: "Employee ID: 12345", "Badge #1234", "Staff ID 98765"
+  {
+    re: /\b(?:employee|badge|staff|personnel|agent|officer)\s*(?:id|number|num|no\.?|#)[:.\s]*([A-Z0-9][A-Z0-9\-]{2,15})/gi,
+    label: "EMPLOYEE/BADGE ID",
+    confidence: "HIGH",
+  },
+  // License/Permit numbers
+  {
+    re: /\b(?:license|licence|permit|registration|certificate)\s*(?:number|num|no\.?|#)[:.\s]*([A-Z0-9][A-Z0-9\-]{2,20})/gi,
+    label: "LICENSE/PERMIT NUMBER",
+    confidence: "HIGH",
+  },
+  // Tracking/Reference/Confirmation numbers
+  {
+    re: /\b(?:tracking|confirmation|receipt|ticket|incident|report)\s*(?:number|num|no\.?|#)[:.\s]*([A-Z0-9][A-Z0-9\-]{3,20})/gi,
+    label: "TRACKING NUMBER",
+    confidence: "MEDIUM",
+  },
+];
+
+function detectIdentifiers(text: string): PiiMatch[] {
+  const matches: PiiMatch[] = [];
+
+  for (const { re, label, confidence } of IDENTIFIER_PATTERNS) {
+    for (const m of text.matchAll(re)) {
+      matches.push({
+        type: "IDENTIFIER",
+        pattern: `[${label}: ${redact(m[1])}]`,
+        position: m.index!,
+        confidence,
+      });
+    }
+  }
+
+  return matches;
+}
+
+// ---------------------------------------------------------------------------
 // Sanitization
 // ---------------------------------------------------------------------------
 
@@ -489,6 +692,9 @@ export function detectPII(text: string): PiiDetectionResult {
     ...detectFinancialData(text),
     ...detectCreditCards(text),
     ...detectBankAccounts(text),
+    ...detectPersonNames(text),
+    ...detectAgencyNames(text),
+    ...detectIdentifiers(text),
   ];
 
   const matches = deduplicateMatches(allMatches);

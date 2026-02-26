@@ -76,6 +76,8 @@ model User {
   createdIncidents   Incident[]          @relation("CreatedIncidents")
   incidentActivities IncidentActivity[]
   auditLogs          AuditLog[]
+  reportedFalsePositives  FalsePositiveReport[] @relation("ReportedFalsePositives")
+  reviewedFalsePositives  FalsePositiveReport[] @relation("ReviewedFalsePositives")
 }
 
 model Invitation {
@@ -232,10 +234,11 @@ model Incident {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
-  organization Organization       @relation(fields: [organizationId], references: [id])
-  assignedTo   User?               @relation("AssignedIncidents", fields: [assignedToId], references: [id])
-  createdBy    User                @relation("CreatedIncidents", fields: [createdById], references: [id])
-  activities   IncidentActivity[]
+  organization        Organization       @relation(fields: [organizationId], references: [id])
+  assignedTo          User?               @relation("AssignedIncidents", fields: [assignedToId], references: [id])
+  createdBy           User                @relation("CreatedIncidents", fields: [createdById], references: [id])
+  activities          IncidentActivity[]
+  falsePositiveReports FalsePositiveReport[]
 }
 
 model IncidentActivity {
@@ -276,4 +279,29 @@ model CISBenchmarkVersion {
   updatedAt      DateTime @updatedAt
 
   updateReviews  SCSEMUpdateReview[]
+}
+
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model FalsePositiveReport {
+  id           String   @id @default(cuid())
+  incidentId   String
+  reportedById String
+  reason       String
+  status       String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  reviewedById String?
+  reviewNotes  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  incident   Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  reportedBy User     @relation("ReportedFalsePositives", fields: [reportedById], references: [id])
+  reviewedBy User?    @relation("ReviewedFalsePositives", fields: [reviewedById], references: [id])
 }

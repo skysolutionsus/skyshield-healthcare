@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { formatDateTime, getInitials } from "@/lib/utils";
 import { Users, Mail, Shield, UserPlus } from "lucide-react";
 import { UserManagement } from "@/components/user-management";
+import { LLMSettings } from "@/components/llm-settings";
 
 export default async function SettingsPage() {
   const session = await auth();
@@ -82,8 +83,13 @@ export default async function SettingsPage() {
         </p>
       </div>
 
-      {/* Invite Section (Admin only) */}
-      {isAdmin && <UserManagement orgId={orgId} />}
+      {/* Admin sections */}
+      {isAdmin && (
+        <>
+          <LLMSettings />
+          <UserManagement orgId={orgId} />
+        </>
+      )}
 
       {/* Users Table */}
       <div className="bg-[var(--sky-surface)] border border-[var(--sky-border)] rounded-xl overflow-hidden mb-8">

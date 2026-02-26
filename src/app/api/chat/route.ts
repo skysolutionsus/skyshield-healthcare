@@ -7,6 +7,26 @@ import Anthropic from "@anthropic-ai/sdk";
 import { readFileSync } from "fs";
 import { join } from "path";
 
+// Helper: Get LLM settings from DB, fall back to env vars
+async function getLLMSettings(): Promise<{ model: string; apiKey: string }> {
+  let model = "claude-sonnet-4-6";
+  let apiKey = process.env.ANTHROPIC_API_KEY || "";
+
+  try {
+    const settings = await db.systemSetting.findMany({
+      where: { key: { in: ["llm_model", "llm_api_key"] } },
+    });
+    for (const s of settings) {
+      if (s.key === "llm_model" && s.value) model = s.value;
+      if (s.key === "llm_api_key" && s.value) apiKey = s.value;
+    }
+  } catch {
+    // Fall back to defaults if DB is unavailable
+  }
+
+  return { model, apiKey };
+}
+
 // Allow up to 60s for Anthropic response (Coolify / long-running AI calls)
 export const maxDuration = 60;
 
@@ -128,8 +148,9 @@ export async function POST(request: NextRequest) {
 
     if (piiResult.hasPII) {
       // Auto-create incident
+      let incidentId: string | null = null;
       try {
-        await db.incident.create({
+        const incident = await db.incident.create({
           data: {
             organizationId: userInfo.organizationId,
             title: `PII/FTI Detection: ${piiResult.matches.map((m) => m.type).join(", ")}`,
@@ -146,6 +167,7 @@ export async function POST(request: NextRequest) {
             affectedSystems: "AI Chat Interface",
           },
         });
+        incidentId = incident.id;
       } catch {
         // Log failure but don't block the response
       }
@@ -173,6 +195,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         piiBlocked: true,
+        incidentId,
         message:
           "Your message was blocked because it appears to contain sensitive data (FTI/PII). This data was NOT sent to any external service. An incident report has been automatically created.",
         piiTypes: piiResult.matches.map((m) => m.type),
@@ -256,7 +279,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Call Anthropic API
-    if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY === "sk-ant-placeholder") {
+    const llmSettings = await getLLMSettings();
+
+    if (!llmSettings.apiKey || llmSettings.apiKey === "sk-ant-placeholder") {
       // Demo mode - return a sample response
       const demoResponse = `Based on Publication 1075, I can provide guidance on your question.
 
@@ -297,7 +322,7 @@ Section 3.1: General Requirements`;
     }
 
     const anthropic = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
+      apiKey: llmSettings.apiKey,
     });
 
     // Build message history
@@ -315,7 +340,7 @@ Section 3.1: General Requirements`;
     apiMessages.push({ role: "user", content: message });
 
     const responsePromise = anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      model: llmSettings.model,
       max_tokens: 4096,
       system: SYSTEM_PROMPT,
       messages: apiMessages,
