@@ -1,5 +1,8 @@
 import { Prisma } from "@prisma/client";
+import { execFile } from "child_process";
 import { readFileSync } from "fs";
+import { mkdtemp, readFile, rm, writeFile } from "fs/promises";
+import { tmpdir } from "os";
 import { join } from "path";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "@/lib/db";
@@ -59,34 +62,60 @@ async function extractPdfTextByPage(pdfBuffer: Buffer): Promise<{
   pageCount: number;
   pdfInfo: Record<string, unknown>;
 }> {
-  const { PDFParse } = await import("pdf-parse");
-  const parser = new PDFParse({ data: pdfBuffer });
-
+  const tempDir = await mkdtemp(join(tmpdir(), "pub1075-"));
+  const pdfPath = join(tempDir, "p1075.pdf");
+  const textPath = join(tempDir, "p1075.txt");
   try {
-    const info = await parser.getInfo({ parsePageInfo: true });
-    const pageCount = info.total || info.pages?.length || 0;
-    const pages: string[] = [];
+    await writeFile(pdfPath, pdfBuffer);
+    await runPdfToText(pdfPath, textPath);
 
-    for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
-      const page = await parser.getText({ partial: [pageNumber] });
-      pages.push(`--- PAGE ${pageNumber} ---\n\n${page.text.trim()}`);
-    }
+    const rawText = await readFile(textPath, "utf-8");
+    const pages = rawText
+      .split("\f")
+      .map((page) => page.trim())
+      .filter(Boolean);
+    const pageCount = pages.length || 1;
 
     return {
-      text: pages.join("\n\n\n"),
+      text: pages
+        .map((page, index) => `--- PAGE ${index + 1} ---\n\n${page}`)
+        .join("\n\n\n"),
       pageCount,
       pdfInfo: {
-        title: info.info?.Title,
-        author: info.info?.Author,
-        creator: info.info?.Creator,
-        producer: info.info?.Producer,
-        creationDate: info.info?.CreationDate,
-        modificationDate: info.info?.ModDate,
+        extractionTool: "pdftotext",
       },
     };
   } finally {
-    await parser.destroy();
+    await rm(tempDir, { recursive: true, force: true });
   }
+}
+
+function runPdfToText(pdfPath: string, textPath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      "pdftotext",
+      ["-layout", "-enc", "UTF-8", pdfPath, textPath],
+      { timeout: 120_000, maxBuffer: 1024 * 1024 },
+      (error, _stdout, stderr) => {
+        if (!error) {
+          resolve();
+          return;
+        }
+
+        const nodeError = error as NodeJS.ErrnoException;
+        if (nodeError.code === "ENOENT") {
+          reject(
+            new Error(
+              "The pdftotext binary is not available. Redeploy with the updated Dockerfile so poppler-utils is installed in the app container."
+            )
+          );
+          return;
+        }
+
+        reject(new Error(`pdftotext failed: ${stderr.trim() || error.message}`));
+      }
+    );
+  });
 }
 
 export async function loadOfficialPub1075FromIrs(): Promise<KnowledgeImportInput & {

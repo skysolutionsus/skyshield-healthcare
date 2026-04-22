@@ -11,6 +11,7 @@ import {
 } from "@/lib/knowledge/ingest";
 
 export const maxDuration = 300;
+export const runtime = "nodejs";
 
 async function requireAdmin() {
   const session = await auth();

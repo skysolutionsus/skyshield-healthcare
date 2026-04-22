@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { writeFileSync, readFileSync, existsSync } from "fs";
+import { loadOfficialPub1075FromIrs, PUB_1075_PDF_URL } from "@/lib/knowledge/ingest";
+import { writeFileSync, readFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
 
-const PUB_1075_PDF_URL = "https://www.irs.gov/pub/irs-pdf/p1075.pdf";
 const DATA_DIR = join(process.cwd(), "data", "pub1075");
-const PDF_PATH = join(DATA_DIR, "p1075.pdf");
 const TEXT_PATH = join(DATA_DIR, "p1075-full-text.md");
 
-export async function POST(request: Request) {
+export const runtime = "nodejs";
+
+export async function POST() {
     try {
         const session = await auth();
         if (!session?.user) {
@@ -20,34 +21,8 @@ export async function POST(request: Request) {
 
         console.log("Downloading latest Pub 1075 from IRS...");
 
-        // Step 1: Download the PDF
-        const pdfResponse = await fetch(PUB_1075_PDF_URL);
-        if (!pdfResponse.ok) {
-            return NextResponse.json({
-                error: `Failed to download Pub 1075 PDF: ${pdfResponse.status} ${pdfResponse.statusText}`,
-            }, { status: 502 });
-        }
-
-        const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
-        const pdfSizeKB = Math.round(pdfBuffer.length / 1024);
-        console.log(`Downloaded ${pdfSizeKB}KB PDF`);
-
-        // Save the PDF
-        writeFileSync(PDF_PATH, pdfBuffer);
-
-        // Step 2: Parse PDF to text
-        const pdfParseModule = await import("pdf-parse") as any;
-        const pdfParse = pdfParseModule.default || pdfParseModule;
-        const parsed = await pdfParse(pdfBuffer);
-
-        const pageCount = parsed.numpages;
-        const rawText = parsed.text;
-
-        // Step 3: Format content with page markers
-        // pdf-parse gives us all text — format it nicely
-        const header = `# IRS Publication 1075 - Tax Information Security Guidelines\n# Total Pages: ${pageCount}\n# Downloaded: ${new Date().toISOString()}\n# Source: ${PUB_1075_PDF_URL}\n\n`;
-
-        const formattedText = header + rawText;
+        const pub1075 = await loadOfficialPub1075FromIrs();
+        mkdirSync(DATA_DIR, { recursive: true });
 
         // Step 4: Backup previous version
         if (existsSync(TEXT_PATH)) {
@@ -58,8 +33,8 @@ export async function POST(request: Request) {
         }
 
         // Step 5: Write new full-text file
-        writeFileSync(TEXT_PATH, formattedText, "utf-8");
-        console.log(`Wrote ${formattedText.length} chars to ${TEXT_PATH}`);
+        writeFileSync(TEXT_PATH, pub1075.content, "utf-8");
+        console.log(`Wrote ${pub1075.content.length} chars to ${TEXT_PATH}`);
 
         // Step 6: Log the update
         await db.auditLog.create({
@@ -71,23 +46,25 @@ export async function POST(request: Request) {
                 resourceId: "pub1075",
                 metadata: {
                     source: PUB_1075_PDF_URL,
-                    pdfSizeKB,
-                    pageCount,
-                    textLength: formattedText.length,
-                    downloadedAt: new Date().toISOString(),
+                    pdfSizeKB: pub1075.pdfSizeKB,
+                    pageCount: pub1075.pageCount,
+                    textLength: pub1075.content.length,
+                    downloadedAt: pub1075.downloadedAt,
+                    pdfSha256: pub1075.pdfSha256,
+                    textSha256: pub1075.textSha256,
                 },
             },
         });
 
         return NextResponse.json({
             success: true,
-            message: `Downloaded and parsed Pub 1075 (${pageCount} pages, ${pdfSizeKB}KB)`,
+            message: `Downloaded and parsed Pub 1075 (${pub1075.pageCount} pages, ${pub1075.pdfSizeKB}KB)`,
             details: {
-                pageCount,
-                pdfSizeKB,
-                textLength: formattedText.length,
+                pageCount: pub1075.pageCount,
+                pdfSizeKB: pub1075.pdfSizeKB,
+                textLength: pub1075.content.length,
                 source: PUB_1075_PDF_URL,
-                updatedAt: new Date().toISOString(),
+                updatedAt: pub1075.downloadedAt,
             },
             note: "Both the AI agent and Pub 1075 sync endpoint will use the updated text. Server restart may be needed for the AI agent to pick up the new text.",
         });
