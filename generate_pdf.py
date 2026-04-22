@@ -349,9 +349,10 @@ html_content = f"""<!DOCTYPE html>
                 </h3>
                 <p>The Office of Safeguards relies on <strong>Publication 1075</strong>, encompassing hundreds of pages. Traditional methods fall short:</p>
                 <ul>
+                    <li><span class="danger">Time-Intensive TI Research:</span> Producing a comprehensive Technical Inquiry response currently requires several hours of manual research per inquiry.</li>
+                    <li><span class="danger">Interpretation Risk:</span> Reviewers must interpret complex guidance across Pub 1075, NIST standards, and technology-specific benchmarks, leading to inconsistent accuracy.</li>
                     <li><span class="danger">Search Limitations:</span> Standard keyword search misses semantic meaning and context necessary to parse complex agency questions.</li>
-                    <li><span class="danger">Scattered Guidance:</span> Vital answers aren't solely in Pub 1075; they rely on NIST standards and specific technology guidelines unseen by basic searches.</li>
-                    <li><span class="danger">Public AI Risks:</span> Commercial LLMs (like ChatGPT) risk exposing <strong>FTI</strong> and <strong>PII</strong>, suffer from hallucinations, and cite outdated regulations.</li>
+                    <li><span class="danger">Public AI Risks:</span> Commercial LLMs risk exposing <strong>FTI</strong> and <strong>PII</strong>, suffer from hallucinations, and cite outdated regulations.</li>
                 </ul>
             </div>
 
@@ -362,9 +363,10 @@ html_content = f"""<!DOCTYPE html>
                 </h3>
                 <p>We built a secure, private AI compliance platform engineered specifically for the IRS, bypassing commercial LLM vulnerabilities entirely.</p>
                 <ul>
+                    <li><span class="highlight">Accelerated Research:</span> Significantly compresses TI research that typically takes hours down to minutes, dramatically increasing throughput.</li>
                     <li><span class="highlight">Ironclad Security:</span> Intercepts and blocks FTI and PII <em>before</em> it ever reaches inference.</li>
-                    <li><span class="highlight">Zero Hallucination:</span> Dedicated scoping strictly utilizing verified Publication 1075 and IRS data, enforcing factual responses.</li>
-                    <li><span class="highlight">Comprehensive Governance:</span> Built-in role-based access control (RBAC), user logging, and an executive dashboard for tracking and reporting.</li>
+                    <li><span class="highlight">Zero Hallucination:</span> Strictly utilizes verified Pub 1075 and IRS data, enforcing factual, citation-backed responses.</li>
+                    <li><span class="highlight">Comprehensive Governance:</span> Built-in RBAC, user logging, and an executive dashboard for tracking and reporting.</li>
                 </ul>
             </div>
         </div>
@@ -425,10 +427,10 @@ html_content = f"""<!DOCTYPE html>
             </div>
             <div class="benefit-card">
                 <div class="benefit-icon">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
                 </div>
-                <h4>SCSEM Updates (WIP)</h4>
-                <p>Automatically keeps SCSEM guidelines compliant in real-time, ingesting emerging TIs and CIS benchmarks.</p>
+                <h4>Analytics</h4>
+                <p>Comprehensive built-in dashboard provides executive visualizations, detailed usage logging, and real-time compliance tracking.</p>
             </div>
         </div>
 
