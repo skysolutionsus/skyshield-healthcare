@@ -1,0 +1,46 @@
+SECURITY AND PRIVACY ALERT MEMO
+Office of Safeguards  
+ 
+Date: August 21, 2023
+ 
+Subject: Publication 1075 Interim Guidance – Data Incidents
+ 
+Purpose:  
+Effective August 21, 2023, federal, state, and local agency partners will report improper inspection or disclosure of federal tax information (FTI), including data breaches, data incidents, and information spillage, to the IRS Office of Safeguards only. Agency partners are no longer required to concurrently report improper inspections or disclosures to the Treasury Inspector General for Tax Administration (TIGTA).
+ 
+Background:
+TIGTA updated its public website and removed TIGTA field office contact information. This impacts Publication 1075, Tax Information Security Guidelines for Federal, State and Local Agencies, data incident, breach, and spillage reporting requirements.
+ 
+Requirements:
+Agency partners must report improper inspection or disclosure of FTI, including data breaches, data incidents, and information spillage, only to the IRS Office of Safeguards. Publication 1075 will be revised in the future to remove the requirements for agency partners to contact TIGTA. Additional section-specific guidance follows:
+•      Section 1.8.2, General
+o   Incident management policies should not include instructions for TIGTA reporting. All reporting of improper inspections and disclosures of FTI, including breaches and incidents, are directed to the Office of Safeguards.
+•      Section 1.8.3, Office of Safeguards Notification Process
+o   Agencies are only required to notify the Office of Safeguards. Concurrent reporting to TIGTA is not required.
+•      Section 1.8.4, Incident Response Procedures
+o   Agencies are only required to notify the Office of Safeguards. Concurrent reporting to TIGTA is not required.
+•      Section 2.D.2.1, Disclosure Awareness Training
+o   The requirement to report improper inspections or disclosures of FTI, including breaches and security incidents, to TIGTA should be removed from all training material.
+o   If applicable, initial training certification and recertification statements should remove the language regarding reporting requirements to TIGTA.
+•      Section 2.D.2.1, Disclosure Awareness Training Products
+o   Publication 4761, Protecting Federal Tax Information: A Guide for Government Employees – Agencies are only required to notify the Office of Safeguards. Concurrent reporting to TIGTA is not required.
+o   Safeguards Disclosure Awareness Videos – Agencies are only required to notify the Office of Safeguards. Concurrent reporting to TIGTA is not required.
+•      Section 4.8 Incident Response                                                                            IR-6 (b), Incident Reporting
+o   Report incident information immediately but no later than 24 hours after the identification of a possible issue involving FTI to the IRS Office of Safeguards.
+•      Section 4.8 Incident Response                                                                            IR-9 (g), Information Spillage Response
+o   Reporting incident information to the appropriate special agent-in-charge is not required.
+ 
+Agency partners can use this Security and Privacy Alert to close findings where a lack of reference to TIGTA is the only issue. 
+ 
+The IRS Office of Safeguards will report all improper inspection or disclosure of FTI, including data breaches, data incidents, and information spillage to TIGTA. 
+ 
+All other data incident reporting requirements remain unchanged. 
+ 
+Additional Information / Resources:
+The IRS will update Publication 1075, Publication 4761, and other data incident resources on IRS.gov (e.g., webpages and training videos) to remove TIGTA’s contact information and the requirements to contact TIGTA. Until that time, agencies should disregard mentions of TIGTA reporting requirements. Agency partners can submit technical inquiries, at the below email address, with any questions concerning this interim guidance. 
+ 
+Safeguards contact: SafeguardReports@irs.gov 
+ 
+Kevin Woolfolk
+Acting Associate Director
+IRS, Office of Safeguards

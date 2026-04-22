@@ -1,0 +1,55 @@
+SECURITY AND PRIVACY ALERT
+Office of Safeguards
+ 
+Date: January 22, 2024
+ 
+Subject: Publication 1075 Interim Guidance - Authentication
+ 
+Introduction
+ 
+Safeguards is issuing this guidance on authentication requirements to align itself with best practices in NIST SP 800-63B: Digital Identity Guidelines: Authentication and Lifecycle Management. 
+ 
+The guidance for passwords or memorized secrets is different from traditional guidance. Most notably: complexity requirements do not apply, and passwords should not be changed periodically. Additionally, the guidelines for maintaining a list that contains values such as passwords commonly-used, expected, or compromised has changed.
+ 
+Guidance
+The following guidance supersedes IRS Publication 1075 (11-2021), Section 4.7 Identification and Authentication, IA-5 Authenticator Management, (CE-1) Password-Based Authentication. 
+For password-based authentication:
+a.    Maintain a list of commonly used, expected, or compromised passwords and update the list annually and when organizational passwords are suspected to have been compromised directly or indirectly.
+1.    The list may include, but is not limited to:
+•      Passwords obtained from previous breach corpuses.
+•      Dictionary words.
+•      Repetitive or sequential characters (e.g., ‘aaaaaa’, ‘1234abcd’.)
+•      Context-specific words, such as the name of the service, the username, and derivatives thereof.
+b.    Verify, when users create or update passwords, that the passwords are not found on the list of commonly-used, expected, or compromised passwords in IA-5(1)(a);
+1.    At least annually, change existing passwords found on the list of commonly-used, expected, or compromised passwords in IA-5(1)(a);
+c.     Transmit passwords only over cryptographically-protected channels;
+d.    Store passwords using an approved salted key derivation function, preferably using a keyed hash;
+e.    Require immediate selection of a new password upon account recovery;
+f.      Allow user selection of long passwords and passphrases, including spaces and all printable characters; and
+g.    Employ automated tools to assist the user in selecting strong password authenticators.
+h.    Enforce the following composition and complexity rules: 
+1.    Enforce minimum password length of (14) characters
+2.    Enforce password lifetime restrictions: 
+                                               i.     Service account passwords shall expire within 366 days (inclusive).
+3.    Allow the use of a temporary password for system logons with an immediate change to a permanent password.
+4.    Password History/Reuse for service accounts: 
+                                               i.     For service accounts: 10 generations. 
+                                             ii.     For systems unable to implement history/reuse restriction by generations but can restrict history/reuse for a specified time period, passwords shall not be reusable for a period of six (6) months. 
+ 
+Supplemental Guidance: In alignment with NIST SP 800-63B, password composition and complexity requirements of uppercase, lowercase, numerical characters, history/reuse, and maximum age/expiration have been removed. 
+ 
+Mitigating requirements for systems unable to implement checks against the list of commonly used, expected, or compromised passwords from IA-5(1)(a) include:
+•      Enforce password lifetime restrictions of one (1) day minimum and 90 days maximum.
+•      Password History/Reuse: 
+o   For all systems: 24 generations. 
+o   For systems unable to implement history/reuse restriction by generations but are able to restrict history/reuse for a specified time period, passwords shall not be reusable for a period of six (6) months. 
+Supplemental Guidance: The mitigating requirements do not eliminate risk associated with non-compliance, findings may still be issued if these mitigations are in place. 
+ 
+Future Considerations
+Ultimately, agencies should move towards a Zero Trust Architecture (ZTA). As such, agencies should plan and begin to implement multifactor authentication (MFA), ideally, phishing resistant, for all system components at the application layer, not just at the network layer or for initial network access. This may be facilitated through the implementation of single sign on (SSO) technology. 
+ 
+Resources
+•       NIST SP 800-63B: Digital Identity Guidelines: Authentication and Lifecycle Management
+•       NSA Cybersecurity Information Sheet: Advancing Zero Trust Maturity Through the Device Pillar
+•       NIST SP 800-207: Zero Trust Architecture
+•       OMB M-22-09: Moving the U.S. Government Toward Zero Trust Cybersecurity Principles

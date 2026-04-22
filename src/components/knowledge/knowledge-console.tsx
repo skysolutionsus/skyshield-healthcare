@@ -404,55 +404,10 @@ export function KnowledgeConsole() {
               onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
               className="w-full rounded-lg border border-dashed border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-3 text-sm text-[var(--sky-text-secondary)] file:mr-3 file:rounded-md file:border-0 file:bg-[var(--sky-royal)] file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white"
             />
-            <input
-              value={fileForm.title}
-              onChange={(e) => setFileForm({ ...fileForm, title: e.target.value })}
-              placeholder="Guidance title, e.g. Interim Guidance on Cloud Encryption"
-              className="w-full rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-2 text-sm text-white outline-none focus:border-[var(--sky-blue)]"
-            />
-            <div className="grid grid-cols-2 gap-3">
-              <input
-                value={fileForm.guidanceDate}
-                onChange={(e) => setFileForm({ ...fileForm, guidanceDate: e.target.value })}
-                placeholder="Guidance date"
-                type="date"
-                className="rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-2 text-sm text-white outline-none"
-              />
-              <input
-                value={fileForm.effectiveDate}
-                onChange={(e) => setFileForm({ ...fileForm, effectiveDate: e.target.value })}
-                placeholder="Effective date"
-                type="date"
-                className="rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-2 text-sm text-white outline-none"
-              />
+            <div className="rounded-xl border border-sky-500/20 bg-sky-500/10 px-3 py-2 text-xs leading-5 text-sky-100">
+              SkyShield will infer the title, guidance date, effective date, Pub 1075 sections,
+              impacted controls, resources, and contact details from the file.
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <input
-                value={fileForm.version}
-                onChange={(e) => setFileForm({ ...fileForm, version: e.target.value })}
-                placeholder="Version or memo number"
-                className="rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-2 text-sm text-white outline-none"
-              />
-              <input
-                value={fileForm.sourceName}
-                onChange={(e) => setFileForm({ ...fileForm, sourceName: e.target.value })}
-                placeholder="Source name or URL"
-                className="rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-2 text-sm text-white outline-none"
-              />
-            </div>
-            <textarea
-              value={fileForm.description}
-              onChange={(e) => setFileForm({ ...fileForm, description: e.target.value })}
-              placeholder="Short note about what this guidance changes"
-              rows={2}
-              className="w-full rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-2 text-sm text-white outline-none"
-            />
-            <textarea
-              value={fileForm.metadata}
-              onChange={(e) => setFileForm({ ...fileForm, metadata: e.target.value })}
-              rows={3}
-              className="w-full rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-2 font-mono text-xs text-white outline-none"
-            />
             <button
               onClick={uploadDocumentFile}
               disabled={importing || !selectedFile}

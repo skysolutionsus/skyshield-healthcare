@@ -1,0 +1,22 @@
+SECURITY AND PRIVACY ALERT
+Office of Safeguards
+ 
+Date: February 6, 2024
+ 
+Subject: Publication 1075 Interim Guidance - Disallowing Triple Data Encryption Algorithm (TDEA) / Triple Data Encryption Standard (3DES) for federal data
+ 
+Announcement
+As of January 1, 2024, the National Institute of Standards and Technology (NIST) has withdrawn Special Publication (SP) 800-67 Revision 2, Recommendation for the Triple Data Encryption Algorithm (TDEA) Block Cipher. TDEA/3DES is no longer a supported algorithm to protect federal data which includes federal tax information (FTI).
+ 
+Guidance
+Agencies must immediately stop the use of TDEA/3DES to protect FTI. 
+Per NIST guidance, agencies should use Advanced Encryption Standard (AES) instead of TDEA/3DES.
+Agencies may continue to use TDEA/3DES for the decryption, key unwrapping and verification of message authentication codes (MAC) s of already protected data.
+ 
+Additional information
+NIST SP 800-131A Revision 2, Transitioning the Use of Cryptographic Algorithms and Key Lengths further explains the acceptability of algorithms used for cryptographic protection of federal data.
+ 
+Resources
+•      Update to Current Use and Deprecation of TDEA | CSRC (nist.gov)
+•      NIST to Withdraw Special Publication 800-67 Revision 2 | CSRC
+•      SP 800-131A Rev. 2, Transitioning the Use of Cryptographic Algorithms and Key Lengths | CSRC (nist.gov)

@@ -11,6 +11,10 @@ import {
   loadOfficialPub1075FromIrs,
 } from "@/lib/knowledge/ingest";
 import { hashText } from "@/lib/knowledge/chunking";
+import {
+  inferInterimGuidanceInput,
+  INTERIM_GUIDANCE_SOURCE_TYPE,
+} from "@/lib/knowledge/interim-guidance";
 
 export const maxDuration = 300;
 export const runtime = "nodejs";
@@ -69,8 +73,7 @@ async function inputFromUploadedFile(
     file.type.startsWith("text/") ||
     [".txt", ".md", ".markdown", ".csv"].some((ext) => lowerName.endsWith(ext));
   const baseMetadata = parseMetadata(formValue(formData, "metadata")) || {};
-  const guidanceDate = formValue(formData, "guidanceDate");
-  const effectiveDate = formValue(formData, "effectiveDate");
+  const sourceType = formValue(formData, "sourceType") || INTERIM_GUIDANCE_SOURCE_TYPE;
 
   let content: string;
   let extractedMetadata: Record<string, unknown> = {};
@@ -110,24 +113,42 @@ async function inputFromUploadedFile(
     throw new Error("Unsupported file type. Upload PDF, TXT, MD, Markdown, or CSV files.");
   }
 
+  const inferred =
+    sourceType === INTERIM_GUIDANCE_SOURCE_TYPE
+      ? inferInterimGuidanceInput({
+          fileName,
+          text: content,
+          uploadedAt,
+          metadata: baseMetadata,
+          title: formValue(formData, "title"),
+          sourceName: formValue(formData, "sourceName"),
+          version: formValue(formData, "version"),
+          description: formValue(formData, "description"),
+          guidanceDate: formValue(formData, "guidanceDate"),
+          effectiveDate: formValue(formData, "effectiveDate"),
+          authority: formValue(formData, "authority"),
+          importedById,
+        })
+      : null;
+
   return {
-    title: formValue(formData, "title") || fileName,
+    ...inferred,
+    title: formValue(formData, "title") || inferred?.title || fileName,
     content,
-    sourceType: formValue(formData, "sourceType") || "document",
-    sourceName: formValue(formData, "sourceName") || fileName,
-    version: formValue(formData, "version"),
-    description: formValue(formData, "description"),
+    sourceType,
+    sourceName: formValue(formData, "sourceName") || inferred?.sourceName || fileName,
+    version: formValue(formData, "version") || inferred?.version,
+    description: formValue(formData, "description") || inferred?.description,
     importedById,
     metadata: {
+      ...(inferred?.metadata || {}),
       ...baseMetadata,
       originalFileName: fileName,
       mimeType: file.type || "unknown",
       uploadedAt,
-      guidanceDate,
-      effectiveDate,
       supersedesOrAmendsPub1075:
-        (formValue(formData, "sourceType") || "") === "interim_guidance",
-      authority: formValue(formData, "authority") || "Interim guidance",
+        sourceType === INTERIM_GUIDANCE_SOURCE_TYPE,
+      authority: formValue(formData, "authority") || inferred?.metadata?.authority || "Interim guidance",
       ...extractedMetadata,
     },
   };
