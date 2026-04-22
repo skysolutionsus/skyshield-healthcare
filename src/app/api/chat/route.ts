@@ -168,7 +168,80 @@ function buildPub1075Context(message: string): string {
   return context;
 }
 
-function buildSystemPrompt(knowledgeContext: string): string {
+interface KnowledgeInventoryDocument {
+  title: string;
+  sourceType: string;
+  sourceName: string | null;
+  version: string | null;
+  description: string | null;
+  metadata: unknown;
+  chunkCount: number;
+  importedAt: Date;
+}
+
+function metadataValue(metadata: unknown, key: string): string | null {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
+  const value = (metadata as Record<string, unknown>)[key];
+  if (value === null || value === undefined || value === "") return null;
+  if (Array.isArray(value)) return value.map(String).join(", ");
+  return String(value);
+}
+
+async function buildKnowledgeInventoryContext(): Promise<string> {
+  try {
+    const documents = await db.knowledgeDocument.findMany({
+      where: { status: "ACTIVE" },
+      orderBy: [{ sourceType: "asc" }, { importedAt: "desc" }],
+      take: 50,
+      select: {
+        title: true,
+        sourceType: true,
+        sourceName: true,
+        version: true,
+        description: true,
+        metadata: true,
+        chunkCount: true,
+        importedAt: true,
+      },
+    });
+
+    if (documents.length === 0) {
+      return "No active knowledge documents are currently registered in the database.";
+    }
+
+    return documents
+      .map((document: KnowledgeInventoryDocument, index: number) => {
+        const guidanceDate = metadataValue(document.metadata, "guidanceDate");
+        const effectiveDate = metadataValue(document.metadata, "effectiveDate");
+        const impactedSections = metadataValue(document.metadata, "impactedPub1075Sections");
+        const impactedControls = metadataValue(document.metadata, "impactedControls");
+        const relationship = metadataValue(document.metadata, "relationshipToPub1075");
+
+        return [
+          `${index + 1}. ${document.title}`,
+          `Source type: ${document.sourceType}`,
+          document.version ? `Version: ${document.version}` : null,
+          document.sourceName ? `Source name: ${document.sourceName}` : null,
+          document.description ? `Description: ${document.description}` : null,
+          guidanceDate ? `Guidance date: ${guidanceDate}` : null,
+          effectiveDate ? `Effective date: ${effectiveDate}` : null,
+          relationship ? `Relationship to Pub 1075: ${relationship}` : null,
+          impactedSections ? `Impacted Pub 1075 sections: ${impactedSections}` : null,
+          impactedControls ? `Impacted controls: ${impactedControls}` : null,
+          `Chunks: ${document.chunkCount}`,
+          `Imported: ${document.importedAt.toISOString()}`,
+        ]
+          .filter(Boolean)
+          .join("\n");
+      })
+      .join("\n\n");
+  } catch (err) {
+    console.warn("Knowledge inventory lookup failed:", err);
+    return "Knowledge inventory lookup failed for this request.";
+  }
+}
+
+function buildSystemPrompt(knowledgeContext: string, knowledgeInventory: string): string {
   return `You are the IRS SkyShield AI Compliance Agent — an expert on IRS Publication 1075 and related IRS Office of Safeguards knowledge-base documents, including interim guidance that may supersede or amend Pub 1075.
 
 RESPONSE FORMAT (follow this structure exactly):
@@ -194,6 +267,7 @@ STYLE RULES:
 - When referencing a section inline, use the format [Section X.X.X]
 - If the answer is from interim guidance, name the interim guidance and explain how it amends or supersedes the Pub 1075 baseline
 - If the answer is not in the retrieved knowledge excerpts, clearly state that the relevant text was not found
+- Do not claim that no interim guidance exists unless the active knowledge inventory below contains no interim_guidance documents
 
 IMPORTANT RULES:
 1. NEVER ask for or process any Federal Tax Information (FTI), Personally Identifiable Information (PII), named state names, named agency names, taxpayer details, case numbers, or other identifiable information
@@ -203,7 +277,13 @@ IMPORTANT RULES:
 5. Use Pub 1075 as the baseline when no relevant interim guidance is retrieved
 6. Reason through gray areas carefully. Explain the controlling requirement, practical interpretation, and any uncertainty without inventing facts
 7. If uncertain about a specific requirement, say so rather than guessing
-8. If the provided excerpts do not contain enough information to answer, say that the relevant text was not found in the loaded excerpts and ask the user to narrow the question
+8. If the active inventory lists an interim guidance document but no relevant excerpt was retrieved, say the guidance exists in the knowledge base but the relevant text was not retrieved for this query
+9. If the provided excerpts do not contain enough information to answer, say that the relevant text was not found in the loaded excerpts and ask the user to narrow the question
+
+ACTIVE KNOWLEDGE DOCUMENT INVENTORY:
+=== BEGIN KNOWLEDGE INVENTORY ===
+${knowledgeInventory}
+=== END KNOWLEDGE INVENTORY ===
 
 RELEVANT KNOWLEDGE EXCERPTS FOLLOW:
 === BEGIN KNOWLEDGE EXCERPTS ===
@@ -251,6 +331,12 @@ function extractCitations(
 function cleanResponseText(response: string): string {
   // Remove the ---CITATIONS--- block from the displayed response
   return response.replace(/---CITATIONS---[\s\S]*?(?:---|$)/, "").trim();
+}
+
+function isKnowledgeInventoryQuestion(message: string): boolean {
+  return /\b(what|which|list|show|tell)\b[\s\S]{0,80}\b(documents?|knowledge|guidance|sources?|loaded|uploaded|available)\b/i.test(
+    message
+  );
 }
 
 export async function POST(request: NextRequest) {
@@ -459,15 +545,18 @@ Section 3.1: General Requirements`;
     const anthropic = new Anthropic({
       apiKey: llmSettings.apiKey,
     });
+    const knowledgeInventory = await buildKnowledgeInventoryContext();
     const retrievedChunks = await retrieveKnowledgeChunks(message, 14).catch((err) => {
       console.warn("Knowledge retrieval failed, falling back to local Pub 1075 excerpts:", err);
       return [];
     });
     const pub1075Context =
-      retrievedChunks.length > 0
-        ? formatKnowledgeContext(retrievedChunks)
-        : buildPub1075Context(message);
-    const systemPrompt = buildSystemPrompt(pub1075Context);
+      isKnowledgeInventoryQuestion(message)
+        ? "The user's question is about the active knowledge inventory. Use the inventory section first; retrieved excerpts are not required to list loaded documents."
+        : retrievedChunks.length > 0
+          ? formatKnowledgeContext(retrievedChunks)
+          : buildPub1075Context(message);
+    const systemPrompt = buildSystemPrompt(pub1075Context, knowledgeInventory);
 
     // Build message history
     const apiMessages: Array<{
