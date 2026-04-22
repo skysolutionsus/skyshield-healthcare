@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
+import { isAdminRole } from "@/lib/roles";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -109,6 +110,9 @@ export async function POST(request: Request) {
             session = await auth();
             if (!session?.user) {
                 return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            }
+            if (!isAdminRole((session.user as unknown as { role: string }).role)) {
+                return NextResponse.json({ error: "Forbidden" }, { status: 403 });
             }
         }
 

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 import { getCISToken, fetchAllBenchmarks } from "@/lib/cis-api";
+import { isAdminRole } from "@/lib/roles";
 
 const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY || "",
@@ -20,6 +21,9 @@ export async function POST(request: Request) {
             session = await auth();
             if (!session?.user) {
                 return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            }
+            if (!isAdminRole((session.user as unknown as { role: string }).role)) {
+                return NextResponse.json({ error: "Forbidden" }, { status: 403 });
             }
         }
 

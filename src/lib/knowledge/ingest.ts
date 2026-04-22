@@ -57,7 +57,7 @@ function detectPub1075Version(text: string): string {
   return "Unknown revision";
 }
 
-async function extractPdfTextByPage(pdfBuffer: Buffer): Promise<{
+export async function extractPdfTextByPage(pdfBuffer: Buffer): Promise<{
   text: string;
   pageCount: number;
   pdfInfo: Record<string, unknown>;

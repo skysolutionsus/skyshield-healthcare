@@ -9,6 +9,7 @@ datasource db {
 
 enum Role {
   ADMIN
+  COMPUTER_SECURITY_REVIEW
   COMPLIANCE_OFFICER
   AUDITOR
   VIEWER

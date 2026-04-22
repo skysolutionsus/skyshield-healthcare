@@ -7,7 +7,10 @@ export interface RetrievedKnowledgeChunk {
   documentId: string;
   documentTitle: string;
   sourceType: string;
+  sourceName: string | null;
   version: string | null;
+  documentMetadata: Record<string, unknown> | null;
+  importedAt: Date;
   chunkIndex: number;
   content: string;
   pageStart: number | null;
@@ -84,20 +87,26 @@ export async function retrieveKnowledgeChunks(
               c."documentId",
               d."title" AS "documentTitle",
               d."sourceType",
+              d."sourceName",
               d."version",
+              d."metadata" AS "documentMetadata",
+              d."importedAt",
               c."chunkIndex",
               c."content",
               c."pageStart",
               c."pageEnd",
               c."section",
               c."heading",
-              100::double precision AS "score",
+              (100 + CASE WHEN d."sourceType" = 'interim_guidance' THEN 25 WHEN d."sourceType" = 'pub1075' THEN 10 ELSE 0 END)::double precision AS "score",
               'exact' AS "matchType"
             FROM "KnowledgeChunk" c
             JOIN "KnowledgeDocument" d ON d."id" = c."documentId"
             WHERE d."status" = 'ACTIVE'
               AND (${exactConditions})
-            ORDER BY c."chunkIndex" ASC
+            ORDER BY
+              CASE WHEN d."sourceType" = 'interim_guidance' THEN 0 WHEN d."sourceType" = 'pub1075' THEN 1 ELSE 2 END,
+              d."importedAt" DESC,
+              c."chunkIndex" ASC
             LIMIT ${limit}
           `
         )
@@ -110,14 +119,20 @@ export async function retrieveKnowledgeChunks(
         c."documentId",
         d."title" AS "documentTitle",
         d."sourceType",
+        d."sourceName",
         d."version",
+        d."metadata" AS "documentMetadata",
+        d."importedAt",
         c."chunkIndex",
         c."content",
         c."pageStart",
         c."pageEnd",
         c."section",
         c."heading",
-        ts_rank_cd(c."searchVector", websearch_to_tsquery('english', ${query}))::double precision AS "score",
+        (
+          ts_rank_cd(c."searchVector", websearch_to_tsquery('english', ${query})) +
+          CASE WHEN d."sourceType" = 'interim_guidance' THEN 0.5 WHEN d."sourceType" = 'pub1075' THEN 0.2 ELSE 0 END
+        )::double precision AS "score",
         'keyword' AS "matchType"
       FROM "KnowledgeChunk" c
       JOIN "KnowledgeDocument" d ON d."id" = c."documentId"
@@ -138,14 +153,20 @@ export async function retrieveKnowledgeChunks(
               c."documentId",
               d."title" AS "documentTitle",
               d."sourceType",
+              d."sourceName",
               d."version",
+              d."metadata" AS "documentMetadata",
+              d."importedAt",
               c."chunkIndex",
               c."content",
               c."pageStart",
               c."pageEnd",
               c."section",
               c."heading",
-              (1 - (c."embedding" <=> ${vectorLiteral(embedding)}::vector))::double precision AS "score",
+              (
+                1 - (c."embedding" <=> ${vectorLiteral(embedding)}::vector) +
+                CASE WHEN d."sourceType" = 'interim_guidance' THEN 0.08 WHEN d."sourceType" = 'pub1075' THEN 0.03 ELSE 0 END
+              )::double precision AS "score",
               'vector' AS "matchType"
             FROM "KnowledgeChunk" c
             JOIN "KnowledgeDocument" d ON d."id" = c."documentId"
@@ -174,6 +195,9 @@ export function formatKnowledgeContext(chunks: RetrievedKnowledgeChunk[]): strin
 
   return chunks
     .map((chunk, index) => {
+      const guidanceDate = metadataValue(chunk.documentMetadata, "guidanceDate");
+      const effectiveDate = metadataValue(chunk.documentMetadata, "effectiveDate");
+      const authority = metadataValue(chunk.documentMetadata, "authority");
       const location = [
         chunk.section,
         chunk.heading,
@@ -185,11 +209,22 @@ export function formatKnowledgeContext(chunks: RetrievedKnowledgeChunk[]): strin
       return `--- KNOWLEDGE EXCERPT ${index + 1} ---
 Document: ${chunk.documentTitle}${chunk.version ? ` (${chunk.version})` : ""}
 Source type: ${chunk.sourceType}
-Location: ${location || `chunk ${chunk.chunkIndex}`}
+Source name: ${chunk.sourceName || "not specified"}
+Imported: ${chunk.importedAt instanceof Date ? chunk.importedAt.toISOString() : chunk.importedAt}
+${guidanceDate ? `Guidance date: ${guidanceDate}\n` : ""}${effectiveDate ? `Effective date: ${effectiveDate}\n` : ""}${authority ? `Authority: ${authority}\n` : ""}Location: ${location || `chunk ${chunk.chunkIndex}`}
 Match: ${chunk.matchType}
 Chunk ID: ${chunk.id}
 
 ${chunk.content}`;
     })
     .join("\n\n");
+}
+
+function metadataValue(
+  metadata: Record<string, unknown> | null,
+  key: string
+): string | null {
+  const value = metadata?.[key];
+  if (value === null || value === undefined || value === "") return null;
+  return String(value);
 }

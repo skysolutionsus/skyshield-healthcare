@@ -8,7 +8,7 @@ export function UserManagement({ orgId }: { orgId: string }) {
   const router = useRouter();
   const [showInvite, setShowInvite] = useState(false);
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState("VIEWER");
+  const [role, setRole] = useState("COMPUTER_SECURITY_REVIEW");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -28,7 +28,7 @@ export function UserManagement({ orgId }: { orgId: string }) {
       if (res.ok) {
         setMessage("Invitation sent successfully");
         setEmail("");
-        setRole("VIEWER");
+        setRole("COMPUTER_SECURITY_REVIEW");
         router.refresh();
       } else {
         setMessage(data.error || "Failed to send invitation");
@@ -80,9 +80,10 @@ export function UserManagement({ orgId }: { orgId: string }) {
                 onChange={(e) => setRole(e.target.value)}
                 className="w-full px-3 py-2 bg-gray-50 bg-[var(--sky-surface-overlay)] border border-[var(--sky-border)] rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)]"
               >
-                <option value="VIEWER">Viewer</option>
-                <option value="AUDITOR">Auditor</option>
+                <option value="COMPUTER_SECURITY_REVIEW">Computer Security Review</option>
                 <option value="COMPLIANCE_OFFICER">Compliance Officer</option>
+                <option value="AUDITOR">Auditor</option>
+                <option value="VIEWER">Viewer</option>
                 <option value="ADMIN">Admin</option>
               </select>
             </div>
@@ -109,4 +110,3 @@ export function UserManagement({ orgId }: { orgId: string }) {
     </div>
   );
 }
-

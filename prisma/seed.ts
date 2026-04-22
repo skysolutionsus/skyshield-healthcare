@@ -14,6 +14,7 @@ async function main() {
     "mconklin@skysolutions.com",
     "jcambra@skysolutions.com",
     "nmatta@skysolutions.com",
+    "folami.r.lofinmakinjr2@irs.gov",
   ];
 
   // Wipe dependent tables first to avoid FK constraint errors
@@ -49,69 +50,56 @@ async function main() {
 
   console.log("Organization:", org.name);
 
-  // Create admin user (primary demo account)
   const adminPassword = await hash("SkyShield2026!", 12);
-  const admin = await prisma.user.upsert({
-    where: { email: "james@skysolutions.com" },
-    update: {},
-    create: {
-      email: "james@skysolutions.com",
-      name: "James Galang",
-      passwordHash: adminPassword,
-      role: "ADMIN",
-      organizationId: org.id,
-    },
-  });
+  const csrPassword = await hash("ComputerSecurity2026!", 12);
+  const adminUsers = [
+    { email: "james@skysolutions.com", name: "James Galang" },
+    { email: "jcambra@skysolutions.com", name: "Jared Cambra" },
+    { email: "mconklin@skysolutions.com", name: "Michael Conklin" },
+    { email: "nmatta@skysolutions.com", name: "Nitin Matta" },
+  ];
 
-  console.log("Created admin user:", admin.email);
+  const admins = [];
+  for (const user of adminUsers) {
+    const adminUser = await prisma.user.upsert({
+      where: { email: user.email },
+      update: {
+        name: user.name,
+        role: "ADMIN",
+        organizationId: org.id,
+        active: true,
+      },
+      create: {
+        email: user.email,
+        name: user.name,
+        passwordHash: adminPassword,
+        role: "ADMIN",
+        organizationId: org.id,
+      },
+    });
+    admins.push(adminUser);
+    console.log("Seeded admin user:", adminUser.email);
+  }
 
-  // Create compliance officer
-  const coPassword = await hash("Compliance123!@#$", 12);
+  const admin = admins[0];
   const complianceOfficer = await prisma.user.upsert({
-    where: { email: "mconklin@skysolutions.com" },
-    update: {},
+    where: { email: "folami.r.lofinmakinjr2@irs.gov" },
+    update: {
+      name: "Folami Lofinmakin",
+      role: "COMPUTER_SECURITY_REVIEW",
+      organizationId: org.id,
+      active: true,
+    },
     create: {
-      email: "mconklin@skysolutions.com",
-      name: "Michael Conklin",
-      passwordHash: coPassword,
-      role: "COMPLIANCE_OFFICER",
+      email: "folami.r.lofinmakinjr2@irs.gov",
+      name: "Folami Lofinmakin",
+      passwordHash: csrPassword,
+      role: "COMPUTER_SECURITY_REVIEW",
       organizationId: org.id,
     },
   });
 
-  console.log("Created compliance officer:", complianceOfficer.email);
-
-  // Create auditor
-  const auditorPassword = await hash("Auditor123!@#$", 12);
-  const auditor = await prisma.user.upsert({
-    where: { email: "jcambra@skysolutions.com" },
-    update: {},
-    create: {
-      email: "jcambra@skysolutions.com",
-      name: "Jared Cambra",
-      passwordHash: auditorPassword,
-      role: "AUDITOR",
-      organizationId: org.id,
-    },
-  });
-
-  console.log("Created auditor:", auditor.email);
-
-  // Create viewer
-  const viewerPassword = await hash("Viewer123!@#$", 12);
-  await prisma.user.upsert({
-    where: { email: "nmatta@skysolutions.com" },
-    update: {},
-    create: {
-      email: "nmatta@skysolutions.com",
-      name: "Nitin Matta",
-      passwordHash: viewerPassword,
-      role: "VIEWER",
-      organizationId: org.id,
-    },
-  });
-
-  console.log("Created viewer user");
+  console.log("Seeded Computer Security Review user:", complianceOfficer.email);
 
   // Load SCSEM templates from index
   const scsemIndexPath = path.join(process.cwd(), "data", "scsem-index.json");
@@ -307,7 +295,7 @@ async function main() {
     { action: "LOGIN", userId: admin.id, resourceType: "session" },
     { action: "AI_QUERY", userId: complianceOfficer.id, resourceType: "chat", metadata: { questionLength: 45 } },
     { action: "INCIDENT_CREATE", userId: complianceOfficer.id, resourceType: "incident" },
-    { action: "LOGIN", userId: auditor.id, resourceType: "session" },
+    { action: "LOGIN", userId: admins[1].id, resourceType: "session" },
     { action: "USER_CREATE", userId: admin.id, resourceType: "user", metadata: { email: "nmatta@skysolutions.com" } },
   ];
 
@@ -358,10 +346,8 @@ async function main() {
 
   console.log("Created sample conversation");
   console.log("\nSeed complete! Login credentials:");
-  console.log("  Admin:      james@skysolutions.com / SkyShield2026!");
-  console.log("  Compliance: mconklin@skysolutions.com / Compliance123!@#$");
-  console.log("  Auditor:    jcambra@skysolutions.com / Auditor123!@#$");
-  console.log("  Viewer:     nmatta@skysolutions.com / Viewer123!@#$");
+  console.log("  Admins: James/Jared/Michael/Nitin / SkyShield2026!");
+  console.log("  Computer Security Review: folami.r.lofinmakinjr2@irs.gov / ComputerSecurity2026!");
 }
 
 main()

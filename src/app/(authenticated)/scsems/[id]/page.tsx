@@ -52,7 +52,7 @@ export default async function SCSEMDetailPage({
         className="inline-flex items-center gap-1.5 text-sm text-[var(--sky-text-secondary)] hover:text-white transition-colors mb-6"
       >
         <ArrowLeft className="w-4 h-4" />
-        Back to SCSEM Library
+        Back to SCSEM Library (WIP)
       </Link>
 
       {/* Header Card */}

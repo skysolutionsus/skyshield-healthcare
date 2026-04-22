@@ -23,11 +23,16 @@ import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { SkyLogo } from "@/components/sky-logo";
 import { NotificationsMenu } from "@/components/notifications-menu";
+import { isAdminRole, roleLabel } from "@/lib/roles";
 
-const navigation = [
+const limitedNavigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "AI Agent", href: "/agent", icon: MessageSquare },
-  { name: "SCSEM Library", href: "/scsems", icon: FileSpreadsheet },
+  { name: "SCSEM Library (WIP)", href: "/scsems", icon: FileSpreadsheet },
+];
+
+const adminNavigation = [
+  ...limitedNavigation,
   { name: "Incidents", href: "/incidents", icon: AlertTriangle },
   { name: "Audit Log", href: "/audit-log", icon: ScrollText },
   { name: "Users", href: "/settings", icon: Users },
@@ -64,7 +69,7 @@ export function AppShell({ children, user }: AppShellProps) {
   const [orgUsers, setOrgUsers] = useState<OrgUser[]>([]);
   const [showViewAsDropdown, setShowViewAsDropdown] = useState(false);
 
-  const isAdmin = user.role === "ADMIN";
+  const isAdmin = isAdminRole(user.role);
 
   // Admin-only nav items
   const adminNavItems = isAdmin
@@ -82,7 +87,10 @@ export function AppShell({ children, user }: AppShellProps) {
     ]
     : [];
 
-  const allNavItems = [...navigation, ...adminNavItems];
+  const allNavItems = [
+    ...(isAdmin ? adminNavigation : limitedNavigation),
+    ...adminNavItems,
+  ];
 
   // Check view-as status on mount
   const checkViewAs = useCallback(async () => {
@@ -158,7 +166,7 @@ export function AppShell({ children, user }: AppShellProps) {
           <div className="flex items-center gap-2 text-sm text-amber-400">
             <Eye className="w-4 h-4" />
             <span>
-              Viewing as <strong>{viewAsUser.name}</strong> ({viewAsUser.role.replace("_", " ")})
+              Viewing as <strong>{viewAsUser.name}</strong> ({roleLabel(viewAsUser.role)})
             </span>
           </div>
           <button
@@ -288,7 +296,7 @@ export function AppShell({ children, user }: AppShellProps) {
                               className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--sky-surface-overlay)] transition-colors border-b border-[var(--sky-border)] last:border-b-0"
                             >
                               <p className="font-medium text-white truncate">{u.name}</p>
-                              <p className="text-[var(--sky-text-muted)] truncate">{u.role.replace("_", " ")}</p>
+                              <p className="text-[var(--sky-text-muted)] truncate">{roleLabel(u.role)}</p>
                             </button>
                           ))
                       )}
@@ -314,7 +322,7 @@ export function AppShell({ children, user }: AppShellProps) {
                     {user.name}
                   </p>
                   <p className="text-xs truncate" style={{ color: 'var(--sky-text-muted)' }}>
-                    {user.role?.replace("_", " ")}
+                    {roleLabel(user.role)}
                   </p>
                 </div>
                 <button

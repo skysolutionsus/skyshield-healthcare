@@ -5,10 +5,12 @@ import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { hasEmbeddingConfig } from "@/lib/knowledge/embeddings";
 import {
+  extractPdfTextByPage,
   importKnowledgeDocument,
   loadLocalPub1075,
   loadOfficialPub1075FromIrs,
 } from "@/lib/knowledge/ingest";
+import { hashText } from "@/lib/knowledge/chunking";
 
 export const maxDuration = 300;
 export const runtime = "nodejs";
@@ -39,6 +41,96 @@ function parseMetadata(value: unknown): Record<string, unknown> | undefined {
     return JSON.parse(value);
   }
   return undefined;
+}
+
+function formValue(formData: FormData, key: string): string | undefined {
+  const value = formData.get(key);
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+async function inputFromUploadedFile(
+  formData: FormData,
+  importedById: string
+) {
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    throw new Error("A document file is required");
+  }
+
+  const uploadedAt = new Date().toISOString();
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const fileName = file.name || "uploaded-document";
+  const lowerName = fileName.toLowerCase();
+  const isPdf =
+    file.type === "application/pdf" ||
+    lowerName.endsWith(".pdf") ||
+    buffer.subarray(0, 4).equals(Buffer.from("%PDF"));
+  const isText =
+    file.type.startsWith("text/") ||
+    [".txt", ".md", ".markdown", ".csv"].some((ext) => lowerName.endsWith(ext));
+  const baseMetadata = parseMetadata(formValue(formData, "metadata")) || {};
+  const guidanceDate = formValue(formData, "guidanceDate");
+  const effectiveDate = formValue(formData, "effectiveDate");
+
+  let content: string;
+  let extractedMetadata: Record<string, unknown> = {};
+
+  if (isPdf) {
+    const { text, pageCount, pdfInfo } = await extractPdfTextByPage(buffer);
+    const pdfSha256 = hashText(buffer.toString("base64"));
+    const textSha256 = hashText(text);
+    content = [
+      `# ${formValue(formData, "title") || fileName}`,
+      `# Uploaded: ${uploadedAt}`,
+      `# Source File: ${fileName}`,
+      `# Total Pages: ${pageCount}`,
+      `# PDF SHA256: ${pdfSha256}`,
+      `# Text SHA256: ${textSha256}`,
+      "",
+      text,
+    ].join("\n");
+    extractedMetadata = {
+      sourceFormat: "pdf",
+      pageCount,
+      pdfSizeKB: Math.round(buffer.length / 1024),
+      pdfSha256,
+      textSha256,
+      pdfInfo,
+    };
+  } else if (isText) {
+    const text = buffer.toString("utf-8");
+    const textSha256 = hashText(text);
+    content = text;
+    extractedMetadata = {
+      sourceFormat: lowerName.endsWith(".md") || lowerName.endsWith(".markdown") ? "markdown" : "text",
+      textSizeKB: Math.round(buffer.length / 1024),
+      textSha256,
+    };
+  } else {
+    throw new Error("Unsupported file type. Upload PDF, TXT, MD, Markdown, or CSV files.");
+  }
+
+  return {
+    title: formValue(formData, "title") || fileName,
+    content,
+    sourceType: formValue(formData, "sourceType") || "document",
+    sourceName: formValue(formData, "sourceName") || fileName,
+    version: formValue(formData, "version"),
+    description: formValue(formData, "description"),
+    importedById,
+    metadata: {
+      ...baseMetadata,
+      originalFileName: fileName,
+      mimeType: file.type || "unknown",
+      uploadedAt,
+      guidanceDate,
+      effectiveDate,
+      supersedesOrAmendsPub1075:
+        (formValue(formData, "sourceType") || "") === "interim_guidance",
+      authority: formValue(formData, "authority") || "Interim guidance",
+      ...extractedMetadata,
+    },
+  };
 }
 
 export async function GET(request: NextRequest) {
@@ -114,7 +206,38 @@ export async function POST(request: NextRequest) {
   if (error) return error;
 
   try {
-    const body = await request.json();
+    const contentType = request.headers.get("content-type") || "";
+    const isMultipart = contentType.includes("multipart/form-data");
+    const body = isMultipart ? null : await request.json();
+    if (isMultipart) {
+      const formData = await request.formData();
+      const input = await inputFromUploadedFile(formData, user!.id);
+      const result = await importKnowledgeDocument(input);
+
+      await logAudit({
+        organizationId: user!.organizationId,
+        userId: user!.id,
+        action: "KNOWLEDGE_DOCUMENT_IMPORT",
+        resourceType: "knowledge_document",
+        resourceId: result.documentId,
+        metadata: {
+          title: input.title,
+          sourceType: input.sourceType,
+          sourceName: input.sourceName,
+          chunkCount: result.chunkCount,
+          embeddedChunkCount: result.embeddedChunkCount,
+          upload: true,
+        },
+        ipAddress:
+          request.headers.get("x-forwarded-for") ||
+          request.headers.get("x-real-ip") ||
+          undefined,
+        userAgent: request.headers.get("user-agent") || undefined,
+      });
+
+      return NextResponse.json({ success: true, ...result });
+    }
+
     const action = body.action || "import_text";
 
     let syncDetails: Record<string, unknown> | undefined;

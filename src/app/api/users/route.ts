@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
       await db.invitation.create({
         data: {
           email,
-          role: role as "ADMIN" | "COMPLIANCE_OFFICER" | "AUDITOR" | "VIEWER",
+          role: role as "ADMIN" | "COMPUTER_SECURITY_REVIEW" | "COMPLIANCE_OFFICER" | "AUDITOR" | "VIEWER",
           organizationId: userInfo.organizationId,
           token,
           expiresAt,

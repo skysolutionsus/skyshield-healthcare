@@ -20,6 +20,7 @@ import {
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { SyncButton } from "@/components/sync-button";
+import { isAdminRole } from "@/lib/roles";
 
 const categoryIcons: Record<string, React.ReactNode> = {
   Database: <Database className="w-5 h-5" />,
@@ -91,6 +92,7 @@ export default async function SCSEMLibraryPage() {
 
   const orgId = (session.user as unknown as { organizationId: string })
     .organizationId;
+  const isAdmin = isAdminRole((session.user as unknown as { role: string }).role);
 
   let templates: TemplateWithUpdates[] = [];
 
@@ -134,14 +136,14 @@ export default async function SCSEMLibraryPage() {
       <div className="mb-8 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">
-            SCSEM Library
+            SCSEM Library <span className="text-sm font-medium text-amber-300">(WIP)</span>
           </h1>
           <p className="text-[var(--sky-text-secondary)] mt-1">
             Supplemental Computer Security Evaluation Matrices for IRS Publication
             1075 compliance
           </p>
         </div>
-        <SyncButton />
+        {isAdmin && <SyncButton />}
       </div>
 
       {/* Summary Stats */}
@@ -279,4 +281,3 @@ export default async function SCSEMLibraryPage() {
     </div>
   );
 }
-

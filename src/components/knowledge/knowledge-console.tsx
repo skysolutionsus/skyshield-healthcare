@@ -52,6 +52,7 @@ interface KnowledgeStats {
 
 const SOURCE_TYPES = [
   "pub1075",
+  "interim_guidance",
   "nist",
   "scsem",
   "irs_guidance",
@@ -92,6 +93,18 @@ export function KnowledgeConsole() {
   const [searchResults, setSearchResults] = useState<KnowledgeChunk[]>([]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileForm, setFileForm] = useState({
+    title: "",
+    sourceType: "interim_guidance",
+    sourceName: "",
+    version: "",
+    guidanceDate: "",
+    effectiveDate: "",
+    authority: "IRS Office of Safeguards interim guidance",
+    description: "",
+    metadata: "{\n  \"relationshipToPub1075\": \"supersedes_or_amends\"\n}",
+  });
   const [form, setForm] = useState({
     title: "",
     sourceType: "document",
@@ -165,6 +178,50 @@ export function KnowledgeConsole() {
       await loadDocuments();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to sync Pub 1075");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function uploadDocumentFile() {
+    if (!selectedFile) return;
+
+    setImporting(true);
+    setError("");
+    setNotice("");
+    try {
+      const formData = new FormData();
+      formData.append("action", "import_file");
+      formData.append("file", selectedFile);
+      for (const [key, value] of Object.entries(fileForm)) {
+        if (value.trim()) formData.append(key, value);
+      }
+
+      const res = await fetch("/api/admin/knowledge", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to upload document");
+
+      setNotice(
+        `Imported ${fileForm.sourceType.replace("_", " ")}: ${data.chunkCount} chunks, ${data.embeddedChunkCount} embedded.`
+      );
+      setSelectedFile(null);
+      setFileForm({
+        title: "",
+        sourceType: "interim_guidance",
+        sourceName: "",
+        version: "",
+        guidanceDate: "",
+        effectiveDate: "",
+        authority: "IRS Office of Safeguards interim guidance",
+        description: "",
+        metadata: "{\n  \"relationshipToPub1075\": \"supersedes_or_amends\"\n}",
+      });
+      await loadDocuments();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to upload document");
     } finally {
       setImporting(false);
     }
@@ -331,6 +388,78 @@ export function KnowledgeConsole() {
                 )}
               </tbody>
             </table>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-[var(--sky-border)] bg-[var(--sky-surface)] p-5">
+          <h2 className="font-semibold text-white">Upload Interim Guidance</h2>
+          <p className="mt-1 text-sm text-[var(--sky-text-muted)]">
+            Upload PDF, TXT, MD, Markdown, or CSV guidance that supersedes or amends Pub 1075.
+          </p>
+
+          <div className="mt-4 space-y-3">
+            <input
+              type="file"
+              accept=".pdf,.txt,.md,.markdown,.csv,text/*,application/pdf"
+              onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+              className="w-full rounded-lg border border-dashed border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-3 text-sm text-[var(--sky-text-secondary)] file:mr-3 file:rounded-md file:border-0 file:bg-[var(--sky-royal)] file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white"
+            />
+            <input
+              value={fileForm.title}
+              onChange={(e) => setFileForm({ ...fileForm, title: e.target.value })}
+              placeholder="Guidance title, e.g. Interim Guidance on Cloud Encryption"
+              className="w-full rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-2 text-sm text-white outline-none focus:border-[var(--sky-blue)]"
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                value={fileForm.guidanceDate}
+                onChange={(e) => setFileForm({ ...fileForm, guidanceDate: e.target.value })}
+                placeholder="Guidance date"
+                type="date"
+                className="rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-2 text-sm text-white outline-none"
+              />
+              <input
+                value={fileForm.effectiveDate}
+                onChange={(e) => setFileForm({ ...fileForm, effectiveDate: e.target.value })}
+                placeholder="Effective date"
+                type="date"
+                className="rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-2 text-sm text-white outline-none"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                value={fileForm.version}
+                onChange={(e) => setFileForm({ ...fileForm, version: e.target.value })}
+                placeholder="Version or memo number"
+                className="rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-2 text-sm text-white outline-none"
+              />
+              <input
+                value={fileForm.sourceName}
+                onChange={(e) => setFileForm({ ...fileForm, sourceName: e.target.value })}
+                placeholder="Source name or URL"
+                className="rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-2 text-sm text-white outline-none"
+              />
+            </div>
+            <textarea
+              value={fileForm.description}
+              onChange={(e) => setFileForm({ ...fileForm, description: e.target.value })}
+              placeholder="Short note about what this guidance changes"
+              rows={2}
+              className="w-full rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-2 text-sm text-white outline-none"
+            />
+            <textarea
+              value={fileForm.metadata}
+              onChange={(e) => setFileForm({ ...fileForm, metadata: e.target.value })}
+              rows={3}
+              className="w-full rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-2 font-mono text-xs text-white outline-none"
+            />
+            <button
+              onClick={uploadDocumentFile}
+              disabled={importing || !selectedFile}
+              className="w-full rounded-lg bg-[var(--sky-royal)] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[var(--sky-blue)] disabled:opacity-50"
+            >
+              {importing ? "Uploading..." : "Upload & Embed Guidance"}
+            </button>
           </div>
         </section>
 

@@ -18,6 +18,7 @@ export type PiiType =
   | "BANK_ACCOUNT"
   | "PERSON_NAME"
   | "AGENCY_NAME"
+  | "STATE_OR_TERRITORY"
   | "IDENTIFIER";
 
 export interface PiiMatch {
@@ -429,7 +430,9 @@ function detectPersonNames(text: string): PiiMatch[] {
 // ---------------------------------------------------------------------------
 // Agency Name Detection
 // ---------------------------------------------------------------------------
-// Detects federal/state agency names and department patterns
+// Detects federal/state agency names, state/territory names, and department
+// patterns. These are intentionally strict because the chat endpoint hard
+// blocks matches before any message can reach a cloud model.
 
 const KNOWN_AGENCIES = [
   // Federal agencies (only flag when they appear with identifying context)
@@ -457,19 +460,73 @@ const KNOWN_AGENCIES = [
   "Office of Personnel Management",
 ];
 
+const US_STATES_AND_TERRITORIES = [
+  "Alabama",
+  "Alaska",
+  "Arizona",
+  "Arkansas",
+  "California",
+  "Colorado",
+  "Connecticut",
+  "Delaware",
+  "District of Columbia",
+  "Florida",
+  "Georgia",
+  "Hawaii",
+  "Idaho",
+  "Illinois",
+  "Indiana",
+  "Iowa",
+  "Kansas",
+  "Kentucky",
+  "Louisiana",
+  "Maine",
+  "Maryland",
+  "Massachusetts",
+  "Michigan",
+  "Minnesota",
+  "Mississippi",
+  "Missouri",
+  "Montana",
+  "Nebraska",
+  "Nevada",
+  "New Hampshire",
+  "New Jersey",
+  "New Mexico",
+  "New York",
+  "North Carolina",
+  "North Dakota",
+  "Ohio",
+  "Oklahoma",
+  "Oregon",
+  "Pennsylvania",
+  "Puerto Rico",
+  "Rhode Island",
+  "South Carolina",
+  "South Dakota",
+  "Tennessee",
+  "Texas",
+  "Utah",
+  "Vermont",
+  "Virginia",
+  "Virgin Islands",
+  "Washington",
+  "West Virginia",
+  "Wisconsin",
+  "Wyoming",
+  "Guam",
+  "American Samoa",
+  "Northern Mariana Islands",
+];
+
 const STATE_DEPT_RE =
   /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+(?:Department|Dept\.?)\s+of\s+(?:Revenue|Taxation|Finance|Tax(?:es)?|Treasury)\b/gi;
-
-const AGENCY_CONTEXT_KEYWORDS = [
-  "taxpayer", "client", "agency", "contract", "case", "file",
-  "report", "employee", "office", "field", "assigned", "responsible",
-];
 
 function detectAgencyNames(text: string): PiiMatch[] {
   const matches: PiiMatch[] = [];
   const lowerText = text.toLowerCase();
 
-  // Known agency names near identifying context
+  // Known agency names are blocked even without surrounding context.
   for (const agency of KNOWN_AGENCIES) {
     const agencyLower = agency.toLowerCase();
     let searchStart = 0;
@@ -478,18 +535,12 @@ function detectAgencyNames(text: string): PiiMatch[] {
       if (idx === -1) break;
       searchStart = idx + agencyLower.length;
 
-      const windowStart = Math.max(0, idx - 100);
-      const windowEnd = Math.min(text.length, idx + agencyLower.length + 100);
-      const context = lowerText.slice(windowStart, windowEnd);
-
-      if (AGENCY_CONTEXT_KEYWORDS.some((kw) => context.includes(kw))) {
-        matches.push({
-          type: "AGENCY_NAME",
-          pattern: `[AGENCY: ${agency}]`,
-          position: idx,
-          confidence: "MEDIUM",
-        });
-      }
+      matches.push({
+        type: "AGENCY_NAME",
+        pattern: `[AGENCY: ${agency}]`,
+        position: idx,
+        confidence: "HIGH",
+      });
     }
   }
 
@@ -501,6 +552,24 @@ function detectAgencyNames(text: string): PiiMatch[] {
       position: m.index!,
       confidence: "HIGH",
     });
+  }
+
+  return matches;
+}
+
+function detectStateTerritoryNames(text: string): PiiMatch[] {
+  const matches: PiiMatch[] = [];
+
+  for (const state of US_STATES_AND_TERRITORIES) {
+    const statePattern = new RegExp(`\\b${state.replace(/\s+/g, "\\s+")}\\b`, "gi");
+    for (const m of text.matchAll(statePattern)) {
+      matches.push({
+        type: "STATE_OR_TERRITORY",
+        pattern: `[STATE/TERRITORY: ${state}]`,
+        position: m.index!,
+        confidence: "HIGH",
+      });
+    }
   }
 
   return matches;
@@ -694,6 +763,7 @@ export function detectPII(text: string): PiiDetectionResult {
     ...detectBankAccounts(text),
     ...detectPersonNames(text),
     ...detectAgencyNames(text),
+    ...detectStateTerritoryNames(text),
     ...detectIdentifiers(text),
   ];
 

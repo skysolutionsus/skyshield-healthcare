@@ -4,6 +4,7 @@ import { formatDateTime, getInitials } from "@/lib/utils";
 import { Users, Mail, Shield, UserPlus } from "lucide-react";
 import { UserManagement } from "@/components/user-management";
 import { LLMSettings } from "@/components/llm-settings";
+import { isAdminRole, roleLabel } from "@/lib/roles";
 
 export default async function SettingsPage() {
   const session = await auth();
@@ -13,7 +14,7 @@ export default async function SettingsPage() {
     role: string;
     organizationId: string;
   };
-  const isAdmin = userInfo.role === "ADMIN";
+  const isAdmin = isAdminRole(userInfo.role);
   const orgId = userInfo.organizationId;
 
   let users: Array<{
@@ -64,6 +65,8 @@ export default async function SettingsPage() {
 
   const roleColors: Record<string, string> = {
     ADMIN: "bg-red-500/15 text-red-400",
+    COMPUTER_SECURITY_REVIEW:
+      "bg-emerald-500/15 text-emerald-300",
     COMPLIANCE_OFFICER:
       "bg-sky-500/15 text-sky-400",
     AUDITOR:
@@ -140,7 +143,7 @@ export default async function SettingsPage() {
                     <span
                       className={`inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full ${roleColors[u.role] || roleColors.VIEWER}`}
                     >
-                      {u.role.replace("_", " ")}
+                      {roleLabel(u.role)}
                     </span>
                   </td>
                   <td className="px-6 py-4">
@@ -186,7 +189,7 @@ export default async function SettingsPage() {
                 <span
                   className={`px-2.5 py-0.5 text-xs font-medium rounded-full ${roleColors[inv.role] || roleColors.VIEWER}`}
                 >
-                  {inv.role.replace("_", " ")}
+                  {roleLabel(inv.role)}
                 </span>
               </div>
             ))}
@@ -196,4 +199,3 @@ export default async function SettingsPage() {
     </div>
   );
 }
-

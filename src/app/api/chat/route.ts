@@ -169,7 +169,7 @@ function buildPub1075Context(message: string): string {
 }
 
 function buildSystemPrompt(knowledgeContext: string): string {
-  return `You are the IRS SkyShield AI Compliance Agent — an expert on IRS Publication 1075 (Tax Information Security Guidelines for Federal, State, and Local Agencies).
+  return `You are the IRS SkyShield AI Compliance Agent — an expert on IRS Publication 1075 and related IRS Office of Safeguards knowledge-base documents, including interim guidance that may supersede or amend Pub 1075.
 
 RESPONSE FORMAT (follow this structure exactly):
 
@@ -183,8 +183,8 @@ RESPONSE FORMAT (follow this structure exactly):
 
 3. End every response with a references section in exactly this format:
 ---CITATIONS---
-Section X.X.X: Brief description
-Section Y.Y: Brief description
+Pub 1075 Section X.X.X: Brief description
+Interim Guidance - Document Title, page Y: Brief description
 
 STYLE RULES:
 - Be authoritative and concise — no filler phrases like "Great question!" or "I'd be happy to help"
@@ -192,14 +192,18 @@ STYLE RULES:
 - Do NOT use markdown headers (no # or ##)
 - Do NOT use code blocks
 - When referencing a section inline, use the format [Section X.X.X]
-- If the answer is NOT in Pub 1075, clearly state that
+- If the answer is from interim guidance, name the interim guidance and explain how it amends or supersedes the Pub 1075 baseline
+- If the answer is not in the retrieved knowledge excerpts, clearly state that the relevant text was not found
 
 IMPORTANT RULES:
-1. NEVER ask for or process any Federal Tax Information (FTI) or Personally Identifiable Information (PII)
-2. If a user seems to be sharing FTI/PII, immediately warn them and refuse to process it
+1. NEVER ask for or process any Federal Tax Information (FTI), Personally Identifiable Information (PII), named state names, named agency names, taxpayer details, case numbers, or other identifiable information
+2. If a user seems to be sharing FTI/PII or identifiable state/agency information, immediately warn them and refuse to process it
 3. Always ground your answers in the retrieved knowledge excerpts
-4. If uncertain about a specific requirement, say so rather than guessing
-5. If the provided excerpts do not contain enough information to answer, say that the relevant text was not found in the loaded excerpts and ask the user to narrow the question
+4. Treat active, relevant interim guidance as higher authority than baseline Pub 1075 when the guidance date/effective date indicates it supersedes or amends Pub 1075
+5. Use Pub 1075 as the baseline when no relevant interim guidance is retrieved
+6. Reason through gray areas carefully. Explain the controlling requirement, practical interpretation, and any uncertainty without inventing facts
+7. If uncertain about a specific requirement, say so rather than guessing
+8. If the provided excerpts do not contain enough information to answer, say that the relevant text was not found in the loaded excerpts and ask the user to narrow the question
 
 RELEVANT KNOWLEDGE EXCERPTS FOLLOW:
 === BEGIN KNOWLEDGE EXCERPTS ===
@@ -219,9 +223,9 @@ function extractCitations(
   if (citationBlock) {
     const lines = citationBlock[1].trim().split("\n");
     for (const line of lines) {
-      // Match: "Section 4.18: ...", "Section SC-28: ...", "Section 2.B.6: ...", "Exhibit 7: ..."
+      // Match strict Pub 1075 style plus broader knowledge-base source labels.
       const match = line.match(
-        /^(Section\s+[\w.\-]+(?:\s*,\s*[\w.\-]+)?|Exhibit\s+\d+):\s*(.+)/i
+        /^(.{3,180}?):\s*(.+)$/i
       );
       if (match) {
         citations.push({ section: match[1], text: match[2].trim() });
@@ -284,7 +288,12 @@ export async function POST(request: NextRequest) {
             type: "AUTO_GENERATED",
             severity:
               piiResult.matches.some(
-                (m) => m.type === "SSN" || m.type === "EIN"
+                (m) =>
+                  m.type === "SSN" ||
+                  m.type === "EIN" ||
+                  m.type === "AGENCY_NAME" ||
+                  m.type === "STATE_OR_TERRITORY" ||
+                  m.type === "IDENTIFIER"
               )
                 ? "HIGH"
                 : "MEDIUM",
@@ -323,7 +332,7 @@ export async function POST(request: NextRequest) {
         piiBlocked: true,
         incidentId,
         message:
-          "Your message was blocked because it appears to contain sensitive data (FTI/PII). This data was NOT sent to any external service. An incident report has been automatically created.",
+          "Your message was blocked because it appears to contain sensitive data (FTI/PII) or identifiable state/agency information. This data was NOT sent to any external service. An incident report has been automatically created.",
         piiTypes: piiResult.matches.map((m) => m.type),
       });
     }
@@ -450,7 +459,7 @@ Section 3.1: General Requirements`;
     const anthropic = new Anthropic({
       apiKey: llmSettings.apiKey,
     });
-    const retrievedChunks = await retrieveKnowledgeChunks(message, 10).catch((err) => {
+    const retrievedChunks = await retrieveKnowledgeChunks(message, 14).catch((err) => {
       console.warn("Knowledge retrieval failed, falling back to local Pub 1075 excerpts:", err);
       return [];
     });
