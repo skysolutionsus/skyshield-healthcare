@@ -13,6 +13,9 @@ const actionTypes = [
   "USER_UPDATE",
   "PII_DETECTED",
   "SETTINGS_UPDATE",
+  "KNOWLEDGE_DOCUMENT_IMPORT",
+  "KNOWLEDGE_DOCUMENT_UPDATE",
+  "KNOWLEDGE_DOCUMENT_DELETE",
 ];
 
 export function AuditLogFilters() {
@@ -48,4 +51,3 @@ export function AuditLogFilters() {
     </div>
   );
 }
-

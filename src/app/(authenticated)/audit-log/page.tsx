@@ -10,6 +10,7 @@ import {
   Settings,
   MessageSquare,
   LogIn,
+  Database,
 } from "lucide-react";
 import { AuditLogFilters } from "@/components/audit-log-filters";
 
@@ -24,6 +25,9 @@ const actionIcons: Record<string, React.ElementType> = {
   USER_UPDATE: User,
   PII_DETECTED: Shield,
   SETTINGS_UPDATE: Settings,
+  KNOWLEDGE_DOCUMENT_IMPORT: Database,
+  KNOWLEDGE_DOCUMENT_UPDATE: Database,
+  KNOWLEDGE_DOCUMENT_DELETE: Database,
 };
 
 export default async function AuditLogPage({
@@ -195,4 +199,3 @@ export default async function AuditLogPage({
     </div>
   );
 }
-

@@ -4,8 +4,9 @@ import { db } from "@/lib/db";
 import { detectPII } from "@/lib/pii-detection";
 import { logAudit } from "@/lib/audit";
 import Anthropic from "@anthropic-ai/sdk";
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { join } from "path";
+import { formatKnowledgeContext, retrieveKnowledgeChunks } from "@/lib/knowledge/retrieval";
 
 // Helper: Get LLM settings from DB, fall back to env vars
 async function getLLMSettings(): Promise<{ model: string; apiKey: string }> {
@@ -30,22 +31,145 @@ async function getLLMSettings(): Promise<{ model: string; apiKey: string }> {
 // Allow up to 60s for Anthropic response (Coolify / long-running AI calls)
 export const maxDuration = 60;
 
-// Load Pub 1075 text once at module level — truncated to keep well within token limits
-let pub1075Text: string = "";
-const MAX_PUB_CHARS = 80_000; // ~20K tokens — sufficient for core compliance guidance
-try {
-  const fullText = readFileSync(
-    join(process.cwd(), "data/pub1075/p1075-full-text.md"),
-    "utf-8"
+let cachedPub1075Text: string | null = null;
+let cachedPub1075Path: string | null = null;
+
+function loadPub1075Text(): string {
+  if (cachedPub1075Text) return cachedPub1075Text;
+
+  const candidates = [
+    join(process.cwd(), "data", "pub1075", "p1075-full-text.md"),
+    join("/app", "data", "pub1075", "p1075-full-text.md"),
+  ];
+
+  for (const filePath of candidates) {
+    if (!existsSync(filePath)) continue;
+
+    const text = readFileSync(filePath, "utf-8").trim();
+    if (text.length > 1000) {
+      cachedPub1075Text = text;
+      cachedPub1075Path = filePath;
+      return text;
+    }
+  }
+
+  throw new Error(
+    `Publication 1075 text file is missing or empty. Checked: ${candidates.join(", ")}`
   );
-  pub1075Text = fullText.length > MAX_PUB_CHARS
-    ? fullText.substring(0, MAX_PUB_CHARS) + "\n\n[Note: Full text truncated for performance. Additional sections available on request.]"
-    : fullText;
-} catch {
-  console.warn("Could not load Publication 1075 text");
 }
 
-const SYSTEM_PROMPT = `You are the IRS SkyShield AI Compliance Agent — an expert on IRS Publication 1075 (Tax Information Security Guidelines for Federal, State, and Local Agencies).
+const STOP_WORDS = new Set([
+  "about",
+  "after",
+  "also",
+  "and",
+  "are",
+  "can",
+  "does",
+  "for",
+  "from",
+  "how",
+  "into",
+  "irs",
+  "must",
+  "pub",
+  "publication",
+  "should",
+  "that",
+  "the",
+  "their",
+  "this",
+  "what",
+  "when",
+  "where",
+  "which",
+  "with",
+]);
+
+function getSearchTerms(message: string): string[] {
+  const normalized = message.toLowerCase();
+  const terms = new Set(
+    (normalized.match(/[a-z0-9][a-z0-9-]{2,}/g) || []).filter(
+      (term) => !STOP_WORDS.has(term)
+    )
+  );
+
+  if (/\b(encrypt|encrypted|encryption|cryptographic|fips|rest|cloud|key|keys)\b/i.test(message)) {
+    [
+      "SC-28",
+      "Protection of Information at Rest",
+      "Data Encryption at Rest",
+      "FIPS 140",
+      "cryptographic mechanisms",
+      "MP-4",
+      "MP-5",
+      "cloud computing",
+    ].forEach((term) => terms.add(term.toLowerCase()));
+  }
+
+  if (/\b(media|removable|backup|storage|transport|laptop|mobile|device)\b/i.test(message)) {
+    ["MP-4", "MP-5", "AC-19", "mobile device", "removable storage"].forEach(
+      (term) => terms.add(term.toLowerCase())
+    );
+  }
+
+  if (/\b(access|account|authentication|mfa|multi-factor|password|remote)\b/i.test(message)) {
+    ["AC-2", "AC-3", "AC-17", "IA-2", "identification", "authentication"].forEach(
+      (term) => terms.add(term.toLowerCase())
+    );
+  }
+
+  return [...terms];
+}
+
+function splitPub1075Pages(text: string): Array<{ label: string; content: string }> {
+  const parts = text.split(/\n--- PAGE (\d+) ---\n/g);
+  const pages: Array<{ label: string; content: string }> = [];
+
+  if (parts[0]?.trim()) {
+    pages.push({ label: "front matter", content: parts[0].trim() });
+  }
+
+  for (let i = 1; i < parts.length; i += 2) {
+    pages.push({ label: `page ${parts[i]}`, content: parts[i + 1]?.trim() || "" });
+  }
+
+  return pages;
+}
+
+function buildPub1075Context(message: string): string {
+  const text = loadPub1075Text();
+  const pages = splitPub1075Pages(text);
+  const terms = getSearchTerms(message);
+  const MAX_CONTEXT_CHARS = 90_000;
+
+  const scoredPages = pages
+    .map((page) => {
+      const lower = page.content.toLowerCase();
+      const score = terms.reduce((total, term) => {
+        if (!term) return total;
+        const matches = lower.split(term.toLowerCase()).length - 1;
+        return total + matches * Math.max(1, Math.min(5, Math.ceil(term.length / 6)));
+      }, 0);
+      return { ...page, score };
+    })
+    .filter((page) => page.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  const selectedPages = scoredPages.length > 0 ? scoredPages : pages.slice(0, 8);
+  let context = `Source: IRS Publication 1075 text loaded from ${cachedPub1075Path || "local file"}.\n`;
+
+  for (const page of selectedPages) {
+    const excerpt = `\n--- PUB 1075 EXCERPT: ${page.label} ---\n${page.content}\n`;
+    if (context.length + excerpt.length > MAX_CONTEXT_CHARS) break;
+    context += excerpt;
+  }
+
+  return context;
+}
+
+function buildSystemPrompt(knowledgeContext: string): string {
+  return `You are the IRS SkyShield AI Compliance Agent — an expert on IRS Publication 1075 (Tax Information Security Guidelines for Federal, State, and Local Agencies).
 
 RESPONSE FORMAT (follow this structure exactly):
 
@@ -73,13 +197,15 @@ STYLE RULES:
 IMPORTANT RULES:
 1. NEVER ask for or process any Federal Tax Information (FTI) or Personally Identifiable Information (PII)
 2. If a user seems to be sharing FTI/PII, immediately warn them and refuse to process it
-3. Always ground your answers in the actual Publication 1075 text
+3. Always ground your answers in the retrieved knowledge excerpts
 4. If uncertain about a specific requirement, say so rather than guessing
+5. If the provided excerpts do not contain enough information to answer, say that the relevant text was not found in the loaded excerpts and ask the user to narrow the question
 
-THE FULL TEXT OF IRS PUBLICATION 1075 FOLLOWS:
-=== BEGIN PUBLICATION 1075 ===
-${pub1075Text}
-=== END PUBLICATION 1075 ===`;
+RELEVANT KNOWLEDGE EXCERPTS FOLLOW:
+=== BEGIN KNOWLEDGE EXCERPTS ===
+${knowledgeContext}
+=== END KNOWLEDGE EXCERPTS ===`;
+}
 
 function extractCitations(
   response: string
@@ -324,6 +450,15 @@ Section 3.1: General Requirements`;
     const anthropic = new Anthropic({
       apiKey: llmSettings.apiKey,
     });
+    const retrievedChunks = await retrieveKnowledgeChunks(message, 10).catch((err) => {
+      console.warn("Knowledge retrieval failed, falling back to local Pub 1075 excerpts:", err);
+      return [];
+    });
+    const pub1075Context =
+      retrievedChunks.length > 0
+        ? formatKnowledgeContext(retrievedChunks)
+        : buildPub1075Context(message);
+    const systemPrompt = buildSystemPrompt(pub1075Context);
 
     // Build message history
     const apiMessages: Array<{
@@ -342,7 +477,7 @@ Section 3.1: General Requirements`;
     const responsePromise = anthropic.messages.create({
       model: llmSettings.model,
       max_tokens: 4096,
-      system: SYSTEM_PROMPT,
+      system: systemPrompt,
       messages: apiMessages,
     });
 

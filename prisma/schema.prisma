@@ -78,6 +78,7 @@ model User {
   auditLogs          AuditLog[]
   reportedFalsePositives  FalsePositiveReport[] @relation("ReportedFalsePositives")
   reviewedFalsePositives  FalsePositiveReport[] @relation("ReviewedFalsePositives")
+  importedKnowledgeDocuments KnowledgeDocument[] @relation("ImportedKnowledgeDocuments")
 }
 
 model Invitation {
@@ -288,6 +289,52 @@ model SystemSetting {
   updatedBy String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model KnowledgeDocument {
+  id           String   @id @default(cuid())
+  title        String
+  sourceType   String   @default("document")
+  sourceName   String?
+  version      String?
+  description  String?
+  metadata     Json?
+  contentHash  String   @unique
+  status       String   @default("ACTIVE")
+  chunkCount   Int      @default(0)
+  importedById String?
+  importedAt   DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  importedBy User?            @relation("ImportedKnowledgeDocuments", fields: [importedById], references: [id], onDelete: SetNull)
+  chunks     KnowledgeChunk[]
+
+  @@index([sourceType])
+  @@index([status])
+}
+
+model KnowledgeChunk {
+  id           String   @id @default(cuid())
+  documentId   String
+  chunkIndex   Int
+  content      String
+  pageStart    Int?
+  pageEnd      Int?
+  section      String?
+  heading      String?
+  metadata     Json?
+  tokenCount   Int      @default(0)
+  contentHash  String
+  embedding    Unsupported("vector(1536)")?
+  searchVector Unsupported("tsvector")? @default(dbgenerated())
+  createdAt    DateTime @default(now())
+
+  document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, chunkIndex])
+  @@unique([documentId, contentHash])
+  @@index([documentId])
+  @@index([section])
 }
 
 model FalsePositiveReport {

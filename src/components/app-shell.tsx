@@ -17,6 +17,7 @@ import {
   EyeOff,
   ShieldAlert,
   ChevronDown,
+  Database,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
@@ -68,6 +69,11 @@ export function AppShell({ children, user }: AppShellProps) {
   // Admin-only nav items
   const adminNavItems = isAdmin
     ? [
+      {
+        name: "Knowledge Base",
+        href: "/knowledge",
+        icon: Database,
+      },
       {
         name: "False Positives",
         href: "/settings/false-positives",

@@ -79,6 +79,9 @@ const ACTION_LABELS: Record<string, string> = {
   USER_CREATE: "invited user",
   PII_DETECTED: "PII detected",
   SETTINGS_UPDATE: "updated settings",
+  KNOWLEDGE_DOCUMENT_IMPORT: "imported knowledge",
+  KNOWLEDGE_DOCUMENT_UPDATE: "updated knowledge",
+  KNOWLEDGE_DOCUMENT_DELETE: "deleted knowledge",
 };
 
 const ACTION_COLORS: Record<string, string> = {
@@ -86,6 +89,9 @@ const ACTION_COLORS: Record<string, string> = {
   AI_QUERY: "bg-sky-500/10 text-sky-400",
   INCIDENT_CREATE: "bg-amber-500/10 text-amber-400",
   PII_DETECTED: "bg-red-500/10 text-red-400",
+  KNOWLEDGE_DOCUMENT_IMPORT: "bg-indigo-500/10 text-indigo-300",
+  KNOWLEDGE_DOCUMENT_UPDATE: "bg-indigo-500/10 text-indigo-300",
+  KNOWLEDGE_DOCUMENT_DELETE: "bg-red-500/10 text-red-300",
 };
 
 const SEVERITY_COLORS: Record<string, string> = {

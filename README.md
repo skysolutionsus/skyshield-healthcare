@@ -51,6 +51,8 @@ Edit `.env` with your values:
 ```env
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/irs_skyshield?schema=public"
 ANTHROPIC_API_KEY="sk-ant-..."     # Optional — app runs in demo mode without it
+OPENAI_API_KEY="sk-..."            # Optional — enables pgvector embeddings for hybrid RAG
+EMBEDDING_MODEL="text-embedding-3-small"
 NEXTAUTH_SECRET="generate-a-random-secret-here"
 NEXTAUTH_URL="http://localhost:3000"
 ```
@@ -62,6 +64,7 @@ Generate a secret: `openssl rand -base64 32`
 ```bash
 npm run db:migrate    # Apply committed migrations
 npm run db:seed       # Seed demo data + SCSEM templates
+npm run rag:ingest:pub1075 # Import Pub 1075 into the Admin knowledge database
 ```
 
 ### 4. Start the dev server
@@ -103,9 +106,17 @@ Set these in your Docker host / Coolify:
 ```env
 DATABASE_URL=postgresql://postgres:your-password@db:5432/irs_skyshield?schema=public
 ANTHROPIC_API_KEY=sk-ant-your-key
+OPENAI_API_KEY=sk-your-embedding-key
+EMBEDDING_MODEL=text-embedding-3-small
 NEXTAUTH_SECRET=your-production-secret
 NEXTAUTH_URL=https://your-domain.com
 ```
+
+After deployment, Admin users can manage source documents in **Knowledge Base**. Use
+`npm run rag:ingest:pub1075` or the Admin UI to import Publication 1075, NIST standards,
+SCSEMs, IRS guidance, or internal policy documents with metadata. When `OPENAI_API_KEY`
+is configured, imports store embeddings in pgvector; otherwise documents are still
+searchable with Postgres full-text and exact section/control matching.
 
 ## Project Structure
 
@@ -176,6 +187,7 @@ npm run db:migrate # Apply committed migrations
 npm run db:migrate:dev # Create/apply a migration during local development
 npm run db:push    # Push schema directly, dev/prototyping only
 npm run db:seed    # Seed demo data
+npm run rag:ingest:pub1075 # Import Pub 1075 into knowledge/RAG tables
 npm run db:studio  # Open Prisma Studio
 ```
 

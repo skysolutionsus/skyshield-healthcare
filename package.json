@@ -12,6 +12,7 @@
     "db:migrate:dev": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:seed": "npx tsx prisma/seed.ts",
+    "rag:ingest:pub1075": "npx tsx scripts/ingest-pub1075.ts",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate"
   },
