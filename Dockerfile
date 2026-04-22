@@ -4,7 +4,9 @@ WORKDIR /app
 
 COPY package.json package-lock.json* ./
 COPY prisma ./prisma/
-RUN npm ci
+# Install dependencies without lifecycle scripts; Prisma is generated explicitly
+# in the builder stage where the build-time DATABASE_URL is defined.
+RUN npm ci --ignore-scripts
 
 # Stage 2: Build
 FROM node:20-alpine AS builder
