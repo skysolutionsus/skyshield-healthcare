@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   BookOpen,
+  ChevronLeft,
+  ChevronRight,
   Database,
   FilePlus2,
   Loader2,
@@ -56,6 +58,7 @@ const SOURCE_TYPES = [
   "internal_policy",
   "document",
 ];
+const CHUNK_PAGE_SIZE = 10;
 
 function metadataPreview(metadata: unknown) {
   if (!metadata) return "No metadata";
@@ -66,6 +69,13 @@ function metadataPreview(metadata: unknown) {
   }
 }
 
+function metadataField(metadata: unknown, key: string): string | null {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
+  const value = (metadata as Record<string, unknown>)[key];
+  if (value === null || value === undefined) return null;
+  return String(value);
+}
+
 export function KnowledgeConsole() {
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
   const [stats, setStats] = useState<KnowledgeStats | null>(null);
@@ -73,6 +83,10 @@ export function KnowledgeConsole() {
   const [importing, setImporting] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<KnowledgeDocument | null>(null);
   const [chunks, setChunks] = useState<KnowledgeChunk[]>([]);
+  const [chunkLoading, setChunkLoading] = useState(false);
+  const [chunkPage, setChunkPage] = useState(1);
+  const [chunkTotalPages, setChunkTotalPages] = useState(1);
+  const [chunkTotalCount, setChunkTotalCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<KnowledgeChunk[]>([]);
@@ -109,18 +123,27 @@ export function KnowledgeConsole() {
     }
   }
 
-  async function loadDocumentDetail(document: KnowledgeDocument) {
+  async function loadDocumentDetail(document: KnowledgeDocument, page = 1) {
     setSelectedDocument(document);
     setChunks([]);
+    setChunkLoading(true);
     try {
-      const res = await fetch(`/api/admin/knowledge/${document.id}`, { cache: "no-store" });
+      const res = await fetch(
+        `/api/admin/knowledge/${document.id}?page=${page}&pageSize=${CHUNK_PAGE_SIZE}`,
+        { cache: "no-store" }
+      );
       const data = await res.json();
       if (res.ok) {
         setSelectedDocument(data.document);
         setChunks(data.chunks || []);
+        setChunkPage(data.page || page);
+        setChunkTotalPages(data.totalPages || 1);
+        setChunkTotalCount(data.totalChunks || data.chunks?.length || 0);
       }
     } catch {
       // keep document selected even if chunk preview fails
+    } finally {
+      setChunkLoading(false);
     }
   }
 
@@ -176,6 +199,9 @@ export function KnowledgeConsole() {
       if (selectedDocument?.id === document.id) {
         setSelectedDocument(null);
         setChunks([]);
+        setChunkPage(1);
+        setChunkTotalPages(1);
+        setChunkTotalCount(0);
       }
       await loadDocuments();
     } catch (err) {
@@ -424,18 +450,71 @@ export function KnowledgeConsole() {
                   {selectedDocument.sourceType} {selectedDocument.version ? `| ${selectedDocument.version}` : ""}
                 </p>
               </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <MiniStat label="Chunks" value={chunkTotalCount || selectedDocument.chunkCount} />
+                <MiniStat
+                  label="Pages"
+                  value={metadataField(selectedDocument.metadata, "pageCount") || "Unknown"}
+                />
+                <MiniStat
+                  label="PDF KB"
+                  value={metadataField(selectedDocument.metadata, "pdfSizeKB") || "Unknown"}
+                />
+              </div>
               <pre className="max-h-48 overflow-auto rounded-xl border border-[var(--sky-border)] bg-black/20 p-3 text-xs text-slate-300">
                 {metadataPreview(selectedDocument.metadata)}
               </pre>
               <div className="space-y-3">
-                {chunks.slice(0, 5).map((chunk) => (
-                  <ChunkPreview key={chunk.id} chunk={chunk} />
-                ))}
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm text-[var(--sky-text-muted)]">
+                    Showing chunks {chunks.length > 0 ? (chunkPage - 1) * CHUNK_PAGE_SIZE + 1 : 0}
+                    {"-"}
+                    {Math.min(chunkPage * CHUNK_PAGE_SIZE, chunkTotalCount)} of {chunkTotalCount}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => selectedDocument && loadDocumentDetail(selectedDocument, chunkPage - 1)}
+                      disabled={chunkLoading || chunkPage <= 1}
+                      className="rounded-lg border border-[var(--sky-border)] p-2 text-[var(--sky-text-secondary)] transition hover:bg-white/10 disabled:opacity-40"
+                      title="Previous chunks"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <span className="text-xs text-[var(--sky-text-muted)]">
+                      Page {chunkPage} of {chunkTotalPages}
+                    </span>
+                    <button
+                      onClick={() => selectedDocument && loadDocumentDetail(selectedDocument, chunkPage + 1)}
+                      disabled={chunkLoading || chunkPage >= chunkTotalPages}
+                      className="rounded-lg border border-[var(--sky-border)] p-2 text-[var(--sky-text-secondary)] transition hover:bg-white/10 disabled:opacity-40"
+                      title="Next chunks"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+                {chunkLoading ? (
+                  <div className="rounded-xl border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] p-6 text-center text-sm text-[var(--sky-text-muted)]">
+                    <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
+                    Loading chunks...
+                  </div>
+                ) : (
+                  chunks.map((chunk) => <ChunkPreview key={chunk.id} chunk={chunk} />)
+                )}
               </div>
             </div>
           )}
         </section>
       </div>
+    </div>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-xl border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] p-3">
+      <p className="text-xs uppercase tracking-wide text-[var(--sky-text-muted)]">{label}</p>
+      <p className="mt-1 font-semibold text-white">{value}</p>
     </div>
   );
 }
@@ -459,6 +538,9 @@ function StatCard({
 }
 
 function ChunkPreview({ chunk }: { chunk: KnowledgeChunk }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = chunk.content.length > 700;
+
   return (
     <article className="rounded-xl border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] p-3">
       <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
@@ -483,9 +565,21 @@ function ChunkPreview({ chunk }: { chunk: KnowledgeChunk }) {
         )}
       </div>
       {chunk.heading && <p className="mb-2 text-sm font-medium text-white">{chunk.heading}</p>}
-      <p className="line-clamp-5 whitespace-pre-wrap text-sm leading-6 text-[var(--sky-text-secondary)]">
+      <p
+        className={`whitespace-pre-wrap text-sm leading-6 text-[var(--sky-text-secondary)] ${
+          expanded ? "" : "line-clamp-6"
+        }`}
+      >
         {chunk.content}
       </p>
+      {isLong && (
+        <button
+          onClick={() => setExpanded((current) => !current)}
+          className="mt-3 text-xs font-medium text-sky-200 transition hover:text-white"
+        >
+          {expanded ? "Collapse chunk" : "Show full chunk"}
+        </button>
+      )}
     </article>
   );
 }
