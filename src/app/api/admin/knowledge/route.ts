@@ -4,7 +4,11 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { hasEmbeddingConfig } from "@/lib/knowledge/embeddings";
-import { importKnowledgeDocument, loadLocalPub1075 } from "@/lib/knowledge/ingest";
+import {
+  importKnowledgeDocument,
+  loadLocalPub1075,
+  loadOfficialPub1075FromIrs,
+} from "@/lib/knowledge/ingest";
 
 export const maxDuration = 300;
 
@@ -112,22 +116,39 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const action = body.action || "import_text";
 
-    const input =
-      action === "import_pub1075"
-        ? {
-            ...loadLocalPub1075(),
-            importedById: user!.id,
-          }
-        : {
-            title: String(body.title || ""),
-            content: String(body.content || ""),
-            sourceType: String(body.sourceType || "document"),
-            sourceName: body.sourceName ? String(body.sourceName) : undefined,
-            version: body.version ? String(body.version) : undefined,
-            description: body.description ? String(body.description) : undefined,
-            metadata: parseMetadata(body.metadata),
-            importedById: user!.id,
-          };
+    let syncDetails: Record<string, unknown> | undefined;
+    let input;
+
+    if (action === "sync_pub1075") {
+      const officialPub1075 = await loadOfficialPub1075FromIrs();
+      syncDetails = {
+        pdfSizeKB: officialPub1075.pdfSizeKB,
+        pageCount: officialPub1075.pageCount,
+        pdfSha256: officialPub1075.pdfSha256,
+        textSha256: officialPub1075.textSha256,
+        downloadedAt: officialPub1075.downloadedAt,
+      };
+      input = {
+        ...officialPub1075,
+        importedById: user!.id,
+      };
+    } else if (action === "import_pub1075") {
+      input = {
+        ...loadLocalPub1075(),
+        importedById: user!.id,
+      };
+    } else {
+      input = {
+        title: String(body.title || ""),
+        content: String(body.content || ""),
+        sourceType: String(body.sourceType || "document"),
+        sourceName: body.sourceName ? String(body.sourceName) : undefined,
+        version: body.version ? String(body.version) : undefined,
+        description: body.description ? String(body.description) : undefined,
+        metadata: parseMetadata(body.metadata),
+        importedById: user!.id,
+      };
+    }
 
     const result = await importKnowledgeDocument(input);
 
@@ -142,6 +163,7 @@ export async function POST(request: NextRequest) {
         sourceType: input.sourceType,
         chunkCount: result.chunkCount,
         embeddedChunkCount: result.embeddedChunkCount,
+        syncDetails,
       },
       ipAddress:
         request.headers.get("x-forwarded-for") ||
@@ -150,7 +172,7 @@ export async function POST(request: NextRequest) {
       userAgent: request.headers.get("user-agent") || undefined,
     });
 
-    return NextResponse.json({ success: true, ...result });
+    return NextResponse.json({ success: true, ...result, syncDetails });
   } catch (err) {
     console.error("Knowledge POST error:", err);
     return NextResponse.json(

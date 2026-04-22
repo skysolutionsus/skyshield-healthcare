@@ -64,7 +64,7 @@ Generate a secret: `openssl rand -base64 32`
 ```bash
 npm run db:migrate    # Apply committed migrations
 npm run db:seed       # Seed demo data + SCSEM templates
-npm run rag:ingest:pub1075 # Import Pub 1075 into the Admin knowledge database
+npm run rag:sync:pub1075 # Download official Pub 1075 from IRS.gov and import/embed it
 ```
 
 ### 4. Start the dev server
@@ -112,11 +112,12 @@ NEXTAUTH_SECRET=your-production-secret
 NEXTAUTH_URL=https://your-domain.com
 ```
 
-After deployment, Admin users can manage source documents in **Knowledge Base**. Use
-`npm run rag:ingest:pub1075` or the Admin UI to import Publication 1075, NIST standards,
-SCSEMs, IRS guidance, or internal policy documents with metadata. When `OPENAI_API_KEY`
-is configured, imports store embeddings in pgvector; otherwise documents are still
-searchable with Postgres full-text and exact section/control matching.
+After deployment, Admin users can manage source documents in **Knowledge Base**. Use the
+**Sync Latest Pub 1075** button or `npm run rag:sync:pub1075` to download the official
+IRS PDF from IRS.gov, extract page-marked text, and import/embed it. You can also import
+NIST standards, SCSEMs, IRS guidance, or internal policy documents with metadata. When
+`OPENAI_API_KEY` is configured, imports store embeddings in pgvector; otherwise documents
+are still searchable with Postgres full-text and exact section/control matching.
 
 ## Project Structure
 
@@ -188,6 +189,7 @@ npm run db:migrate:dev # Create/apply a migration during local development
 npm run db:push    # Push schema directly, dev/prototyping only
 npm run db:seed    # Seed demo data
 npm run rag:ingest:pub1075 # Import Pub 1075 into knowledge/RAG tables
+npm run rag:sync:pub1075 # Download official Pub 1075 from IRS.gov and import/embed it
 npm run db:studio  # Open Prisma Studio
 ```
 

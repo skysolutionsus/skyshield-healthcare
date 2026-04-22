@@ -6,6 +6,8 @@ import { db } from "@/lib/db";
 import { chunkKnowledgeDocument, hashText } from "@/lib/knowledge/chunking";
 import { embedTextsInBatches, hasEmbeddingConfig, vectorLiteral } from "@/lib/knowledge/embeddings";
 
+export const PUB_1075_PDF_URL = "https://www.irs.gov/pub/irs-pdf/p1075.pdf";
+
 export interface KnowledgeImportInput {
   title: string;
   content: string;
@@ -37,7 +39,121 @@ export function loadLocalPub1075(): KnowledgeImportInput {
     content,
     metadata: {
       sourcePath: "data/pub1075/p1075-full-text.md",
-      sourceUrl: "https://www.irs.gov/pub/irs-pdf/p1075.pdf",
+      sourceUrl: PUB_1075_PDF_URL,
+    },
+  };
+}
+
+function detectPub1075Version(text: string): string {
+  const revMatch = text.match(/Publication\s+1075\s+\(Rev\.\s*([^)]+)\)/i);
+  if (revMatch) return `Rev. ${revMatch[1].trim()}`;
+
+  const headerMatch = text.match(/#\s*IRS Publication 1075[^\n]*\n#\s*Total Pages:/i);
+  if (headerMatch) return "Current IRS PDF";
+
+  return "Unknown revision";
+}
+
+async function extractPdfTextByPage(pdfBuffer: Buffer): Promise<{
+  text: string;
+  pageCount: number;
+  pdfInfo: Record<string, unknown>;
+}> {
+  const { PDFParse } = await import("pdf-parse");
+  const parser = new PDFParse({ data: pdfBuffer });
+
+  try {
+    const info = await parser.getInfo({ parsePageInfo: true });
+    const pageCount = info.total || info.pages?.length || 0;
+    const pages: string[] = [];
+
+    for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+      const page = await parser.getText({ partial: [pageNumber] });
+      pages.push(`--- PAGE ${pageNumber} ---\n\n${page.text.trim()}`);
+    }
+
+    return {
+      text: pages.join("\n\n\n"),
+      pageCount,
+      pdfInfo: {
+        title: info.info?.Title,
+        author: info.info?.Author,
+        creator: info.info?.Creator,
+        producer: info.info?.Producer,
+        creationDate: info.info?.CreationDate,
+        modificationDate: info.info?.ModDate,
+      },
+    };
+  } finally {
+    await parser.destroy();
+  }
+}
+
+export async function loadOfficialPub1075FromIrs(): Promise<KnowledgeImportInput & {
+  pdfSizeKB: number;
+  pageCount: number;
+  pdfSha256: string;
+  textSha256: string;
+  downloadedAt: string;
+}> {
+  const downloadedAt = new Date().toISOString();
+  const response = await fetch(PUB_1075_PDF_URL, {
+    headers: {
+      "User-Agent": "IRS SkyShield Pub1075 Sync/1.0",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to download Pub 1075 PDF: ${response.status} ${response.statusText}`
+    );
+  }
+
+  const contentType = response.headers.get("content-type") || "";
+  const pdfBuffer = Buffer.from(await response.arrayBuffer());
+
+  if (!contentType.toLowerCase().includes("pdf") && !pdfBuffer.subarray(0, 4).equals(Buffer.from("%PDF"))) {
+    throw new Error(`IRS response did not look like a PDF. Content-Type: ${contentType || "unknown"}`);
+  }
+
+  const { text, pageCount, pdfInfo } = await extractPdfTextByPage(pdfBuffer);
+  const pdfSha256 = hashText(pdfBuffer.toString("base64"));
+  const textSha256 = hashText(text);
+  const version = detectPub1075Version(text);
+  const header = [
+    "# IRS Publication 1075 - Tax Information Security Guidelines",
+    `# Total Pages: ${pageCount}`,
+    `# Downloaded: ${downloadedAt}`,
+    `# Source: ${PUB_1075_PDF_URL}`,
+    `# PDF SHA256: ${pdfSha256}`,
+    `# Text SHA256: ${textSha256}`,
+    "",
+    "",
+  ].join("\n");
+  const content = `${header}${text}`;
+
+  return {
+    title: "IRS Publication 1075",
+    sourceType: "pub1075",
+    sourceName: PUB_1075_PDF_URL,
+    version,
+    description: "Official IRS Publication 1075 PDF synced directly from IRS.gov",
+    content,
+    pdfSizeKB: Math.round(pdfBuffer.length / 1024),
+    pageCount,
+    pdfSha256,
+    textSha256,
+    downloadedAt,
+    metadata: {
+      sourceUrl: PUB_1075_PDF_URL,
+      sourceFormat: "pdf",
+      syncedFrom: "irs.gov",
+      downloadedAt,
+      pageCount,
+      pdfSizeKB: Math.round(pdfBuffer.length / 1024),
+      pdfSha256,
+      textSha256,
+      pdfInfo,
     },
   };
 }

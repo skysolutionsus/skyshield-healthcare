@@ -77,6 +77,7 @@ export function KnowledgeConsole() {
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<KnowledgeChunk[]>([]);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [form, setForm] = useState({
     title: "",
     sourceType: "document",
@@ -123,20 +124,24 @@ export function KnowledgeConsole() {
     }
   }
 
-  async function importPub1075() {
+  async function syncLatestPub1075() {
     setImporting(true);
     setError("");
+    setNotice("");
     try {
       const res = await fetch("/api/admin/knowledge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "import_pub1075" }),
+        body: JSON.stringify({ action: "sync_pub1075" }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to import Pub 1075");
+      if (!res.ok) throw new Error(data.error || "Failed to sync Pub 1075");
+      setNotice(
+        `Synced official Pub 1075 from IRS.gov: ${data.chunkCount} chunks, ${data.embeddedChunkCount} embedded.`
+      );
       await loadDocuments();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to import Pub 1075");
+      setError(err instanceof Error ? err.message : "Failed to sync Pub 1075");
     } finally {
       setImporting(false);
     }
@@ -205,6 +210,11 @@ export function KnowledgeConsole() {
           {error}
         </div>
       )}
+      {notice && (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+          {notice}
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard icon={BookOpen} label="Documents" value={stats?.documentCount ?? 0} />
@@ -223,11 +233,11 @@ export function KnowledgeConsole() {
               </p>
             </div>
             <button
-              onClick={importPub1075}
+              onClick={syncLatestPub1075}
               disabled={importing}
               className="rounded-lg bg-[var(--sky-royal)] px-3 py-2 text-sm font-medium text-white transition hover:bg-[var(--sky-blue)] disabled:opacity-50"
             >
-              {importing ? "Importing..." : "Import Pub 1075"}
+              {importing ? "Syncing..." : "Sync Latest Pub 1075"}
             </button>
           </div>
 
