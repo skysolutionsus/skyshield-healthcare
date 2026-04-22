@@ -15,8 +15,8 @@ COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
-# SQLite needs a dummy DATABASE_URL at build time for Prisma to generate
-ENV DATABASE_URL="file:./data/db.sqlite"
+# Prisma needs a build-time DATABASE_URL to generate the client.
+ENV DATABASE_URL="postgresql://postgres:postgres@localhost:5432/irs_skyshield?schema=public"
 
 RUN npx prisma generate
 RUN mkdir -p data
@@ -48,9 +48,6 @@ COPY --from=builder /app/src/lib/xlsx-parser.ts ./src/lib/xlsx-parser.ts
 COPY --from=builder /app/assets ./assets
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
-# Create data directory for SQLite and set ownership
-RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
-
 # Copy entrypoint script
 COPY --from=builder /app/entrypoint.sh ./entrypoint.sh
 USER root
@@ -61,8 +58,8 @@ EXPOSE 3000
 
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
-# Default SQLite path - can be overridden via env var
-ENV DATABASE_URL="file:/app/data/db.sqlite"
+# Override this in Coolify with the internal PostgreSQL connection string.
+ENV DATABASE_URL="postgresql://postgres:postgres@db:5432/irs_skyshield?schema=public"
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/api/health || exit 1

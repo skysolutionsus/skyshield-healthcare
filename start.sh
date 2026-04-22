@@ -3,23 +3,28 @@ set -e
 
 echo "=== SkyShield Start ==="
 
-# Ensure schema is up to date (--accept-data-loss needed for non-interactive deploys)
-echo "Running prisma db push..."
-npx prisma db push --accept-data-loss 2>&1
-DB_PUSH_STATUS=$?
-if [ $DB_PUSH_STATUS -ne 0 ]; then
-  echo "ERROR: prisma db push failed with exit code $DB_PUSH_STATUS"
-fi
+# Ensure schema is up to date using committed migrations.
+echo "Running prisma migrate deploy..."
+attempt=1
+until npx prisma migrate deploy; do
+  if [ "$attempt" -ge 10 ]; then
+    echo "ERROR: prisma migrate deploy failed after ${attempt} attempts"
+    exit 1
+  fi
+  attempt=$((attempt + 1))
+  echo "Database not ready or migration failed. Retrying in 5 seconds (${attempt}/10)..."
+  sleep 5
+done
 
 # Check if SCSEM data needs seeding
-# Force re-seed if: controls < 9000 OR sheets lack rawData (v3 parser stores all sheet data)
+# Force re-seed if: sheets are missing OR sheets lack rawData (v3 parser stores all sheet data)
 NEEDS_SEED=$(node -e "
 const { PrismaClient } = require('@prisma/client');
 const p = new PrismaClient();
 (async () => {
   try {
-    const total = await p.sCSEMControl.count();
-    if (total < 9000) { console.log('yes'); return; }
+    const sheets = await p.sCSEMSheet.count();
+    if (sheets === 0) { console.log('yes'); return; }
     const withRaw = await p.sCSEMSheet.count({ where: { rawData: { not: null } } });
     if (withRaw === 0) { console.log('yes'); return; }
     console.log('no');

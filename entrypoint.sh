@@ -2,11 +2,20 @@
 set -e
 
 echo "=== SkyShield Entrypoint ==="
-echo "DATABASE_URL: ${DATABASE_URL}"
+echo "DATABASE_URL: configured"
 
-# Run Prisma db push to ensure schema is up to date
-echo "Running prisma db push..."
-npx prisma db push --skip-generate 2>&1 || echo "Warning: prisma db push encountered an issue"
+# Apply committed database migrations, including pgvector extension setup.
+echo "Running prisma migrate deploy..."
+attempt=1
+until npx prisma migrate deploy; do
+  if [ "$attempt" -ge 10 ]; then
+    echo "ERROR: prisma migrate deploy failed after ${attempt} attempts"
+    exit 1
+  fi
+  attempt=$((attempt + 1))
+  echo "Database not ready or migration failed. Retrying in 5 seconds (${attempt}/10)..."
+  sleep 5
+done
 
 # Check if seed data exists
 echo "Checking if database needs seeding..."

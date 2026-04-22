@@ -29,7 +29,7 @@ IRS SkyShield helps compliance workers, agencies, and organizations achieve and 
 ### Prerequisites
 
 - Node.js 20+
-- PostgreSQL 16+
+- PostgreSQL 16+ with the `vector` extension available, or the `pgvector/pgvector:pg16` image
 - Anthropic API key (optional for demo mode)
 
 ### 1. Clone and install
@@ -60,7 +60,7 @@ Generate a secret: `openssl rand -base64 32`
 ### 3. Set up the database
 
 ```bash
-npx prisma db push    # Create tables
+npm run db:migrate    # Apply committed migrations
 npm run db:seed       # Seed demo data + SCSEM templates
 ```
 
@@ -92,21 +92,16 @@ docker compose up -d --build
 
 This starts:
 - **app** — Next.js on port 3000
-- **db** — PostgreSQL 16 on port 5432
+- **db** — PostgreSQL 16 + pgvector on port 5432
 
-After the containers start:
-
-```bash
-docker compose exec app npx prisma db push
-docker compose exec app npx tsx prisma/seed.ts
-```
+The app container runs migrations and seeds SCSEM/demo data on startup when needed.
 
 ### Production environment variables
 
 Set these in your Docker host / Coolify:
 
 ```env
-DATABASE_URL=postgresql://postgres:your-password@db:5432/irs_skyshield
+DATABASE_URL=postgresql://postgres:your-password@db:5432/irs_skyshield?schema=public
 ANTHROPIC_API_KEY=sk-ant-your-key
 NEXTAUTH_SECRET=your-production-secret
 NEXTAUTH_URL=https://your-domain.com
@@ -177,7 +172,9 @@ npm run build      # Build for production
 npm run start      # Start production server
 npm run lint       # Run ESLint
 npm run db:generate # Generate Prisma client
-npm run db:push    # Push schema to database
+npm run db:migrate # Apply committed migrations
+npm run db:migrate:dev # Create/apply a migration during local development
+npm run db:push    # Push schema directly, dev/prototyping only
 npm run db:seed    # Seed demo data
 npm run db:studio  # Open Prisma Studio
 ```

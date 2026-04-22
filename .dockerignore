@@ -1,0 +1,17 @@
+.git
+.next
+node_modules
+npm-debug.log*
+
+.env
+.env.*
+!.env.example
+
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+prisma/*.db
+prisma/*.sqlite
+prisma/*.sqlite3
+
+SkyShield_Office_of_Safeguards_Pitch.pdf
