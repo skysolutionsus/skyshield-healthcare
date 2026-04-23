@@ -1,4 +1,8 @@
+import * as fs from "fs";
+import * as path from "path";
 import { db } from "@/lib/db";
+
+type IndexEntry = { file: string; category: string; name: string };
 
 const rules: [RegExp, string][] = [
   [/windows server 2022/i, "Windows Server 2022"],
@@ -35,35 +39,88 @@ function detect(name: string): string | null {
   return null;
 }
 
-async function main() {
-  const templates = await db.sCSEMTemplate.findMany({
-    select: { id: true, name: true, cisTechnology: true },
-  });
+function slugify(name: string): string {
+  return name.replace(/\s+/g, "-").toLowerCase();
+}
 
+function loadIndex(): IndexEntry[] {
+  const candidates = [
+    path.join(process.cwd(), "data", "scsem-index.json"),
+    path.join(__dirname, "..", "data", "scsem-index.json"),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) {
+      console.log(`  Reading SCSEM index from ${p}`);
+      return JSON.parse(fs.readFileSync(p, "utf-8"));
+    }
+  }
+  console.warn(
+    `  SCSEM index not found. Checked: ${candidates.join(", ")}. ` +
+      `Skipping template creation; only existing templates will be backfilled.`
+  );
+  return [];
+}
+
+async function main() {
+  const index = loadIndex();
+
+  let created = 0;
   let updated = 0;
   let unchanged = 0;
-  let unmatched = 0;
 
-  for (const t of templates) {
-    const detected = detect(t.name);
-    if (!detected) {
-      unmatched++;
-      continue;
-    }
-    if (t.cisTechnology === detected) {
+  for (const entry of index) {
+    const id = slugify(entry.name);
+    const cisTechnology = detect(entry.name);
+
+    const existing = await db.sCSEMTemplate.findUnique({ where: { id } });
+
+    if (!existing) {
+      await db.sCSEMTemplate.create({
+        data: {
+          id,
+          name: entry.name,
+          category: entry.category,
+          filePath: entry.file,
+          cisTechnology,
+        },
+      });
+      created++;
+      console.log(`  + created ${entry.name}${cisTechnology ? ` [${cisTechnology}]` : ""}`);
+    } else if (existing.cisTechnology !== cisTechnology) {
+      await db.sCSEMTemplate.update({
+        where: { id },
+        data: { cisTechnology },
+      });
+      updated++;
+      console.log(
+        `  ~ ${entry.name}: ${existing.cisTechnology || "null"} -> ${cisTechnology || "null"}`
+      );
+    } else {
       unchanged++;
-      continue;
     }
-    await db.sCSEMTemplate.update({
-      where: { id: t.id },
-      data: { cisTechnology: detected },
-    });
-    updated++;
-    console.log(`  ${t.name} -> ${detected}`);
   }
 
+  const orphans = await db.sCSEMTemplate.findMany({
+    where: index.length > 0 ? { id: { notIn: index.map((e) => slugify(e.name)) } } : {},
+    select: { id: true, name: true, cisTechnology: true },
+  });
+  for (const t of orphans) {
+    const detected = detect(t.name);
+    if (detected && t.cisTechnology !== detected) {
+      await db.sCSEMTemplate.update({
+        where: { id: t.id },
+        data: { cisTechnology: detected },
+      });
+      updated++;
+      console.log(`  ~ (orphan) ${t.name}: ${t.cisTechnology || "null"} -> ${detected}`);
+    }
+  }
+
+  const total = await db.sCSEMTemplate.count();
+  const withTech = await db.sCSEMTemplate.count({ where: { cisTechnology: { not: null } } });
   console.log(
-    `CIS tech backfill: updated ${updated}, unchanged ${unchanged}, no-match ${unmatched} (of ${templates.length})`
+    `CIS tech backfill: created ${created}, updated ${updated}, unchanged ${unchanged}. ` +
+      `Totals: ${total} templates, ${withTech} with cisTechnology.`
   );
 }
 
