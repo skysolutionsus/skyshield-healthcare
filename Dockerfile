@@ -49,7 +49,9 @@ COPY --from=builder /app/node_modules ./node_modules
 
 # Copy source files needed for seed (tsx can import TS directly)
 COPY --from=builder /app/src/lib/xlsx-parser.ts ./src/lib/xlsx-parser.ts
+COPY --from=builder /app/src/lib/db.ts ./src/lib/db.ts
 COPY --from=builder /app/assets ./assets
+COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
 # Copy entrypoint script

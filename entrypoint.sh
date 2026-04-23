@@ -37,5 +37,8 @@ else
   echo "Database already has SCSEM data. Skipping seed."
 fi
 
+echo "Backfilling CIS technology mapping on SCSEM templates..."
+npx tsx scripts/backfill-cis-technology.ts 2>&1 || echo "Warning: CIS backfill encountered an issue"
+
 echo "Starting Next.js server..."
 exec npm start

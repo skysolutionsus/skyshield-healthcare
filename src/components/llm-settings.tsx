@@ -7,7 +7,7 @@ const AVAILABLE_MODELS = [
     { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 (Default)" },
     { value: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" },
     { value: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet" },
-    { value: "claude-3-haiku-20240307", label: "Claude 3 Haiku (Fast)" },
+    { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5 (Fast)" },
     { value: "claude-3-opus-20240229", label: "Claude 3 Opus (Most capable)" },
 ];
 

@@ -560,7 +560,7 @@ Section 3.1: General Requirements`;
     if (isNewConversation) {
       titlePromise = anthropic.messages
         .create({
-          model: "claude-3-haiku-20240307",
+          model: "claude-haiku-4-5-20251001",
           max_tokens: 15,
           system:
             "You are a summarization assistant. Given a user's first message, generate a concise, 3-5 word title describing the topic. Do not include quotes, periods, or intro text. Just the title.",

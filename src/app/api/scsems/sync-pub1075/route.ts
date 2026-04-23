@@ -222,7 +222,7 @@ RULES:
 - Do NOT invent Test IDs or Pub 1075 content`;
 
             const message = await anthropic.messages.create({
-                model: "claude-3-haiku-20240307",
+                model: "claude-haiku-4-5-20251001",
                 max_tokens: 2500,
                 temperature: 0.2, // Lower temperature for more precise compliance work
                 system: "You are a precise IRS Publication 1075 compliance analyst. You only cite requirements that appear in the actual document excerpts provided to you.",
