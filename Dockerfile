@@ -67,7 +67,10 @@ ENV HOSTNAME="0.0.0.0"
 # Override this in Coolify with the internal PostgreSQL connection string.
 ENV DATABASE_URL="postgresql://postgres:postgres@db:5432/irs_skyshield?schema=public"
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+# start-period covers the cold-start seed on a fresh DB. The seed parses
+# 58 SCSEM XLSX files and takes several minutes; only runs when the DB is
+# empty, so subsequent deploys are fast.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=420s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/api/health || exit 1
 
 ENTRYPOINT ["/app/entrypoint.sh"]
