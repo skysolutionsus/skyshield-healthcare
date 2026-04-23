@@ -4,9 +4,12 @@ import { db } from "@/lib/db";
 import { detectPII } from "@/lib/pii-detection";
 import { logAudit } from "@/lib/audit";
 import Anthropic from "@anthropic-ai/sdk";
-import { existsSync, readFileSync } from "fs";
-import { join } from "path";
-import { formatKnowledgeContext, retrieveKnowledgeChunks } from "@/lib/knowledge/retrieval";
+import {
+  handleKnowledgeSearch,
+  KNOWLEDGE_SEARCH_TOOL,
+  type KnowledgeSearchInput,
+} from "@/lib/knowledge/agent-tools";
+import { buildFallbackContext } from "@/lib/knowledge/fallback-context";
 
 // Helper: Get LLM settings from DB, fall back to env vars
 async function getLLMSettings(): Promise<{ model: string; apiKey: string }> {
@@ -28,145 +31,13 @@ async function getLLMSettings(): Promise<{ model: string; apiKey: string }> {
   return { model, apiKey };
 }
 
-// Allow up to 60s for Anthropic response (Coolify / long-running AI calls)
+// Allow up to 60s for the full agent loop (multiple tool rounds + final answer).
 export const maxDuration = 60;
 
-let cachedPub1075Text: string | null = null;
-let cachedPub1075Path: string | null = null;
-
-function loadPub1075Text(): string {
-  if (cachedPub1075Text) return cachedPub1075Text;
-
-  const candidates = [
-    join(process.cwd(), "data", "pub1075", "p1075-full-text.md"),
-    join("/app", "data", "pub1075", "p1075-full-text.md"),
-  ];
-
-  for (const filePath of candidates) {
-    if (!existsSync(filePath)) continue;
-
-    const text = readFileSync(filePath, "utf-8").trim();
-    if (text.length > 1000) {
-      cachedPub1075Text = text;
-      cachedPub1075Path = filePath;
-      return text;
-    }
-  }
-
-  throw new Error(
-    `Publication 1075 text file is missing or empty. Checked: ${candidates.join(", ")}`
-  );
-}
-
-const STOP_WORDS = new Set([
-  "about",
-  "after",
-  "also",
-  "and",
-  "are",
-  "can",
-  "does",
-  "for",
-  "from",
-  "how",
-  "into",
-  "irs",
-  "must",
-  "pub",
-  "publication",
-  "should",
-  "that",
-  "the",
-  "their",
-  "this",
-  "what",
-  "when",
-  "where",
-  "which",
-  "with",
-]);
-
-function getSearchTerms(message: string): string[] {
-  const normalized = message.toLowerCase();
-  const terms = new Set(
-    (normalized.match(/[a-z0-9][a-z0-9-]{2,}/g) || []).filter(
-      (term) => !STOP_WORDS.has(term)
-    )
-  );
-
-  if (/\b(encrypt|encrypted|encryption|cryptographic|fips|rest|cloud|key|keys)\b/i.test(message)) {
-    [
-      "SC-28",
-      "Protection of Information at Rest",
-      "Data Encryption at Rest",
-      "FIPS 140",
-      "cryptographic mechanisms",
-      "MP-4",
-      "MP-5",
-      "cloud computing",
-    ].forEach((term) => terms.add(term.toLowerCase()));
-  }
-
-  if (/\b(media|removable|backup|storage|transport|laptop|mobile|device)\b/i.test(message)) {
-    ["MP-4", "MP-5", "AC-19", "mobile device", "removable storage"].forEach(
-      (term) => terms.add(term.toLowerCase())
-    );
-  }
-
-  if (/\b(access|account|authentication|mfa|multi-factor|password|remote)\b/i.test(message)) {
-    ["AC-2", "AC-3", "AC-17", "IA-2", "identification", "authentication"].forEach(
-      (term) => terms.add(term.toLowerCase())
-    );
-  }
-
-  return [...terms];
-}
-
-function splitPub1075Pages(text: string): Array<{ label: string; content: string }> {
-  const parts = text.split(/\n--- PAGE (\d+) ---\n/g);
-  const pages: Array<{ label: string; content: string }> = [];
-
-  if (parts[0]?.trim()) {
-    pages.push({ label: "front matter", content: parts[0].trim() });
-  }
-
-  for (let i = 1; i < parts.length; i += 2) {
-    pages.push({ label: `page ${parts[i]}`, content: parts[i + 1]?.trim() || "" });
-  }
-
-  return pages;
-}
-
-function buildPub1075Context(message: string): string {
-  const text = loadPub1075Text();
-  const pages = splitPub1075Pages(text);
-  const terms = getSearchTerms(message);
-  const MAX_CONTEXT_CHARS = 90_000;
-
-  const scoredPages = pages
-    .map((page) => {
-      const lower = page.content.toLowerCase();
-      const score = terms.reduce((total, term) => {
-        if (!term) return total;
-        const matches = lower.split(term.toLowerCase()).length - 1;
-        return total + matches * Math.max(1, Math.min(5, Math.ceil(term.length / 6)));
-      }, 0);
-      return { ...page, score };
-    })
-    .filter((page) => page.score > 0)
-    .sort((a, b) => b.score - a.score);
-
-  const selectedPages = scoredPages.length > 0 ? scoredPages : pages.slice(0, 8);
-  let context = `Source: IRS Publication 1075 text loaded from ${cachedPub1075Path || "local file"}.\n`;
-
-  for (const page of selectedPages) {
-    const excerpt = `\n--- PUB 1075 EXCERPT: ${page.label} ---\n${page.content}\n`;
-    if (context.length + excerpt.length > MAX_CONTEXT_CHARS) break;
-    context += excerpt;
-  }
-
-  return context;
-}
+// Agent loop bounds: 5 tool rounds is enough for "search baseline → search
+// interim guidance → refine" compliance flows without runaway.
+const MAX_TOOL_ROUNDS = 5;
+const MAX_TOKENS_PER_ROUND = 4096;
 
 interface KnowledgeInventoryDocument {
   title: string;
@@ -187,7 +58,10 @@ function metadataValue(metadata: unknown, key: string): string | null {
   return String(value);
 }
 
-async function buildKnowledgeInventoryContext(): Promise<string> {
+async function buildKnowledgeInventoryContext(): Promise<{
+  content: string;
+  available: boolean;
+}> {
   try {
     const documents = await db.knowledgeDocument.findMany({
       where: { status: "ACTIVE" },
@@ -206,10 +80,13 @@ async function buildKnowledgeInventoryContext(): Promise<string> {
     });
 
     if (documents.length === 0) {
-      return "No active knowledge documents are currently registered in the database.";
+      return {
+        content: "No active knowledge documents are currently registered in the database.",
+        available: false,
+      };
     }
 
-    return documents
+    const content = documents
       .map((document: KnowledgeInventoryDocument, index: number) => {
         const guidanceDate = metadataValue(document.metadata, "guidanceDate");
         const effectiveDate = metadataValue(document.metadata, "effectiveDate");
@@ -235,14 +112,43 @@ async function buildKnowledgeInventoryContext(): Promise<string> {
           .join("\n");
       })
       .join("\n\n");
+
+    return { content, available: true };
   } catch (err) {
     console.warn("Knowledge inventory lookup failed:", err);
-    return "Knowledge inventory lookup failed for this request.";
+    return {
+      content: "Knowledge inventory lookup failed for this request.",
+      available: false,
+    };
   }
 }
 
-function buildSystemPrompt(knowledgeContext: string, knowledgeInventory: string): string {
+function buildSystemPrompt(options: {
+  knowledgeInventory: string;
+  fallbackWarning: string | null;
+  fallbackContext: string | null;
+}): string {
+  const { knowledgeInventory, fallbackWarning, fallbackContext } = options;
+
+  const retrievalInstructions = fallbackContext
+    ? `RETRIEVAL MODE: DEGRADED. Live knowledge retrieval is unavailable. A pre-loaded fallback excerpt set is provided below — use it to answer. Do NOT call the knowledge_search tool; it will fail.`
+    : `RETRIEVAL MODE: AGENTIC. You have access to a knowledge_search tool. You MUST call knowledge_search to ground every compliance answer.
+
+WHEN TO CALL knowledge_search:
+- On every user message about Pub 1075, FTI, IRS Safeguards, or any compliance topic
+- Use multiple calls for multi-faceted questions: search the Pub 1075 baseline first, then search for any impacting interim guidance
+- If the first result is a short fragment, call again with expand_neighbors=true or a more specific query
+- If the user asks about a NIST control (e.g., SC-28), search that control ID directly AND search for interim guidance that references it
+- Do NOT answer from memory for anything beyond the most general framing
+
+WHEN NOT TO CALL knowledge_search:
+- Questions purely about the active knowledge inventory below (e.g., "what documents are loaded")
+- Pure conversational acknowledgements
+- Questions about your own capabilities`;
+
   return `You are the IRS SkyShield AI Compliance Agent — an expert on IRS Publication 1075 and related IRS Office of Safeguards knowledge-base documents, including interim guidance that may supersede or amend Pub 1075.
+
+${retrievalInstructions}
 
 RESPONSE FORMAT (follow this structure exactly):
 
@@ -266,29 +172,31 @@ STYLE RULES:
 - Do NOT use code blocks
 - When referencing a section inline, use the format [Section X.X.X]
 - If the answer is from interim guidance, name the interim guidance and explain how it amends or supersedes the Pub 1075 baseline
-- If the answer is not in the retrieved knowledge excerpts, clearly state that the relevant text was not found
+- If the retrieved excerpts do not answer the question, say so explicitly — do not fabricate
 - Do not claim that no interim guidance exists unless the active knowledge inventory below contains no interim_guidance documents
 
 IMPORTANT RULES:
 1. NEVER ask for or process any Federal Tax Information (FTI), Personally Identifiable Information (PII), named state names, named agency names, taxpayer details, case numbers, or other identifiable information
 2. If a user seems to be sharing FTI/PII or identifiable state/agency information, immediately warn them and refuse to process it
-3. Always ground your answers in the retrieved knowledge excerpts
+3. Always ground your answers in the retrieved knowledge excerpts (from knowledge_search) or the pre-loaded fallback excerpts when in degraded mode
 4. Treat active, relevant interim guidance as higher authority than baseline Pub 1075 when the guidance date/effective date indicates it supersedes or amends Pub 1075
 5. Use Pub 1075 as the baseline when no relevant interim guidance is retrieved
 6. Reason through gray areas carefully. Explain the controlling requirement, practical interpretation, and any uncertainty without inventing facts
 7. If uncertain about a specific requirement, say so rather than guessing
-8. If the active inventory lists an interim guidance document but no relevant excerpt was retrieved, say the guidance exists in the knowledge base but the relevant text was not retrieved for this query
-9. If the provided excerpts do not contain enough information to answer, say that the relevant text was not found in the loaded excerpts and ask the user to narrow the question
+8. If the active inventory lists an interim guidance document but no relevant excerpt was retrieved, say the guidance exists in the knowledge base but was not retrieved for this query — and consider calling knowledge_search again with the document title
 
+${fallbackWarning ? `\nDEGRADED NOTICE: ${fallbackWarning}\n` : ""}
 ACTIVE KNOWLEDGE DOCUMENT INVENTORY:
 === BEGIN KNOWLEDGE INVENTORY ===
 ${knowledgeInventory}
 === END KNOWLEDGE INVENTORY ===
+${fallbackContext ? `
 
-RELEVANT KNOWLEDGE EXCERPTS FOLLOW:
-=== BEGIN KNOWLEDGE EXCERPTS ===
-${knowledgeContext}
-=== END KNOWLEDGE EXCERPTS ===`;
+PRE-LOADED FALLBACK EXCERPTS (use these; knowledge_search is unavailable):
+=== BEGIN FALLBACK EXCERPTS ===
+${fallbackContext}
+=== END FALLBACK EXCERPTS ===
+` : ""}`;
 }
 
 function extractCitations(
@@ -296,25 +204,19 @@ function extractCitations(
 ): { section: string; text: string }[] {
   const citations: { section: string; text: string }[] = [];
 
-  // Extract from ---CITATIONS--- block
   const citationBlock = response.match(
     /---CITATIONS---\s*([\s\S]*?)(?:$|---)/
   );
   if (citationBlock) {
     const lines = citationBlock[1].trim().split("\n");
     for (const line of lines) {
-      // Match strict Pub 1075 style plus broader knowledge-base source labels.
-      const match = line.match(
-        /^(.{3,180}?):\s*(.+)$/i
-      );
+      const match = line.match(/^(.{3,180}?):\s*(.+)$/i);
       if (match) {
         citations.push({ section: match[1], text: match[2].trim() });
       }
     }
   }
 
-  // Extract inline [Section X.X.X] and [Section SC-28] references
-  // Handles: [Section 4.18], [Section SC-28], [Section 4.18, SC-28], [Section AC-19], [Section 2.B.6]
   const inlineRefs = response.matchAll(
     /\[(Section\s+[\w.\-]+(?:\s*,\s*[\w.\-]+)?|Exhibit\s+\d+)(?:\s*,\s*Page\s+\d+)?\]/gi
   );
@@ -329,14 +231,103 @@ function extractCitations(
 }
 
 function cleanResponseText(response: string): string {
-  // Remove the ---CITATIONS--- block from the displayed response
   return response.replace(/---CITATIONS---[\s\S]*?(?:---|$)/, "").trim();
 }
 
-function isKnowledgeInventoryQuestion(message: string): boolean {
-  return /\b(what|which|list|show|tell)\b[\s\S]{0,80}\b(documents?|knowledge|guidance|sources?|loaded|uploaded|available)\b/i.test(
-    message
-  );
+/**
+ * Run the Anthropic agent loop with the knowledge_search tool. Executes up to
+ * MAX_TOOL_ROUNDS rounds; returns the final assistant text and telemetry.
+ */
+async function runAgentLoop(
+  anthropic: Anthropic,
+  model: string,
+  systemPrompt: string,
+  messages: Anthropic.MessageParam[],
+  enableTools: boolean
+): Promise<{
+  finalText: string;
+  toolCallsExecuted: number;
+  rounds: number;
+  stopReason: string;
+}> {
+  let toolCallsExecuted = 0;
+  let rounds = 0;
+  let finalText = "";
+  let stopReason = "unknown";
+
+  // Use a mutable working copy of the messages array.
+  const working: Anthropic.MessageParam[] = [...messages];
+
+  while (rounds < MAX_TOOL_ROUNDS) {
+    const response: Anthropic.Message = await anthropic.messages.create({
+      model,
+      max_tokens: MAX_TOKENS_PER_ROUND,
+      system: systemPrompt,
+      tools: enableTools ? [KNOWLEDGE_SEARCH_TOOL] : undefined,
+      messages: working,
+    });
+
+    stopReason = response.stop_reason || "unknown";
+
+    // Always append the assistant turn to the working history.
+    working.push({ role: "assistant", content: response.content });
+
+    if (response.stop_reason !== "tool_use") {
+      for (const block of response.content) {
+        if (block.type === "text") finalText += block.text;
+      }
+      break;
+    }
+
+    // Execute each tool_use block in parallel.
+    const toolBlocks = response.content.filter(
+      (block): block is Anthropic.ToolUseBlock => block.type === "tool_use"
+    );
+
+    const toolResults = await Promise.all(
+      toolBlocks.map(async (block) => {
+        toolCallsExecuted += 1;
+        if (block.name !== "knowledge_search") {
+          return {
+            type: "tool_result" as const,
+            tool_use_id: block.id,
+            content: `ERROR: unknown tool '${block.name}'. Only knowledge_search is available.`,
+            is_error: true,
+          };
+        }
+
+        const input = block.input as KnowledgeSearchInput;
+        const outcome = await handleKnowledgeSearch(input);
+        return {
+          type: "tool_result" as const,
+          tool_use_id: block.id,
+          content: outcome.content,
+        };
+      })
+    );
+
+    working.push({ role: "user", content: toolResults });
+    rounds += 1;
+  }
+
+  if (!finalText) {
+    // Loop hit MAX_TOOL_ROUNDS without producing final text. Force a final turn
+    // with tools disabled so the model must synthesize an answer from context.
+    const finalResponse: Anthropic.Message = await anthropic.messages.create({
+      model,
+      max_tokens: MAX_TOKENS_PER_ROUND,
+      system:
+        systemPrompt +
+        "\n\nYou have reached the maximum number of tool-use rounds. Produce the best answer you can from the tool results already in the conversation. Do not call any more tools.",
+      messages: working,
+    });
+    stopReason = finalResponse.stop_reason || stopReason;
+    for (const block of finalResponse.content) {
+      if (block.type === "text") finalText += block.text;
+    }
+  }
+
+  return { finalText, toolCallsExecuted, rounds, stopReason };
 }
 
 export async function POST(request: NextRequest) {
@@ -363,7 +354,6 @@ export async function POST(request: NextRequest) {
     const piiResult = detectPII(message);
 
     if (piiResult.hasPII) {
-      // Auto-create incident
       let incidentId: string | null = null;
       try {
         const incident = await db.incident.create({
@@ -390,10 +380,9 @@ export async function POST(request: NextRequest) {
         });
         incidentId = incident.id;
       } catch {
-        // Log failure but don't block the response
+        // ignore
       }
 
-      // Log the PII detection
       try {
         await logAudit({
           organizationId: userInfo.organizationId,
@@ -423,7 +412,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Log the AI query
     try {
       await logAudit({
         organizationId: userInfo.organizationId,
@@ -441,7 +429,6 @@ export async function POST(request: NextRequest) {
       // ignore
     }
 
-    // Get or create conversation
     let convId = conversationId;
     let isNewConversation = false;
     if (!convId) {
@@ -462,7 +449,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Save user message
     if (convId) {
       try {
         await db.message.create({
@@ -477,7 +463,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Get conversation history for context
     let previousMessages: Array<{
       role: "user" | "assistant";
       content: string;
@@ -499,11 +484,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Call Anthropic API
     const llmSettings = await getLLMSettings();
 
     if (!llmSettings.apiKey || llmSettings.apiKey === "sk-ant-placeholder") {
-      // Demo mode - return a sample response
       const demoResponse = `Based on Publication 1075, I can provide guidance on your question.
 
 **Note:** This is a demo response. Configure the ANTHROPIC_API_KEY environment variable to enable AI powered IRS Office of Safeguards Compliance analysis.
@@ -519,7 +502,6 @@ Section 3.1: General Requirements`;
       const citations = extractCitations(demoResponse);
       const cleanedResponse = cleanResponseText(demoResponse);
 
-      // Save assistant message
       if (convId) {
         try {
           await db.message.create({
@@ -542,74 +524,61 @@ Section 3.1: General Requirements`;
       });
     }
 
-    const anthropic = new Anthropic({
-      apiKey: llmSettings.apiKey,
-    });
-    const knowledgeInventory = await buildKnowledgeInventoryContext();
-    const retrievedChunks = await retrieveKnowledgeChunks(message, 14).catch((err) => {
-      console.warn("Knowledge retrieval failed, falling back to local Pub 1075 excerpts:", err);
-      return [];
-    });
-    const pub1075Context =
-      isKnowledgeInventoryQuestion(message)
-        ? "The user's question is about the active knowledge inventory. Use the inventory section first; retrieved excerpts are not required to list loaded documents."
-        : retrievedChunks.length > 0
-          ? formatKnowledgeContext(retrievedChunks)
-          : buildPub1075Context(message);
-    const systemPrompt = buildSystemPrompt(pub1075Context, knowledgeInventory);
+    const anthropic = new Anthropic({ apiKey: llmSettings.apiKey });
+    const inventory = await buildKnowledgeInventoryContext();
 
-    // Build message history
-    const apiMessages: Array<{
-      role: "user" | "assistant";
-      content: string;
-    }> = [];
+    // Decide if we should run in degraded (fallback) mode: DB appears unhealthy.
+    const useFallback = !inventory.available;
+    const fallback = useFallback ? buildFallbackContext({ message }) : null;
 
-    // Add recent conversation history (skip the last user message we just added)
+    const systemPrompt = buildSystemPrompt({
+      knowledgeInventory: inventory.content,
+      fallbackWarning: fallback?.warning ?? null,
+      fallbackContext: fallback?.context ?? null,
+    });
+
+    const apiMessages: Anthropic.MessageParam[] = [];
     for (const msg of previousMessages.slice(0, -1)) {
-      apiMessages.push(msg);
+      apiMessages.push({ role: msg.role, content: msg.content });
     }
-
-    // Add current message
     apiMessages.push({ role: "user", content: message });
 
-    const responsePromise = anthropic.messages.create({
-      model: llmSettings.model,
-      max_tokens: 4096,
-      system: systemPrompt,
-      messages: apiMessages,
-    });
+    const agentPromise = runAgentLoop(
+      anthropic,
+      llmSettings.model,
+      systemPrompt,
+      apiMessages,
+      !useFallback
+    );
 
     let titlePromise: Promise<string | null> = Promise.resolve(null);
     if (isNewConversation) {
-      titlePromise = anthropic.messages.create({
-        model: "claude-3-haiku-20240307",
-        max_tokens: 15,
-        system: "You are a summarization assistant. Given a user's first message, generate a concise, 3-5 word title describing the topic. Do not include quotes, periods, or intro text. Just the title.",
-        messages: [{ role: "user", content: message }],
-      }).then((res) => {
-        return res.content[0].type === "text" ? res.content[0].text.trim() : null;
-      }).catch((err) => {
-        console.warn("Failed to generate Haiku title:", err);
-        return null;
-      });
+      titlePromise = anthropic.messages
+        .create({
+          model: "claude-3-haiku-20240307",
+          max_tokens: 15,
+          system:
+            "You are a summarization assistant. Given a user's first message, generate a concise, 3-5 word title describing the topic. Do not include quotes, periods, or intro text. Just the title.",
+          messages: [{ role: "user", content: message }],
+        })
+        .then((res) => (res.content[0].type === "text" ? res.content[0].text.trim() : null))
+        .catch((err) => {
+          console.warn("Failed to generate Haiku title:", err);
+          return null;
+        });
     }
 
-    const [response, newTitle] = await Promise.all([responsePromise, titlePromise]);
+    const [agentResult, newTitle] = await Promise.all([agentPromise, titlePromise]);
 
     if (newTitle && convId) {
-      // Fire-and-forget DB update so we don't block returning the response
-      db.conversation.update({
-        where: { id: convId, userId: userInfo.id },
-        data: { title: newTitle },
-      }).catch(err => console.warn("Failed to update new conversation title:", err));
+      db.conversation
+        .update({ where: { id: convId, userId: userInfo.id }, data: { title: newTitle } })
+        .catch((err) => console.warn("Failed to update new conversation title:", err));
     }
 
-    const assistantContent =
-      response.content[0].type === "text" ? response.content[0].text : "";
-    const citations = extractCitations(assistantContent);
-    const cleanedResponse = cleanResponseText(assistantContent);
+    const citations = extractCitations(agentResult.finalText);
+    const cleanedResponse = cleanResponseText(agentResult.finalText);
 
-    // Save assistant message
     if (convId) {
       try {
         await db.message.create({
@@ -629,26 +598,45 @@ Section 3.1: General Requirements`;
       response: cleanedResponse,
       citations,
       conversationId: convId,
+      retrieval: {
+        mode: useFallback ? "degraded-fallback" : "agentic",
+        toolCallsExecuted: agentResult.toolCallsExecuted,
+        rounds: agentResult.rounds,
+        stopReason: agentResult.stopReason,
+      },
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error("Chat API error:", errorMessage, error);
 
-    if (errorMessage.includes("DATABASE_URL") || errorMessage.includes("prisma") || errorMessage.toLowerCase().includes("connect")) {
+    if (
+      errorMessage.includes("DATABASE_URL") ||
+      errorMessage.includes("prisma") ||
+      errorMessage.toLowerCase().includes("connect")
+    ) {
       return NextResponse.json(
         { error: `Database error: ${errorMessage}` },
         { status: 503 }
       );
     }
 
-    if (errorMessage.includes("401") || errorMessage.includes("Unauthorized") || errorMessage.includes("auth")) {
+    if (
+      errorMessage.includes("401") ||
+      errorMessage.includes("Unauthorized") ||
+      errorMessage.includes("auth")
+    ) {
       return NextResponse.json(
         { error: `Auth error: ${errorMessage}` },
         { status: 401 }
       );
     }
 
-    if (errorMessage.includes("anthropic") || errorMessage.includes("Anthropic") || errorMessage.includes("model") || errorMessage.includes("api_key")) {
+    if (
+      errorMessage.includes("anthropic") ||
+      errorMessage.includes("Anthropic") ||
+      errorMessage.includes("model") ||
+      errorMessage.includes("api_key")
+    ) {
       return NextResponse.json(
         { error: `AI API error: ${errorMessage}` },
         { status: 502 }
@@ -672,7 +660,6 @@ export async function GET(request: NextRequest) {
     const userInfo = session.user as unknown as { id: string };
     const { searchParams } = new URL(request.url);
 
-    // List conversations
     if (searchParams.get("list") === "true") {
       const conversations = await db.conversation.findMany({
         where: { userId: userInfo.id },
@@ -688,7 +675,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ conversations });
     }
 
-    // Get specific conversation
     const convId = searchParams.get("conversationId");
     if (convId) {
       const conversation = await db.conversation.findFirst({

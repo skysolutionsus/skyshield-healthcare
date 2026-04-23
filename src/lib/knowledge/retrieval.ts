@@ -1,30 +1,40 @@
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { embedTexts, hasEmbeddingConfig, vectorLiteral } from "@/lib/knowledge/embeddings";
+import {
+  findDocumentsForControls,
+  formatCrossRefNotice,
+  getCrossRefIndex,
+  type CrossRefDocument,
+} from "@/lib/knowledge/crossref";
+import { expandQuery } from "@/lib/knowledge/query-expansion";
+import { rerankChunks, hasRerankConfig } from "@/lib/knowledge/rerank";
+import type { RetrievedKnowledgeChunk } from "@/lib/knowledge/retrieval-types";
 
-export interface RetrievedKnowledgeChunk {
-  id: string;
-  documentId: string;
-  documentTitle: string;
-  sourceType: string;
-  sourceName: string | null;
-  version: string | null;
-  documentMetadata: Record<string, unknown> | null;
-  importedAt: Date;
-  chunkIndex: number;
-  content: string;
-  pageStart: number | null;
-  pageEnd: number | null;
-  section: string | null;
-  heading: string | null;
-  score: number;
-  matchType: string;
+export type { RetrievedKnowledgeChunk } from "@/lib/knowledge/retrieval-types";
+
+// NOTE on role-based filtering: `Role` (ADMIN, COMPUTER_SECURITY_REVIEW, etc.)
+// gates access to admin UIs and some mutation endpoints, but retrieval intentionally
+// returns the same Pub 1075 / interim guidance corpus to every authenticated user.
+// All authenticated roles legitimately need access to the compliance knowledge base.
+// If a future corpus adds agency-restricted material, add a role filter at the SQL level.
+
+export interface KnowledgeRetrievalResult {
+  chunks: RetrievedKnowledgeChunk[];
+  expansion: {
+    extractedControls: string[];
+    addedTerms: string[];
+  };
+  crossReferencedDocs: CrossRefDocument[];
+  crossRefNotice: string;
+  rerankApplied: boolean;
 }
 
-function extractExactTerms(query: string): string[] {
+function extractExactTerms(query: string, additionalControls: string[] = []): string[] {
   const terms = new Set<string>();
   const controls = query.match(/\b(?:AC|AT|AU|CA|CM|CP|IA|IR|MA|MP|PE|PL|PM|PS|PT|RA|SA|SC|SI|SR)-\d+(?:\([^)]+\))?\b/gi) || [];
   controls.forEach((term) => terms.add(term.toUpperCase()));
+  additionalControls.forEach((term) => terms.add(term.toUpperCase()));
 
   const sections = query.match(/\bSection\s+\d+(?:\.[A-Z0-9]+)*(?:\.\d+)*\b/gi) || [];
   sections.forEach((term) => terms.add(term));
@@ -35,6 +45,29 @@ function extractExactTerms(query: string): string[] {
   }
 
   return [...terms];
+}
+
+const DOCUMENT_QUERY_STOP_WORDS = new Set([
+  "about",
+  "does",
+  "guidance",
+  "interim",
+  "publication",
+  "pub",
+  "say",
+  "says",
+  "the",
+  "what",
+]);
+
+function extractDocumentMatchTerms(query: string): string[] {
+  return [
+    ...new Set(
+      (query.toLowerCase().match(/[a-z0-9][a-z0-9-]{2,}/g) || []).filter(
+        (term) => !DOCUMENT_QUERY_STOP_WORDS.has(term)
+      )
+    ),
+  ].slice(0, 6);
 }
 
 function mergeResults(
@@ -59,11 +92,18 @@ function mergeResults(
     .slice(0, limit);
 }
 
-export async function retrieveKnowledgeChunks(
-  query: string,
-  limit = 10
+/**
+ * Low-level candidate retrieval — runs the 4-way hybrid (exact, title, keyword, vector)
+ * and merges. This is the recall stage; precision is handled by `retrieveKnowledgeChunks`
+ * which adds reranking on top.
+ */
+async function retrieveCandidates(
+  searchQuery: string,
+  additionalControls: string[],
+  limit: number
 ): Promise<RetrievedKnowledgeChunk[]> {
-  const exactTerms = extractExactTerms(query);
+  const exactTerms = extractExactTerms(searchQuery, additionalControls);
+  const documentTerms = extractDocumentMatchTerms(searchQuery);
   const exactConditions =
     exactTerms.length > 0
       ? Prisma.join(
@@ -75,6 +115,23 @@ export async function retrieveKnowledgeChunks(
             `
           ),
           " OR "
+        )
+      : Prisma.empty;
+  const documentMatchConditions =
+    documentTerms.length > 0
+      ? Prisma.join(
+          documentTerms.map(
+            (term) => Prisma.sql`
+              (
+                d."title" ILIKE ${`%${term}%`}
+                OR coalesce(d."sourceName", '') ILIKE ${`%${term}%`}
+                OR coalesce(d."description", '') ILIKE ${`%${term}%`}
+                OR coalesce(d."metadata"->>'subject', '') ILIKE ${`%${term}%`}
+                OR c."content" ILIKE ${`%${term}%`}
+              )
+            `
+          ),
+          " AND "
         )
       : Prisma.empty;
 
@@ -90,6 +147,7 @@ export async function retrieveKnowledgeChunks(
               d."sourceName",
               d."version",
               d."metadata" AS "documentMetadata",
+              c."metadata" AS "chunkMetadata",
               d."importedAt",
               c."chunkIndex",
               c."content",
@@ -103,6 +161,41 @@ export async function retrieveKnowledgeChunks(
             JOIN "KnowledgeDocument" d ON d."id" = c."documentId"
             WHERE d."status" = 'ACTIVE'
               AND (${exactConditions})
+            ORDER BY
+              CASE WHEN d."sourceType" = 'interim_guidance' THEN 0 WHEN d."sourceType" = 'pub1075' THEN 1 ELSE 2 END,
+              d."importedAt" DESC,
+              c."chunkIndex" ASC
+            LIMIT ${limit}
+          `
+        )
+      : Promise.resolve([]);
+
+  const documentPromise =
+    documentTerms.length > 0
+      ? db.$queryRaw<RetrievedKnowledgeChunk[]>(
+          Prisma.sql`
+            SELECT
+              c."id",
+              c."documentId",
+              d."title" AS "documentTitle",
+              d."sourceType",
+              d."sourceName",
+              d."version",
+              d."metadata" AS "documentMetadata",
+              c."metadata" AS "chunkMetadata",
+              d."importedAt",
+              c."chunkIndex",
+              c."content",
+              c."pageStart",
+              c."pageEnd",
+              c."section",
+              c."heading",
+              (140 + CASE WHEN d."sourceType" = 'interim_guidance' THEN 30 WHEN d."sourceType" = 'pub1075' THEN 10 ELSE 0 END)::double precision AS "score",
+              'document-title' AS "matchType"
+            FROM "KnowledgeChunk" c
+            JOIN "KnowledgeDocument" d ON d."id" = c."documentId"
+            WHERE d."status" = 'ACTIVE'
+              AND (${documentMatchConditions})
             ORDER BY
               CASE WHEN d."sourceType" = 'interim_guidance' THEN 0 WHEN d."sourceType" = 'pub1075' THEN 1 ELSE 2 END,
               d."importedAt" DESC,
@@ -130,21 +223,21 @@ export async function retrieveKnowledgeChunks(
         c."section",
         c."heading",
         (
-          ts_rank_cd(c."searchVector", websearch_to_tsquery('english', ${query})) +
+          ts_rank_cd(c."searchVector", websearch_to_tsquery('english', ${searchQuery})) +
           CASE WHEN d."sourceType" = 'interim_guidance' THEN 0.5 WHEN d."sourceType" = 'pub1075' THEN 0.2 ELSE 0 END
         )::double precision AS "score",
         'keyword' AS "matchType"
       FROM "KnowledgeChunk" c
       JOIN "KnowledgeDocument" d ON d."id" = c."documentId"
       WHERE d."status" = 'ACTIVE'
-        AND c."searchVector" @@ websearch_to_tsquery('english', ${query})
+        AND c."searchVector" @@ websearch_to_tsquery('english', ${searchQuery})
       ORDER BY "score" DESC
       LIMIT ${limit}
     `
   );
 
   const vectorPromise = hasEmbeddingConfig()
-    ? embedTexts([query]).then(([embedding]) => {
+    ? embedTexts([searchQuery]).then(([embedding]) => {
         if (!embedding) return [];
         return db.$queryRaw<RetrievedKnowledgeChunk[]>(
           Prisma.sql`
@@ -156,6 +249,7 @@ export async function retrieveKnowledgeChunks(
               d."sourceName",
               d."version",
               d."metadata" AS "documentMetadata",
+              c."metadata" AS "chunkMetadata",
               d."importedAt",
               c."chunkIndex",
               c."content",
@@ -179,29 +273,104 @@ export async function retrieveKnowledgeChunks(
       })
     : Promise.resolve([]);
 
-  const [exact, keyword, vector] = await Promise.all([
+  const [exact, document, keyword, vector] = await Promise.all([
     exactPromise,
+    documentPromise,
     keywordPromise,
     vectorPromise,
   ]);
 
-  return mergeResults([exact, keyword, vector], limit);
+  return mergeResults([exact, document, keyword, vector], limit);
 }
 
-export function formatKnowledgeContext(chunks: RetrievedKnowledgeChunk[]): string {
+/**
+ * Full retrieval pipeline: query expansion → over-fetch hybrid candidates →
+ * reranker (if configured) → crossref enrichment.
+ *
+ * Defaults tuned for Pub 1075 compliance Q&A — callers typically want the
+ * structured `retrieveKnowledgeContext` which includes crossref metadata for
+ * the LLM prompt.
+ */
+export async function retrieveKnowledgeContext(
+  query: string,
+  limit = 10
+): Promise<KnowledgeRetrievalResult> {
+  const expansion = expandQuery(query);
+
+  const candidateLimit = Math.max(limit, hasRerankConfig() ? 30 : limit);
+  const candidates = await retrieveCandidates(
+    expansion.expandedQuery,
+    expansion.extractedControls,
+    candidateLimit
+  );
+
+  const rerankApplied = hasRerankConfig() && candidates.length > limit;
+  const reranked = rerankApplied
+    ? await rerankChunks(expansion.originalQuery, candidates, limit)
+    : candidates.slice(0, limit);
+
+  let crossReferencedDocs: CrossRefDocument[] = [];
+  let crossRefNotice = "";
+  if (expansion.extractedControls.length > 0) {
+    try {
+      const index = await getCrossRefIndex();
+      crossReferencedDocs = findDocumentsForControls(index, expansion.extractedControls);
+      crossRefNotice = formatCrossRefNotice(crossReferencedDocs, expansion.extractedControls);
+    } catch (err) {
+      console.warn("Cross-reference lookup failed:", err);
+    }
+  }
+
+  return {
+    chunks: reranked,
+    expansion: {
+      extractedControls: expansion.extractedControls,
+      addedTerms: expansion.addedTerms,
+    },
+    crossReferencedDocs,
+    crossRefNotice,
+    rerankApplied,
+  };
+}
+
+/**
+ * Thin wrapper kept for callers that only need chunks (backwards compatible).
+ */
+export async function retrieveKnowledgeChunks(
+  query: string,
+  limit = 10
+): Promise<RetrievedKnowledgeChunk[]> {
+  const result = await retrieveKnowledgeContext(query, limit);
+  return result.chunks;
+}
+
+export function formatKnowledgeContext(
+  chunks: RetrievedKnowledgeChunk[],
+  crossRefNotice = ""
+): string {
   if (chunks.length === 0) {
     return "No relevant knowledge-base excerpts were retrieved.";
   }
 
-  return chunks
+  const body = chunks
     .map((chunk, index) => {
       const guidanceDate = metadataValue(chunk.documentMetadata, "guidanceDate");
       const effectiveDate = metadataValue(chunk.documentMetadata, "effectiveDate");
       const authority = metadataValue(chunk.documentMetadata, "authority");
+      const chunkMeta = readChunkMetadata(chunk);
+      const parentSectionNumber = chunkMeta?.parentSectionNumber;
+      const parentSectionTitle = chunkMeta?.parentSectionTitle;
+      const parentLabel =
+        parentSectionNumber && parentSectionTitle
+          ? `${parentSectionNumber} ${parentSectionTitle}`
+          : parentSectionNumber || parentSectionTitle || null;
+
       const location = [
-        chunk.section,
-        chunk.heading,
-        chunk.pageStart ? `page ${chunk.pageStart}${chunk.pageEnd && chunk.pageEnd !== chunk.pageStart ? `-${chunk.pageEnd}` : ""}` : null,
+        parentLabel ? `Section ${parentLabel}` : chunk.section,
+        chunk.heading && chunk.heading !== parentLabel ? chunk.heading : null,
+        chunk.pageStart
+          ? `page ${chunk.pageStart}${chunk.pageEnd && chunk.pageEnd !== chunk.pageStart ? `-${chunk.pageEnd}` : ""}`
+          : null,
       ]
         .filter(Boolean)
         .join(" | ");
@@ -218,6 +387,87 @@ Chunk ID: ${chunk.id}
 ${chunk.content}`;
     })
     .join("\n\n");
+
+  return crossRefNotice ? `${crossRefNotice}\n\n${body}` : body;
+}
+
+/**
+ * Fetch chunks adjacent (previous / next chunkIndex) to each input chunk.
+ * Used to expand context for retrieved children — the LLM sees the neighbor
+ * paragraphs without re-running retrieval.
+ */
+export async function expandWithNeighbors(
+  chunks: RetrievedKnowledgeChunk[],
+  radius = 1
+): Promise<RetrievedKnowledgeChunk[]> {
+  if (chunks.length === 0 || radius <= 0) return chunks;
+
+  const existingIds = new Set(chunks.map((c) => c.id));
+  const ranges = new Map<string, Set<number>>();
+
+  for (const chunk of chunks) {
+    const wanted = ranges.get(chunk.documentId) || new Set<number>();
+    for (let offset = 1; offset <= radius; offset += 1) {
+      if (chunk.chunkIndex - offset >= 0) wanted.add(chunk.chunkIndex - offset);
+      wanted.add(chunk.chunkIndex + offset);
+    }
+    ranges.set(chunk.documentId, wanted);
+  }
+
+  const fetchPromises: Promise<RetrievedKnowledgeChunk[]>[] = [];
+  for (const [documentId, indexes] of ranges.entries()) {
+    if (indexes.size === 0) continue;
+    const indexList = [...indexes];
+    fetchPromises.push(
+      db.$queryRaw<RetrievedKnowledgeChunk[]>(
+        Prisma.sql`
+          SELECT
+            c."id",
+            c."documentId",
+            d."title" AS "documentTitle",
+            d."sourceType",
+            d."sourceName",
+            d."version",
+            d."metadata" AS "documentMetadata",
+            c."metadata" AS "chunkMetadata",
+            d."importedAt",
+            c."chunkIndex",
+            c."content",
+            c."pageStart",
+            c."pageEnd",
+            c."section",
+            c."heading",
+            0::double precision AS "score",
+            'neighbor' AS "matchType"
+          FROM "KnowledgeChunk" c
+          JOIN "KnowledgeDocument" d ON d."id" = c."documentId"
+          WHERE c."documentId" = ${documentId}
+            AND c."chunkIndex" IN (${Prisma.join(indexList)})
+            AND d."status" = 'ACTIVE'
+        `
+      )
+    );
+  }
+
+  const neighborGroups = await Promise.all(fetchPromises);
+  const additions: RetrievedKnowledgeChunk[] = [];
+  for (const group of neighborGroups) {
+    for (const neighbor of group) {
+      if (!existingIds.has(neighbor.id)) {
+        existingIds.add(neighbor.id);
+        additions.push(neighbor);
+      }
+    }
+  }
+
+  const combined = [...chunks, ...additions];
+  combined.sort((a, b) => {
+    if (a.documentId !== b.documentId) {
+      return a.documentTitle.localeCompare(b.documentTitle);
+    }
+    return a.chunkIndex - b.chunkIndex;
+  });
+  return combined;
 }
 
 function metadataValue(
@@ -227,4 +477,18 @@ function metadataValue(
   const value = metadata?.[key];
   if (value === null || value === undefined || value === "") return null;
   return String(value);
+}
+
+function readChunkMetadata(
+  chunk: RetrievedKnowledgeChunk
+): { parentSectionNumber?: string; parentSectionTitle?: string } | null {
+  const meta = chunk.chunkMetadata;
+  if (!meta || typeof meta !== "object" || Array.isArray(meta)) return null;
+  const record = meta as Record<string, unknown>;
+  const parentSectionNumber =
+    typeof record.parentSectionNumber === "string" ? record.parentSectionNumber : undefined;
+  const parentSectionTitle =
+    typeof record.parentSectionTitle === "string" ? record.parentSectionTitle : undefined;
+  if (!parentSectionNumber && !parentSectionTitle) return null;
+  return { parentSectionNumber, parentSectionTitle };
 }
