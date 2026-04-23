@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
+import { readFileSync } from "fs";
+import { join } from "path";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
@@ -19,6 +21,12 @@ import {
 export const maxDuration = 300;
 export const runtime = "nodejs";
 
+const BUNDLED_INTERIM_GUIDANCE_FILES = [
+  "Publication 1075 Interim Guidance - Authentication.txt",
+  "Publication 1075 Interim Guidance - Data Incidents.txt",
+  "Publication 1075 Interim Guidance - Disallowing Triple Data Encryption Algorithm (TDEA) and Triple Data Encryption Standard (3DES) for federal.txt",
+];
+
 async function requireAdmin() {
   const session = await auth();
   const user = session?.user as
@@ -34,6 +42,25 @@ async function requireAdmin() {
   }
 
   return { user };
+}
+
+function loadBundledInterimGuidanceInputs(importedById: string) {
+  return BUNDLED_INTERIM_GUIDANCE_FILES.map((fileName) => {
+    const filePath = join(process.cwd(), "public", fileName);
+    const text = readFileSync(filePath, "utf-8");
+
+    return inferInterimGuidanceInput({
+      fileName,
+      text,
+      sourceName: fileName,
+      importedById,
+      metadata: {
+        bundledExample: true,
+        sourcePath: `public/${fileName}`,
+        sourceType: INTERIM_GUIDANCE_SOURCE_TYPE,
+      },
+    });
+  });
 }
 
 function parseMetadata(value: unknown): Record<string, unknown> | undefined {
@@ -263,6 +290,57 @@ export async function POST(request: NextRequest) {
 
     let syncDetails: Record<string, unknown> | undefined;
     let input;
+
+    if (action === "import_bundled_interim_guidance") {
+      const inputs = loadBundledInterimGuidanceInputs(user!.id);
+      const imports = [];
+
+      for (const input of inputs) {
+        const result = await importKnowledgeDocument(input);
+        imports.push({
+          title: input.title,
+          sourceType: input.sourceType,
+          sourceName: input.sourceName,
+          chunkCount: result.chunkCount,
+          embeddedChunkCount: result.embeddedChunkCount,
+          documentId: result.documentId,
+          contentHash: result.contentHash,
+        });
+      }
+
+      await logAudit({
+        organizationId: user!.organizationId,
+        userId: user!.id,
+        action: "KNOWLEDGE_DOCUMENT_IMPORT",
+        resourceType: "knowledge_document",
+        metadata: {
+          action,
+          bundled: true,
+          documents: imports,
+          chunkCount: imports.reduce((total, item) => total + item.chunkCount, 0),
+          embeddedChunkCount: imports.reduce(
+            (total, item) => total + item.embeddedChunkCount,
+            0
+          ),
+        },
+        ipAddress:
+          request.headers.get("x-forwarded-for") ||
+          request.headers.get("x-real-ip") ||
+          undefined,
+        userAgent: request.headers.get("user-agent") || undefined,
+      });
+
+      return NextResponse.json({
+        success: true,
+        documentCount: imports.length,
+        chunkCount: imports.reduce((total, item) => total + item.chunkCount, 0),
+        embeddedChunkCount: imports.reduce(
+          (total, item) => total + item.embeddedChunkCount,
+          0
+        ),
+        documents: imports,
+      });
+    }
 
     if (action === "sync_pub1075") {
       const officialPub1075 = await loadOfficialPub1075FromIrs();

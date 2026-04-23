@@ -183,6 +183,33 @@ export function KnowledgeConsole() {
     }
   }
 
+  async function importBundledInterimGuidance() {
+    setImporting(true);
+    setError("");
+    setNotice("");
+    try {
+      const res = await fetch("/api/admin/knowledge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "import_bundled_interim_guidance" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to import bundled interim guidance");
+      }
+      setNotice(
+        `Imported bundled interim guidance: ${data.documentCount} documents, ${data.chunkCount} chunks, ${data.embeddedChunkCount} embedded.`
+      );
+      await loadDocuments();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to import bundled interim guidance"
+      );
+    } finally {
+      setImporting(false);
+    }
+  }
+
   async function uploadDocumentFile() {
     if (!selectedFile) return;
 
@@ -315,13 +342,22 @@ export function KnowledgeConsole() {
                 Admin-only database view for source documents, chunks, metadata, and status.
               </p>
             </div>
-            <button
-              onClick={syncLatestPub1075}
-              disabled={importing}
-              className="rounded-lg bg-[var(--sky-royal)] px-3 py-2 text-sm font-medium text-white transition hover:bg-[var(--sky-blue)] disabled:opacity-50"
-            >
-              {importing ? "Syncing..." : "Sync Latest Pub 1075"}
-            </button>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                onClick={importBundledInterimGuidance}
+                disabled={importing}
+                className="rounded-lg bg-[var(--sky-surface-overlay)] px-3 py-2 text-sm font-medium text-white transition hover:bg-white/10 disabled:opacity-50"
+              >
+                {importing ? "Importing..." : "Import Interim Guidance"}
+              </button>
+              <button
+                onClick={syncLatestPub1075}
+                disabled={importing}
+                className="rounded-lg bg-[var(--sky-royal)] px-3 py-2 text-sm font-medium text-white transition hover:bg-[var(--sky-blue)] disabled:opacity-50"
+              >
+                {importing ? "Syncing..." : "Sync Latest Pub 1075"}
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
