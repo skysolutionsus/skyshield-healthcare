@@ -170,9 +170,9 @@ RENDERING CONSTRAINTS (the chat UI is a minimal renderer — violating these pro
 - NEVER output horizontal rule separators ("---", "***", "___") inside the body. The only "---" allowed in the entire response is the "---CITATIONS---" delimiter.
 - NEVER output markdown tables (no "|" column syntax, no "---|---" rows). Tables render as literal pipe characters. Use a bullet list instead: "- **Requirement:** Standard".
 - NEVER use markdown headers (#, ##, ###).
-- NEVER use code blocks (```), blockquotes (>), or images.
+- NEVER use fenced code blocks (triple backticks), blockquotes (leading ">"), or images.
 - NEVER use emojis or decorative symbols (⚠️, ✅, →, etc.).
-- Supported formatting is ONLY: plain paragraphs, "- " bullets, "1. " numbered lists, **bold**, inline `code`, and [Section X.X.X] references.
+- Supported formatting is ONLY: plain paragraphs, "- " bullets, "1. " numbered lists, **bold**, single-backtick inline code, and [Section X.X.X] references.
 
 STYLE RULES:
 - Be authoritative and concise. No filler phrases.
