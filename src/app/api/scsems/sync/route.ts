@@ -1,13 +1,9 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import Anthropic from "@anthropic-ai/sdk";
 import { getCISToken, fetchAllBenchmarks } from "@/lib/cis-api";
 import { isAdminRole } from "@/lib/roles";
-
-const anthropic = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY || "",
-});
+import { generateBifrostText, getConfiguredBifrostModel } from "@/lib/ai/bifrost";
 
 export async function POST(request: Request) {
     try {
@@ -124,7 +120,7 @@ export async function POST(request: Request) {
                 `${c.testId} | NIST: ${c.nistId || "—"} | CIS Ref: ${c.cisBenchmarkRef || "—"} | ${c.nistControlName || c.sectionTitle || "—"} | Criticality: ${c.criticality || "—"}`
             ).join("\n");
 
-            // Step 5: Ask Claude to generate grounded update suggestions
+            // Step 5: Ask Bifrost to generate grounded update suggestions
             const prompt = `You are a cybersecurity compliance expert analyzing CIS Benchmark updates for IRS Safeguards SCSEMs.
 
 CONTEXT:
@@ -164,15 +160,13 @@ RULES:
 - Do NOT invent new Test IDs
 - Do NOT include markdown formatting`;
 
-            const message = await anthropic.messages.create({
-                model: "claude-haiku-4-5-20251001",
-                max_tokens: 2000,
-                temperature: 0.3,
+            let responseText = await generateBifrostText({
+                model: getConfiguredBifrostModel("BIFROST_SCSEM_MODEL"),
+                maxTokens: 1400,
+                temperature: 0.2,
                 system: "You generate precise, realistic CIS benchmark update payloads referencing real control IDs.",
-                messages: [{ role: "user", content: prompt }],
+                prompt,
             });
-
-            let responseText = message.content[0].type === "text" ? message.content[0].text : "";
             responseText = responseText.replace(/```json/gi, "").replace(/```/g, "").trim();
 
             let payload;

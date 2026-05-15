@@ -1,14 +1,10 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import Anthropic from "@anthropic-ai/sdk";
 import { isAdminRole } from "@/lib/roles";
+import { generateBifrostText, getConfiguredBifrostModel } from "@/lib/ai/bifrost";
 import * as fs from "fs";
 import * as path from "path";
-
-const anthropic = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY || "",
-});
 
 const PUB_1075_CURRENT = {
     version: "Rev. 11-2021",
@@ -221,15 +217,13 @@ RULES:
 - reason MUST cite a specific Pub 1075 section
 - Do NOT invent Test IDs or Pub 1075 content`;
 
-            const message = await anthropic.messages.create({
-                model: "claude-haiku-4-5-20251001",
-                max_tokens: 2500,
+            let responseText = await generateBifrostText({
+                model: getConfiguredBifrostModel("BIFROST_SCSEM_MODEL"),
+                maxTokens: 1400,
                 temperature: 0.2, // Lower temperature for more precise compliance work
                 system: "You are a precise IRS Publication 1075 compliance analyst. You only cite requirements that appear in the actual document excerpts provided to you.",
-                messages: [{ role: "user", content: prompt }],
+                prompt,
             });
-
-            let responseText = message.content[0].type === "text" ? message.content[0].text : "";
             responseText = responseText.replace(/```json/gi, "").replace(/```/g, "").trim();
 
             let payload;

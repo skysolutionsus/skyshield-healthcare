@@ -3,6 +3,7 @@ export const DEFAULT_BIFROST_EMBEDDING_MODEL = "azure/text-embedding-ada-002";
 export const DEFAULT_BIFROST_BASE_URL = "http://192.168.16.104:8080/v1";
 
 type JsonObject = Record<string, unknown>;
+const DEFAULT_MAX_OUTPUT_TOKENS = 1600;
 
 export interface BifrostToolCall {
   id: string;
@@ -168,6 +169,13 @@ export function parseBifrostToolArguments(args: string | JsonObject | undefined)
   }
 }
 
+function clampBifrostMaxTokens(maxTokens?: number): number | undefined {
+  if (maxTokens === undefined) return undefined;
+  const configuredMax = Number(process.env.BIFROST_MAX_OUTPUT_TOKENS || DEFAULT_MAX_OUTPUT_TOKENS);
+  if (!Number.isFinite(configuredMax) || configuredMax <= 0) return maxTokens;
+  return Math.min(maxTokens, configuredMax);
+}
+
 export async function createBifrostChatCompletion(
   request: BifrostChatCompletionRequest,
   options: { apiKey?: string; baseUrl?: string; signal?: AbortSignal } = {}
@@ -183,7 +191,11 @@ export async function createBifrostChatCompletion(
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ ...request, model: normalizeBifrostModel(request.model) }),
+    body: JSON.stringify({
+      ...request,
+      model: normalizeBifrostModel(request.model),
+      max_tokens: clampBifrostMaxTokens(request.max_tokens),
+    }),
     signal: options.signal,
   });
 
@@ -285,7 +297,7 @@ export async function generateBifrostText(options: {
   const response = await createBifrostChatCompletion(
     {
       model: normalizeBifrostModel(options.model),
-      max_tokens: options.maxTokens,
+      max_tokens: clampBifrostMaxTokens(options.maxTokens),
       temperature: options.temperature,
       messages,
     },

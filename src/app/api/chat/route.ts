@@ -3,17 +3,9 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { detectPII } from "@/lib/pii-detection";
 import { logAudit } from "@/lib/audit";
-import {
-  handleKnowledgeSearch,
-  KNOWLEDGE_SEARCH_BIFROST_TOOL,
-  type KnowledgeSearchInput,
-} from "@/lib/knowledge/agent-tools";
+import { handleKnowledgeSearch } from "@/lib/knowledge/agent-tools";
 import { buildFallbackContext } from "@/lib/knowledge/fallback-context";
 import {
-  type BifrostChatMessage,
-  type BifrostToolCall,
-  createBifrostChatCompletion,
-  extractBifrostMessageText,
   generateBifrostText,
   getConfiguredBifrostModel,
   hasConfiguredBifrostApiKey,
@@ -51,13 +43,13 @@ async function getLLMSettings(): Promise<{ model: string; apiKey: string }> {
   return { model, apiKey };
 }
 
-// Allow up to 60s for the full agent loop (multiple tool rounds + final answer).
+// Allow up to 60s for retrieval plus the final Bifrost answer call.
 export const maxDuration = 60;
 
-// Agent loop bounds: 5 tool rounds is enough for "search baseline → search
-// interim guidance → refine" compliance flows without runaway.
-const MAX_TOOL_ROUNDS = 5;
-const MAX_TOKENS_PER_ROUND = 4096;
+const CHAT_MAX_TOKENS = Number(process.env.BIFROST_CHAT_MAX_TOKENS || 1200);
+const RETRIEVAL_LIMIT = Number(process.env.BIFROST_CHAT_RETRIEVAL_LIMIT || 6);
+const MAX_RETRIEVAL_CONTEXT_CHARS = Number(process.env.BIFROST_CHAT_CONTEXT_CHARS || 14000);
+const MAX_HISTORY_CHARS = 2500;
 
 interface KnowledgeInventoryDocument {
   title: string;
@@ -86,7 +78,7 @@ async function buildKnowledgeInventoryContext(): Promise<{
     const documents = await db.knowledgeDocument.findMany({
       where: { status: "ACTIVE" },
       orderBy: [{ sourceType: "asc" }, { importedAt: "desc" }],
-      take: 50,
+      take: 12,
       select: {
         title: true,
         sourceType: true,
@@ -145,30 +137,17 @@ async function buildKnowledgeInventoryContext(): Promise<{
 
 function buildSystemPrompt(options: {
   knowledgeInventory: string;
+  retrievalContext: string;
   fallbackWarning: string | null;
   fallbackContext: string | null;
 }): string {
-  const { knowledgeInventory, fallbackWarning, fallbackContext } = options;
-
-  const retrievalInstructions = fallbackContext
-    ? `RETRIEVAL MODE: DEGRADED. Live knowledge retrieval is unavailable. A pre-loaded fallback excerpt set is provided below — use it to answer. Do NOT call the knowledge_search tool; it will fail.`
-    : `RETRIEVAL MODE: AGENTIC. You have access to a knowledge_search tool. You MUST call knowledge_search to ground every compliance answer.
-
-WHEN TO CALL knowledge_search:
-- On every user message about Pub 1075, FTI, IRS Safeguards, or any compliance topic
-- Use multiple calls for multi-faceted questions: search the Pub 1075 baseline first, then search for any impacting interim guidance
-- If the first result is a short fragment, call again with expand_neighbors=true or a more specific query
-- If the user asks about a NIST control (e.g., SC-28), search that control ID directly AND search for interim guidance that references it
-- Do NOT answer from memory for anything beyond the most general framing
-
-WHEN NOT TO CALL knowledge_search:
-- Questions purely about the active knowledge inventory below (e.g., "what documents are loaded")
-- Pure conversational acknowledgements
-- Questions about your own capabilities`;
+  const { knowledgeInventory, retrievalContext, fallbackWarning, fallbackContext } = options;
 
   return `You are the IRS SkyShield AI Compliance Agent — an expert on IRS Publication 1075 and related IRS Office of Safeguards knowledge-base documents, including interim guidance that may supersede or amend Pub 1075.
 
-${retrievalInstructions}
+RETRIEVAL MODE: ${fallbackContext ? "DEGRADED. Live retrieval is unavailable; use the fallback excerpts below." : "PRE-RETRIEVED. The application has already searched the knowledge base for this question."}
+
+Use ONLY the retrieved excerpts and active inventory below for specific compliance claims. Do not call tools. If the excerpts do not answer the question, say that the loaded knowledge base did not retrieve a specific answer.
 
 RESPONSE FORMAT (follow this structure exactly):
 
@@ -196,6 +175,7 @@ RENDERING CONSTRAINTS (the chat UI is a minimal renderer — violating these pro
 
 STYLE RULES:
 - Be authoritative and concise. No filler phrases.
+- Keep the answer under 700 words unless the user explicitly asks for a longer analysis.
 - If the answer is from interim guidance, name the interim guidance and explain how it amends or supersedes the Pub 1075 baseline.
 - If the retrieved excerpts do not answer the question, say so explicitly — do not fabricate.
 - Do not claim that no interim guidance exists unless the active knowledge inventory below contains no interim_guidance documents.
@@ -208,20 +188,17 @@ IMPORTANT RULES:
 5. Use Pub 1075 as the baseline when no relevant interim guidance is retrieved
 6. Reason through gray areas carefully. Explain the controlling requirement, practical interpretation, and any uncertainty without inventing facts
 7. If uncertain about a specific requirement, say so rather than guessing
-8. If the active inventory lists an interim guidance document but no relevant excerpt was retrieved, say the guidance exists in the knowledge base but was not retrieved for this query — and consider calling knowledge_search again with the document title
+8. If the active inventory lists an interim guidance document but no relevant excerpt was retrieved, say the guidance exists in the knowledge base but was not retrieved for this query
 
 ${fallbackWarning ? `\nDEGRADED NOTICE: ${fallbackWarning}\n` : ""}
 ACTIVE KNOWLEDGE DOCUMENT INVENTORY:
 === BEGIN KNOWLEDGE INVENTORY ===
 ${knowledgeInventory}
 === END KNOWLEDGE INVENTORY ===
-${fallbackContext ? `
-
-PRE-LOADED FALLBACK EXCERPTS (use these; knowledge_search is unavailable):
-=== BEGIN FALLBACK EXCERPTS ===
-${fallbackContext}
-=== END FALLBACK EXCERPTS ===
-` : ""}`;
+RETRIEVED EXCERPTS:
+=== BEGIN RETRIEVED EXCERPTS ===
+${retrievalContext}
+=== END RETRIEVED EXCERPTS ===`;
 }
 
 function extractCitations(
@@ -259,117 +236,57 @@ function cleanResponseText(response: string): string {
   return response.replace(/---CITATIONS---[\s\S]*?(?:---|$)/, "").trim();
 }
 
-/**
- * Run the Bifrost/OpenAI-compatible agent loop with the knowledge_search tool.
- * Executes up to MAX_TOOL_ROUNDS rounds; returns final assistant text and telemetry.
- */
-async function runAgentLoop(
-  model: string,
-  apiKey: string,
-  systemPrompt: string,
-  messages: BifrostChatMessage[],
-  enableTools: boolean
-): Promise<{
-  finalText: string;
+function limitText(value: string, maxChars: number): string {
+  if (value.length <= maxChars) return value;
+  return `${value.slice(0, maxChars)}\n\n[Context truncated for Bifrost timeout protection.]`;
+}
+
+function formatConversationContext(
+  messages: Array<{ role: "user" | "assistant"; content: string }>
+): string {
+  const recent = messages.slice(-6);
+  const formatted = recent
+    .map((msg) => `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`)
+    .join("\n\n");
+  return limitText(formatted, MAX_HISTORY_CHARS);
+}
+
+async function retrieveGroundingContext(message: string): Promise<{
+  content: string;
   toolCallsExecuted: number;
-  rounds: number;
-  stopReason: string;
+  mode: "retrieved" | "degraded-fallback";
+  fallbackWarning: string | null;
+  fallbackContext: string | null;
+  inventory: { content: string; available: boolean };
 }> {
-  let toolCallsExecuted = 0;
-  let rounds = 0;
-  let finalText = "";
-  let stopReason = "unknown";
+  const inventory = await buildKnowledgeInventoryContext();
+  const fallback = !inventory.available ? buildFallbackContext({ message }) : null;
 
-  // Use a mutable working copy of the messages array.
-  const working: BifrostChatMessage[] = [...messages];
-
-  while (rounds < MAX_TOOL_ROUNDS) {
-    const response = await createBifrostChatCompletion({
-      model: normalizeBifrostModel(model),
-      max_tokens: MAX_TOKENS_PER_ROUND,
-      tools: enableTools ? [KNOWLEDGE_SEARCH_BIFROST_TOOL] : undefined,
-      tool_choice: enableTools ? "auto" : undefined,
-      messages: [{ role: "system", content: systemPrompt }, ...working],
-    }, {
-      apiKey,
-    });
-
-    const choice = response.choices?.[0];
-    const assistantMessage = choice?.message;
-    const toolCalls = assistantMessage?.tool_calls || [];
-
-    stopReason = choice?.finish_reason || (toolCalls.length > 0 ? "tool_calls" : "unknown");
-
-    // Always append the assistant turn to the working history.
-    working.push({
-      role: "assistant",
-      content: extractBifrostMessageText(assistantMessage?.content) || null,
-      tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
-    });
-
-    if (!enableTools || toolCalls.length === 0) {
-      finalText += extractBifrostMessageText(assistantMessage?.content);
-      break;
-    }
-
-    // Execute each tool call in parallel.
-    const toolResults: BifrostChatMessage[] = await Promise.all(
-      toolCalls.map(async (call: BifrostToolCall) => {
-        toolCallsExecuted += 1;
-        if (call.function.name !== "knowledge_search") {
-          return {
-            role: "tool" as const,
-            tool_call_id: call.id,
-            name: call.function.name,
-            content: `ERROR: unknown tool '${call.function.name}'. Only knowledge_search is available.`,
-          };
-        }
-
-        const args = parseBifrostToolArguments(call.function.arguments);
-        const input: KnowledgeSearchInput = {
-          query: typeof args.query === "string" ? args.query : "",
-          limit: typeof args.limit === "number" ? args.limit : undefined,
-          expand_neighbors:
-            typeof args.expand_neighbors === "boolean" ? args.expand_neighbors : undefined,
-        };
-        const outcome = await handleKnowledgeSearch(input);
-        return {
-          role: "tool" as const,
-          tool_call_id: call.id,
-          name: call.function.name,
-          content: outcome.content,
-        };
-      })
-    );
-
-    working.push(...toolResults);
-    rounds += 1;
+  if (fallback) {
+    return {
+      content: limitText(fallback.context, MAX_RETRIEVAL_CONTEXT_CHARS),
+      toolCallsExecuted: 0,
+      mode: "degraded-fallback",
+      fallbackWarning: fallback.warning,
+      fallbackContext: fallback.context,
+      inventory,
+    };
   }
 
-  if (!finalText) {
-    // Loop hit MAX_TOOL_ROUNDS without producing final text. Force a final turn
-    // with tools disabled so the model must synthesize an answer from context.
-    const finalResponse = await createBifrostChatCompletion({
-      model: normalizeBifrostModel(model),
-      max_tokens: MAX_TOKENS_PER_ROUND,
-      messages: [
-        {
-          role: "system",
-          content:
-            systemPrompt +
-            "\n\nYou have reached the maximum number of tool-use rounds. Produce the best answer you can from the tool results already in the conversation. Do not call any more tools.",
-        },
-        ...working,
-      ],
-    }, {
-      apiKey,
-    });
-    const choice = finalResponse.choices?.[0];
-    stopReason = choice?.finish_reason || stopReason;
-    finalText += extractBifrostMessageText(choice?.message?.content);
-  }
+  const outcome = await handleKnowledgeSearch({
+    query: message,
+    limit: RETRIEVAL_LIMIT,
+    expand_neighbors: true,
+  });
 
-  return { finalText, toolCallsExecuted, rounds, stopReason };
+  return {
+    content: limitText(outcome.content, MAX_RETRIEVAL_CONTEXT_CHARS),
+    toolCallsExecuted: 1,
+    mode: "retrieved",
+    fallbackWarning: null,
+    fallbackContext: null,
+    inventory,
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -566,59 +483,77 @@ Section 3.1: General Requirements`;
       });
     }
 
-    const inventory = await buildKnowledgeInventoryContext();
-
-    // Decide if we should run in degraded (fallback) mode: DB appears unhealthy.
-    const useFallback = !inventory.available;
-    const fallback = useFallback ? buildFallbackContext({ message }) : null;
+    const grounding = await retrieveGroundingContext(message);
 
     const systemPrompt = buildSystemPrompt({
-      knowledgeInventory: inventory.content,
-      fallbackWarning: fallback?.warning ?? null,
-      fallbackContext: fallback?.context ?? null,
+      knowledgeInventory: grounding.inventory.content,
+      retrievalContext: grounding.content,
+      fallbackWarning: grounding.fallbackWarning,
+      fallbackContext: grounding.fallbackContext,
     });
 
-    const apiMessages: BifrostChatMessage[] = [];
-    for (const msg of previousMessages.slice(0, -1)) {
-      apiMessages.push({ role: msg.role, content: msg.content });
+    const conversationContext = formatConversationContext(previousMessages.slice(0, -1));
+    const answerPrompt = [
+      conversationContext ? `Recent conversation:\n${conversationContext}` : null,
+      `Current user question:\n${message}`,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    let finalText: string;
+    try {
+      finalText = await generateBifrostText({
+        apiKey: llmSettings.apiKey,
+        model: llmSettings.model,
+        maxTokens: CHAT_MAX_TOKENS,
+        temperature: 0.2,
+        system: systemPrompt,
+        prompt: answerPrompt,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (!errorMessage.includes("504") && !errorMessage.toLowerCase().includes("timed out")) {
+        throw error;
+      }
+
+      console.warn("Retrying Bifrost chat answer with compact prompt after timeout:", errorMessage);
+      finalText = await generateBifrostText({
+        apiKey: llmSettings.apiKey,
+        model: llmSettings.model,
+        maxTokens: 650,
+        temperature: 0.1,
+        system: buildSystemPrompt({
+          knowledgeInventory: "Compact retry mode. Use the retrieved excerpts below.",
+          retrievalContext: limitText(grounding.content, 7000),
+          fallbackWarning: grounding.fallbackWarning,
+          fallbackContext: grounding.fallbackContext,
+        }),
+        prompt: `Answer this Pub 1075 question concisely using the retrieved excerpts: ${message}`,
+      });
     }
-    apiMessages.push({ role: "user", content: message });
 
-    const agentPromise = runAgentLoop(
-      llmSettings.model,
-      llmSettings.apiKey,
-      systemPrompt,
-      apiMessages,
-      !useFallback
-    );
-
-    let titlePromise: Promise<string | null> = Promise.resolve(null);
-    if (isNewConversation) {
-      titlePromise = generateBifrostText({
-          apiKey: llmSettings.apiKey,
-          model: getConfiguredBifrostModel("BIFROST_TITLE_MODEL"),
-          maxTokens: 15,
-          system:
-            "You are a summarization assistant. Given a user's first message, generate a concise, 3-5 word title describing the topic. Do not include quotes, periods, or intro text. Just the title.",
-          prompt: message,
+    if (isNewConversation && convId) {
+      generateBifrostText({
+        apiKey: llmSettings.apiKey,
+        model: getConfiguredBifrostModel("BIFROST_TITLE_MODEL"),
+        maxTokens: 12,
+        system:
+          "Generate a concise 3-5 word title for the user's message. Return only the title.",
+        prompt: message,
+      })
+        .then((title) => {
+          const cleanTitle = title.trim();
+          if (!cleanTitle) return null;
+          return db.conversation.update({
+            where: { id: convId, userId: userInfo.id },
+            data: { title: cleanTitle },
+          });
         })
-        .then((title) => title.trim() || null)
-        .catch((err) => {
-          console.warn("Failed to generate Bifrost title:", err);
-          return null;
-        });
+        .catch((err) => console.warn("Failed to generate Bifrost title:", err));
     }
 
-    const [agentResult, newTitle] = await Promise.all([agentPromise, titlePromise]);
-
-    if (newTitle && convId) {
-      db.conversation
-        .update({ where: { id: convId, userId: userInfo.id }, data: { title: newTitle } })
-        .catch((err) => console.warn("Failed to update new conversation title:", err));
-    }
-
-    const citations = extractCitations(agentResult.finalText);
-    const cleanedResponse = cleanResponseText(agentResult.finalText);
+    const citations = extractCitations(finalText);
+    const cleanedResponse = cleanResponseText(finalText);
 
     if (convId) {
       try {
@@ -640,10 +575,10 @@ Section 3.1: General Requirements`;
       citations,
       conversationId: convId,
       retrieval: {
-        mode: useFallback ? "degraded-fallback" : "agentic",
-        toolCallsExecuted: agentResult.toolCallsExecuted,
-        rounds: agentResult.rounds,
-        stopReason: agentResult.stopReason,
+        mode: grounding.mode,
+        toolCallsExecuted: grounding.toolCallsExecuted,
+        rounds: 1,
+        stopReason: "stop",
       },
     });
   } catch (error) {
