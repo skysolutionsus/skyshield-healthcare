@@ -7,7 +7,10 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/irs_skyshield?schema=public
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-change-me-in-production}
       - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-sk-ant-placeholder}
+      - BIFROST_API_KEY=${BIFROST_API_KEY:-sk-bf-placeholder}
+      - BIFROST_BASE_URL=${BIFROST_BASE_URL:-http://192.168.16.104:8080/v1}
+      - BIFROST_MODEL=${BIFROST_MODEL:-azure/claude-sonnet-4-6}
+      - BIFROST_EMBEDDING_MODEL=${BIFROST_EMBEDDING_MODEL:-azure/text-embedding-ada-002}
     depends_on:
       db:
         condition: service_healthy

@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
+import {
+    getConfiguredBifrostModel,
+    hasConfiguredBifrostApiKey,
+    isLikelyBifrostVirtualKey,
+    maskSecret,
+    normalizeBifrostModel,
+} from "@/lib/ai/bifrost";
 
 // GET /api/settings/llm — Returns current LLM configuration (admin-only)
 export async function GET() {
@@ -28,21 +35,24 @@ export async function GET() {
         });
 
         const settingsMap: Record<string, string> = {};
+        let storedApiKey = "";
         for (const s of settings) {
             if (s.key === "llm_api_key") {
-                // Mask the API key — show only last 4 characters
-                settingsMap[s.key] = s.value.length > 4
-                    ? "•".repeat(s.value.length - 4) + s.value.slice(-4)
-                    : "••••";
+                storedApiKey = s.value;
             } else {
                 settingsMap[s.key] = s.value;
             }
         }
 
+        const hasStoredBifrostKey =
+            isLikelyBifrostVirtualKey(storedApiKey) && hasConfiguredBifrostApiKey(storedApiKey);
+        const hasEnvKey = hasConfiguredBifrostApiKey(process.env.BIFROST_API_KEY);
+
         return NextResponse.json({
-            model: settingsMap["llm_model"] || "",
-            apiKeyMasked: settingsMap["llm_api_key"] || "",
-            hasApiKey: settings.some((s) => s.key === "llm_api_key"),
+            model: normalizeBifrostModel(settingsMap["llm_model"] || getConfiguredBifrostModel("BIFROST_MODEL")),
+            apiKeyMasked: hasStoredBifrostKey ? maskSecret(storedApiKey) : hasEnvKey ? "server env" : "",
+            hasApiKey: hasStoredBifrostKey || hasEnvKey,
+            legacyKeyIgnored: Boolean(storedApiKey && !hasStoredBifrostKey),
         });
     } catch (error) {
         console.error("LLM settings GET error:", error);
@@ -77,10 +87,16 @@ export async function PUT(request: NextRequest) {
         const updates: Array<{ key: string; value: string }> = [];
 
         if (model !== undefined && typeof model === "string") {
-            updates.push({ key: "llm_model", value: model });
+            updates.push({ key: "llm_model", value: normalizeBifrostModel(model) });
         }
 
         if (apiKey !== undefined && typeof apiKey === "string" && apiKey.trim()) {
+            if (!isLikelyBifrostVirtualKey(apiKey) || !hasConfiguredBifrostApiKey(apiKey)) {
+                return NextResponse.json(
+                    { error: "Enter a Bifrost virtual key beginning with sk-bf-." },
+                    { status: 400 }
+                );
+            }
             updates.push({ key: "llm_api_key", value: apiKey.trim() });
         }
 

@@ -1,33 +1,42 @@
 import { NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import {
+    createBifrostChatCompletion,
+    extractBifrostMessageText,
+    getConfiguredBifrostModel,
+    hasConfiguredBifrostApiKey,
+    normalizeBifrostModel,
+} from "@/lib/ai/bifrost";
 
-const MODELS_TO_TRY = [
-    "claude-sonnet-4-6",
-    "claude-opus-4-6",
-    "claude-sonnet-4-5",
-    "claude-opus-4-5",
-    "claude-sonnet-4-6-20250929",
-    "claude-opus-4-6-20250929",
-];
+function modelsToTry(): string[] {
+    return Array.from(
+        new Set([
+            getConfiguredBifrostModel("BIFROST_MODEL"),
+            normalizeBifrostModel("azure/claude-sonnet-4-6"),
+            normalizeBifrostModel("azure/gpt-5.1-chat"),
+        ])
+    );
+}
 
 export async function GET() {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.BIFROST_API_KEY;
 
-    if (!apiKey || apiKey === "sk-ant-placeholder") {
-        return NextResponse.json({ status: "no_key", error: "ANTHROPIC_API_KEY not set" });
+    if (!hasConfiguredBifrostApiKey(apiKey)) {
+        return NextResponse.json({ status: "no_key", error: "BIFROST_API_KEY not set" });
     }
 
-    const anthropic = new Anthropic({ apiKey });
     const results: Record<string, string> = {};
 
-    for (const model of MODELS_TO_TRY) {
+    for (const model of modelsToTry()) {
         try {
-            const response = await anthropic.messages.create({
-                model,
-                max_tokens: 10,
-                messages: [{ role: "user", content: "Say OK" }],
-            });
-            const text = response.content[0].type === "text" ? response.content[0].text : "(no text)";
+            const response = await createBifrostChatCompletion(
+                {
+                    model,
+                    max_tokens: 10,
+                    messages: [{ role: "user", content: "Say OK" }],
+                },
+                { apiKey }
+            );
+            const text = extractBifrostMessageText(response.choices?.[0]?.message?.content) || "(no text)";
             results[model] = `OK: ${text}`;
             // Found one that works — report immediately
             return NextResponse.json({ status: "ok", working_model: model, response: text, all_results: results });

@@ -6,7 +6,7 @@ IRS SkyShield helps compliance workers, agencies, and organizations achieve and 
 
 ## Features
 
-- **AI Compliance Agent** — Ask questions in plain English, get cited answers with specific Pub 1075 section references. Powered by Claude with the full Publication 1075 text in context.
+- **AI Compliance Agent** — Ask questions in plain English, get cited answers with specific Pub 1075 section references. Powered by Claude through Bifrost with the full Publication 1075 text in context.
 - **FTI/PII Guardrails** — All user inputs are scanned for sensitive data (SSN, EIN, tax return data) before reaching the AI. Blocked messages auto-create incident reports.
 - **SCSEM Management** — Browse, search, and track all 58 technology-specific compliance matrices. Mark controls as Compliant/Non-Compliant/N/A/In Progress with notes and evidence.
 - **Incident Tracking** — Log and manage FTI/PII exposure incidents with severity levels, status workflows, remediation plans, and activity timelines.
@@ -21,7 +21,7 @@ IRS SkyShield helps compliance workers, agencies, and organizations achieve and 
 - **UI:** Tailwind CSS v4 + shadcn/ui components
 - **Database:** PostgreSQL + Prisma ORM
 - **Auth:** NextAuth.js v5 (JWT sessions, credentials provider)
-- **AI:** Anthropic Claude Sonnet 4.6 (1M token context window)
+- **AI:** Bifrost chat completions routing to Claude Sonnet 4.6 on Microsoft Foundry
 - **Deployment:** Docker (standalone output) → Coolify on Hetzner VPS
 
 ## Quick Start
@@ -30,7 +30,7 @@ IRS SkyShield helps compliance workers, agencies, and organizations achieve and 
 
 - Node.js 20+
 - PostgreSQL 16+ with the `vector` extension available, or the `pgvector/pgvector:pg16` image
-- Anthropic API key (optional for demo mode)
+- Bifrost virtual key (optional for demo mode)
 
 ### 1. Clone and install
 
@@ -50,14 +50,19 @@ Edit `.env` with your values:
 
 ```env
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/irs_skyshield?schema=public"
-ANTHROPIC_API_KEY="sk-ant-..."     # Optional — app runs in demo mode without it
-OPENAI_API_KEY="sk-..."            # Optional — enables pgvector embeddings for hybrid RAG
-EMBEDDING_MODEL="text-embedding-3-small"
+BIFROST_API_KEY="sk-bf-..."        # Optional — app runs in demo mode without it
+BIFROST_BASE_URL="http://192.168.16.104:8080/v1"
+BIFROST_MODEL="azure/claude-sonnet-4-6"
+BIFROST_EMBEDDING_MODEL="azure/text-embedding-ada-002"
 NEXTAUTH_SECRET="generate-a-random-secret-here"
 NEXTAUTH_URL="http://localhost:3000"
 ```
 
 Generate a secret: `openssl rand -base64 32`
+
+`BIFROST_BASE_URL` may be set to the service root, `/v1`, or the full
+`/v1/chat/completions` URL; SkyShield normalizes it internally. Use the private
+`192.168.16.104` address from the deployed server.
 
 ### 3. Set up the database
 
@@ -105,9 +110,10 @@ Set these in your Docker host / Coolify:
 
 ```env
 DATABASE_URL=postgresql://postgres:your-password@db:5432/irs_skyshield?schema=public
-ANTHROPIC_API_KEY=sk-ant-your-key
-OPENAI_API_KEY=sk-your-embedding-key
-EMBEDDING_MODEL=text-embedding-3-small
+BIFROST_API_KEY=sk-bf-your-virtual-key
+BIFROST_BASE_URL=http://192.168.16.104:8080/v1
+BIFROST_MODEL=azure/claude-sonnet-4-6
+BIFROST_EMBEDDING_MODEL=azure/text-embedding-ada-002
 NEXTAUTH_SECRET=your-production-secret
 NEXTAUTH_URL=https://your-domain.com
 ```
@@ -116,8 +122,9 @@ After deployment, Admin users can manage source documents in **Knowledge Base**.
 **Sync Latest Pub 1075** button or `npm run rag:sync:pub1075` to download the official
 IRS PDF from IRS.gov, extract page-marked text, and import/embed it. You can also import
 NIST standards, SCSEMs, IRS guidance, or internal policy documents with metadata. When
-`OPENAI_API_KEY` is configured, imports store embeddings in pgvector; otherwise documents
-are still searchable with Postgres full-text and exact section/control matching.
+`BIFROST_API_KEY` is configured, imports store embeddings in pgvector using
+`BIFROST_EMBEDDING_MODEL`; otherwise documents are still searchable with Postgres
+full-text and exact section/control matching.
 
 ## Project Structure
 
@@ -208,5 +215,5 @@ npm run db:studio  # Open Prisma Studio
 - **Server Components by default** — Pages use React Server Components for data fetching, keeping the client bundle small
 - **PII detection runs server-side** — Sensitive data patterns are caught before any external API call
 - **Audit logging is non-blocking** — Failed audit writes don't break primary workflows
-- **Demo mode** — Works without an Anthropic API key by returning sample responses
+- **Demo mode** — Works without a Bifrost virtual key by returning sample responses
 - **Standalone Docker output** — Optimized for containerized deployment

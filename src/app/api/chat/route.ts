@@ -3,26 +3,46 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { detectPII } from "@/lib/pii-detection";
 import { logAudit } from "@/lib/audit";
-import Anthropic from "@anthropic-ai/sdk";
 import {
   handleKnowledgeSearch,
-  KNOWLEDGE_SEARCH_TOOL,
+  KNOWLEDGE_SEARCH_BIFROST_TOOL,
   type KnowledgeSearchInput,
 } from "@/lib/knowledge/agent-tools";
 import { buildFallbackContext } from "@/lib/knowledge/fallback-context";
+import {
+  type BifrostChatMessage,
+  type BifrostToolCall,
+  createBifrostChatCompletion,
+  extractBifrostMessageText,
+  generateBifrostText,
+  getConfiguredBifrostModel,
+  hasConfiguredBifrostApiKey,
+  isLikelyBifrostVirtualKey,
+  normalizeBifrostModel,
+  parseBifrostToolArguments,
+} from "@/lib/ai/bifrost";
 
 // Helper: Get LLM settings from DB, fall back to env vars
 async function getLLMSettings(): Promise<{ model: string; apiKey: string }> {
-  let model = "claude-sonnet-4-6";
-  let apiKey = process.env.ANTHROPIC_API_KEY || "";
+  let model = getConfiguredBifrostModel("BIFROST_MODEL");
+  let apiKey = hasConfiguredBifrostApiKey(process.env.BIFROST_API_KEY)
+    ? process.env.BIFROST_API_KEY || ""
+    : "";
 
   try {
     const settings = await db.systemSetting.findMany({
       where: { key: { in: ["llm_model", "llm_api_key"] } },
     });
     for (const s of settings) {
-      if (s.key === "llm_model" && s.value) model = s.value;
-      if (s.key === "llm_api_key" && s.value) apiKey = s.value;
+      if (s.key === "llm_model" && s.value) model = normalizeBifrostModel(s.value);
+      if (
+        !apiKey &&
+        s.key === "llm_api_key" &&
+        isLikelyBifrostVirtualKey(s.value) &&
+        hasConfiguredBifrostApiKey(s.value)
+      ) {
+        apiKey = s.value;
+      }
     }
   } catch {
     // Fall back to defaults if DB is unavailable
@@ -240,14 +260,14 @@ function cleanResponseText(response: string): string {
 }
 
 /**
- * Run the Anthropic agent loop with the knowledge_search tool. Executes up to
- * MAX_TOOL_ROUNDS rounds; returns the final assistant text and telemetry.
+ * Run the Bifrost/OpenAI-compatible agent loop with the knowledge_search tool.
+ * Executes up to MAX_TOOL_ROUNDS rounds; returns final assistant text and telemetry.
  */
 async function runAgentLoop(
-  anthropic: Anthropic,
   model: string,
+  apiKey: string,
   systemPrompt: string,
-  messages: Anthropic.MessageParam[],
+  messages: BifrostChatMessage[],
   enableTools: boolean
 ): Promise<{
   finalText: string;
@@ -261,75 +281,92 @@ async function runAgentLoop(
   let stopReason = "unknown";
 
   // Use a mutable working copy of the messages array.
-  const working: Anthropic.MessageParam[] = [...messages];
+  const working: BifrostChatMessage[] = [...messages];
 
   while (rounds < MAX_TOOL_ROUNDS) {
-    const response: Anthropic.Message = await anthropic.messages.create({
-      model,
+    const response = await createBifrostChatCompletion({
+      model: normalizeBifrostModel(model),
       max_tokens: MAX_TOKENS_PER_ROUND,
-      system: systemPrompt,
-      tools: enableTools ? [KNOWLEDGE_SEARCH_TOOL] : undefined,
-      messages: working,
+      tools: enableTools ? [KNOWLEDGE_SEARCH_BIFROST_TOOL] : undefined,
+      tool_choice: enableTools ? "auto" : undefined,
+      messages: [{ role: "system", content: systemPrompt }, ...working],
+    }, {
+      apiKey,
     });
 
-    stopReason = response.stop_reason || "unknown";
+    const choice = response.choices?.[0];
+    const assistantMessage = choice?.message;
+    const toolCalls = assistantMessage?.tool_calls || [];
+
+    stopReason = choice?.finish_reason || (toolCalls.length > 0 ? "tool_calls" : "unknown");
 
     // Always append the assistant turn to the working history.
-    working.push({ role: "assistant", content: response.content });
+    working.push({
+      role: "assistant",
+      content: extractBifrostMessageText(assistantMessage?.content) || null,
+      tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+    });
 
-    if (response.stop_reason !== "tool_use") {
-      for (const block of response.content) {
-        if (block.type === "text") finalText += block.text;
-      }
+    if (!enableTools || toolCalls.length === 0) {
+      finalText += extractBifrostMessageText(assistantMessage?.content);
       break;
     }
 
-    // Execute each tool_use block in parallel.
-    const toolBlocks = response.content.filter(
-      (block): block is Anthropic.ToolUseBlock => block.type === "tool_use"
-    );
-
-    const toolResults = await Promise.all(
-      toolBlocks.map(async (block) => {
+    // Execute each tool call in parallel.
+    const toolResults: BifrostChatMessage[] = await Promise.all(
+      toolCalls.map(async (call: BifrostToolCall) => {
         toolCallsExecuted += 1;
-        if (block.name !== "knowledge_search") {
+        if (call.function.name !== "knowledge_search") {
           return {
-            type: "tool_result" as const,
-            tool_use_id: block.id,
-            content: `ERROR: unknown tool '${block.name}'. Only knowledge_search is available.`,
-            is_error: true,
+            role: "tool" as const,
+            tool_call_id: call.id,
+            name: call.function.name,
+            content: `ERROR: unknown tool '${call.function.name}'. Only knowledge_search is available.`,
           };
         }
 
-        const input = block.input as KnowledgeSearchInput;
+        const args = parseBifrostToolArguments(call.function.arguments);
+        const input: KnowledgeSearchInput = {
+          query: typeof args.query === "string" ? args.query : "",
+          limit: typeof args.limit === "number" ? args.limit : undefined,
+          expand_neighbors:
+            typeof args.expand_neighbors === "boolean" ? args.expand_neighbors : undefined,
+        };
         const outcome = await handleKnowledgeSearch(input);
         return {
-          type: "tool_result" as const,
-          tool_use_id: block.id,
+          role: "tool" as const,
+          tool_call_id: call.id,
+          name: call.function.name,
           content: outcome.content,
         };
       })
     );
 
-    working.push({ role: "user", content: toolResults });
+    working.push(...toolResults);
     rounds += 1;
   }
 
   if (!finalText) {
     // Loop hit MAX_TOOL_ROUNDS without producing final text. Force a final turn
     // with tools disabled so the model must synthesize an answer from context.
-    const finalResponse: Anthropic.Message = await anthropic.messages.create({
-      model,
+    const finalResponse = await createBifrostChatCompletion({
+      model: normalizeBifrostModel(model),
       max_tokens: MAX_TOKENS_PER_ROUND,
-      system:
-        systemPrompt +
-        "\n\nYou have reached the maximum number of tool-use rounds. Produce the best answer you can from the tool results already in the conversation. Do not call any more tools.",
-      messages: working,
+      messages: [
+        {
+          role: "system",
+          content:
+            systemPrompt +
+            "\n\nYou have reached the maximum number of tool-use rounds. Produce the best answer you can from the tool results already in the conversation. Do not call any more tools.",
+        },
+        ...working,
+      ],
+    }, {
+      apiKey,
     });
-    stopReason = finalResponse.stop_reason || stopReason;
-    for (const block of finalResponse.content) {
-      if (block.type === "text") finalText += block.text;
-    }
+    const choice = finalResponse.choices?.[0];
+    stopReason = choice?.finish_reason || stopReason;
+    finalText += extractBifrostMessageText(choice?.message?.content);
   }
 
   return { finalText, toolCallsExecuted, rounds, stopReason };
@@ -355,7 +392,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // PII/FTI Detection - MUST happen before sending to Anthropic
+    // PII/FTI Detection - MUST happen before sending to the AI provider
     const piiResult = detectPII(message);
 
     if (piiResult.hasPII) {
@@ -491,14 +528,14 @@ export async function POST(request: NextRequest) {
 
     const llmSettings = await getLLMSettings();
 
-    if (!llmSettings.apiKey || llmSettings.apiKey === "sk-ant-placeholder") {
+    if (!hasConfiguredBifrostApiKey(llmSettings.apiKey)) {
       const demoResponse = `Based on Publication 1075, I can provide guidance on your question.
 
-**Note:** This is a demo response. Configure the ANTHROPIC_API_KEY environment variable to enable AI powered IRS Office of Safeguards Compliance analysis.
+**Note:** This is a demo response. Configure the BIFROST_API_KEY environment variable to enable AI powered IRS Office of Safeguards Compliance analysis.
 
 Your question: "${message}"
 
-For full Pub 1075 guidance, please ensure the Anthropic API key is configured.
+For full Pub 1075 guidance, please ensure the Bifrost virtual key is configured.
 
 ---CITATIONS---
 Section 1.1: Introduction to Publication 1075
@@ -529,7 +566,6 @@ Section 3.1: General Requirements`;
       });
     }
 
-    const anthropic = new Anthropic({ apiKey: llmSettings.apiKey });
     const inventory = await buildKnowledgeInventoryContext();
 
     // Decide if we should run in degraded (fallback) mode: DB appears unhealthy.
@@ -542,15 +578,15 @@ Section 3.1: General Requirements`;
       fallbackContext: fallback?.context ?? null,
     });
 
-    const apiMessages: Anthropic.MessageParam[] = [];
+    const apiMessages: BifrostChatMessage[] = [];
     for (const msg of previousMessages.slice(0, -1)) {
       apiMessages.push({ role: msg.role, content: msg.content });
     }
     apiMessages.push({ role: "user", content: message });
 
     const agentPromise = runAgentLoop(
-      anthropic,
       llmSettings.model,
+      llmSettings.apiKey,
       systemPrompt,
       apiMessages,
       !useFallback
@@ -558,17 +594,17 @@ Section 3.1: General Requirements`;
 
     let titlePromise: Promise<string | null> = Promise.resolve(null);
     if (isNewConversation) {
-      titlePromise = anthropic.messages
-        .create({
-          model: "claude-haiku-4-5-20251001",
-          max_tokens: 15,
+      titlePromise = generateBifrostText({
+          apiKey: llmSettings.apiKey,
+          model: getConfiguredBifrostModel("BIFROST_TITLE_MODEL"),
+          maxTokens: 15,
           system:
             "You are a summarization assistant. Given a user's first message, generate a concise, 3-5 word title describing the topic. Do not include quotes, periods, or intro text. Just the title.",
-          messages: [{ role: "user", content: message }],
+          prompt: message,
         })
-        .then((res) => (res.content[0].type === "text" ? res.content[0].text.trim() : null))
+        .then((title) => title.trim() || null)
         .catch((err) => {
-          console.warn("Failed to generate Haiku title:", err);
+          console.warn("Failed to generate Bifrost title:", err);
           return null;
         });
     }
@@ -637,8 +673,8 @@ Section 3.1: General Requirements`;
     }
 
     if (
-      errorMessage.includes("anthropic") ||
-      errorMessage.includes("Anthropic") ||
+      errorMessage.includes("Bifrost") ||
+      errorMessage.includes("bifrost") ||
       errorMessage.includes("model") ||
       errorMessage.includes("api_key")
     ) {

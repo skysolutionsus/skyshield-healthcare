@@ -1,11 +1,11 @@
-import Anthropic from "@anthropic-ai/sdk";
 import {
   expandWithNeighbors,
   formatKnowledgeContext,
   retrieveKnowledgeContext,
 } from "@/lib/knowledge/retrieval";
+import type { BifrostChatTool } from "@/lib/ai/bifrost";
 
-export const KNOWLEDGE_SEARCH_TOOL: Anthropic.Tool = {
+export const KNOWLEDGE_SEARCH_TOOL = {
   name: "knowledge_search",
   description:
     "Search the IRS Publication 1075 and interim guidance knowledge base. " +
@@ -32,6 +32,15 @@ export const KNOWLEDGE_SEARCH_TOOL: Anthropic.Tool = {
       },
     },
     required: ["query"],
+  },
+};
+
+export const KNOWLEDGE_SEARCH_BIFROST_TOOL: BifrostChatTool = {
+  type: "function",
+  function: {
+    name: KNOWLEDGE_SEARCH_TOOL.name,
+    description: KNOWLEDGE_SEARCH_TOOL.description,
+    parameters: KNOWLEDGE_SEARCH_TOOL.input_schema,
   },
 };
 

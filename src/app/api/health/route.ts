@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import {
+  getBifrostBaseUrl,
+  getConfiguredBifrostEmbeddingModel,
+  getConfiguredBifrostModel,
+  hasConfiguredBifrostApiKey,
+} from "@/lib/ai/bifrost";
 import { existsSync, statSync } from "fs";
 import { join } from "path";
 
@@ -14,9 +20,10 @@ export async function GET() {
       AUTH_SECRET: process.env.AUTH_SECRET ? "SET" : "NOT SET",
       AUTH_TRUST_HOST: process.env.AUTH_TRUST_HOST || "NOT SET",
       NEXTAUTH_URL: process.env.NEXTAUTH_URL || "NOT SET",
-      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY
-        ? `${process.env.ANTHROPIC_API_KEY.substring(0, 15)}...`
-        : "NOT SET",
+      BIFROST_API_KEY: hasConfiguredBifrostApiKey(process.env.BIFROST_API_KEY) ? "SET" : "NOT SET",
+      BIFROST_BASE_URL: getBifrostBaseUrl(),
+      BIFROST_MODEL: getConfiguredBifrostModel("BIFROST_MODEL"),
+      BIFROST_EMBEDDING_MODEL: getConfiguredBifrostEmbeddingModel(),
     },
     database: "unknown",
     userCount: 0,
@@ -62,7 +69,7 @@ export async function GET() {
         chunks: chunkCount,
         embeddedChunks: Number(embeddedRows[0]?.count || 0),
         pgvector: Boolean(vectorRows[0]?.installed),
-        embeddingConfigured: Boolean(process.env.OPENAI_API_KEY),
+        embeddingConfigured: hasConfiguredBifrostApiKey(process.env.BIFROST_API_KEY),
       };
     } catch (e) {
       health.userCount = `error: ${e}`;

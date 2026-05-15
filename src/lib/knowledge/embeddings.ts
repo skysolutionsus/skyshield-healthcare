@@ -1,11 +1,15 @@
-const DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small";
+import {
+  createBifrostEmbedding,
+  getConfiguredBifrostEmbeddingModel,
+  hasConfiguredBifrostApiKey,
+} from "@/lib/ai/bifrost";
 
 export function getEmbeddingModel(): string {
-  return process.env.EMBEDDING_MODEL || DEFAULT_EMBEDDING_MODEL;
+  return getConfiguredBifrostEmbeddingModel();
 }
 
 export function hasEmbeddingConfig(): boolean {
-  return Boolean(process.env.OPENAI_API_KEY);
+  return hasConfiguredBifrostApiKey(process.env.BIFROST_API_KEY);
 }
 
 export function vectorLiteral(embedding: number[]): string {
@@ -13,31 +17,11 @@ export function vectorLiteral(embedding: number[]): string {
 }
 
 export async function embedTexts(texts: string[]): Promise<Array<number[] | null>> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey || texts.length === 0) {
+  if (!hasEmbeddingConfig() || texts.length === 0) {
     return texts.map(() => null);
   }
 
-  const response = await fetch("https://api.openai.com/v1/embeddings", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: getEmbeddingModel(),
-      input: texts,
-    }),
-  });
-
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`Embedding request failed: ${response.status} ${detail}`);
-  }
-
-  const data = (await response.json()) as {
-    data: Array<{ index: number; embedding: number[] }>;
-  };
+  const data = await createBifrostEmbedding(texts, { model: getEmbeddingModel() });
 
   const embeddings: Array<number[] | null> = texts.map(() => null);
   for (const item of data.data) {

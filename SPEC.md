@@ -19,7 +19,7 @@ IRS SkyShield is an AI-powered web application that helps IRS Office of Safeguar
 - **Database:** PostgreSQL (for multi-tenant data, audit logs, incidents)
 - **ORM:** Prisma
 - **Auth:** NextAuth.js v5 with role-based access (Admin, Compliance Officer, Auditor, Viewer)
-- **AI:** Anthropic Claude Sonnet 4.6 via API (1M token context window)
+- **AI:** Claude Sonnet 4.6 via Bifrost chat completions on Microsoft Foundry
 - **Search:** Brave Search API or similar for web augmentation
 - **Deployment:** Docker → Coolify on Hetzner VPS
 
@@ -42,13 +42,13 @@ The heart of the app. A chat interface where compliance workers ask questions an
 - Agent maintains conversation history per user (stored in DB, not just session)
 
 **FTI/PII Guardrails (CRITICAL):**
-- Before sending ANY user message to Anthropic API, run PII/FTI detection:
+- Before sending ANY user message to the Bifrost AI endpoint, run PII/FTI detection:
   - SSN patterns (XXX-XX-XXXX, XXXXXXXXX)
   - EIN patterns (XX-XXXXXXX)
   - Tax return data patterns
   - Names + financial amounts together
   - Any data that looks like it could be from a tax return
-- If detected: BLOCK the message, DO NOT send to Anthropic, show warning to user
+- If detected: BLOCK the message, DO NOT send to Bifrost, show warning to user
 - Auto-create an incident report logging the attempt (user, timestamp, type of data detected, sanitized excerpt)
 - Provide a "Report False Positive" button if the detection was wrong
 
@@ -209,7 +209,7 @@ CISBenchmarkVersion
 
 ## Security Requirements
 - All data encrypted at rest and in transit
-- API key (Anthropic) stored as environment variable, never in code
+- API key (Bifrost virtual key) stored as environment variable, never in code
 - Rate limiting on AI agent (prevent abuse)
 - Session timeout after 30 minutes of inactivity
 - Password requirements: 12+ chars, complexity rules
@@ -220,7 +220,10 @@ CISBenchmarkVersion
 ## Environment Variables Needed
 ```
 DATABASE_URL=postgresql://...
-ANTHROPIC_API_KEY=sk-ant-... (from 1Password: "IRS SkyShield - Anthropic API Key")
+BIFROST_API_KEY=sk-bf-... (Bifrost virtual key)
+BIFROST_BASE_URL=http://192.168.16.104:8080/v1
+BIFROST_MODEL=azure/claude-sonnet-4-6
+BIFROST_EMBEDDING_MODEL=azure/text-embedding-ada-002
 NEXTAUTH_SECRET=...
 NEXTAUTH_URL=...
 BRAVE_SEARCH_API_KEY=... (for web search, if available)

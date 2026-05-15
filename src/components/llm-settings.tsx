@@ -4,11 +4,8 @@ import { useState, useEffect } from "react";
 import { Bot, Save, Loader2, Check, Eye, EyeOff } from "lucide-react";
 
 const AVAILABLE_MODELS = [
-    { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 (Default)" },
-    { value: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" },
-    { value: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet" },
-    { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5 (Fast)" },
-    { value: "claude-3-opus-20240229", label: "Claude 3 Opus (Most capable)" },
+    { value: "azure/claude-sonnet-4-6", label: "Bifrost Claude Sonnet 4.6 (Default)" },
+    { value: "azure/gpt-5.1-chat", label: "Bifrost GPT-5.1 Chat" },
 ];
 
 export function LLMSettings() {
@@ -16,6 +13,7 @@ export function LLMSettings() {
     const [apiKey, setApiKey] = useState("");
     const [apiKeyMasked, setApiKeyMasked] = useState("");
     const [hasApiKey, setHasApiKey] = useState(false);
+    const [legacyKeyIgnored, setLegacyKeyIgnored] = useState(false);
     const [showApiKey, setShowApiKey] = useState(false);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -31,9 +29,10 @@ export function LLMSettings() {
             const res = await fetch("/api/settings/llm");
             if (res.ok) {
                 const data = await res.json();
-                setModel(data.model || "claude-sonnet-4-6");
+                setModel(data.model || "azure/claude-sonnet-4-6");
                 setApiKeyMasked(data.apiKeyMasked || "");
                 setHasApiKey(data.hasApiKey || false);
+                setLegacyKeyIgnored(data.legacyKeyIgnored || false);
             }
         } catch {
             // ignore
@@ -115,21 +114,21 @@ export function LLMSettings() {
                         ))}
                     </select>
                     <p className="text-xs text-[var(--sky-text-muted)] mt-1.5">
-                        Select the Anthropic model used for compliance analysis.
+                        Select the Bifrost model route used for compliance analysis.
                     </p>
                 </div>
 
                 {/* API Key */}
                 <div>
                     <label className="block text-sm font-medium text-[var(--sky-text-secondary)] mb-1.5">
-                        Anthropic API Key
+                        Bifrost Virtual Key
                     </label>
                     <div className="relative max-w-md">
                         <input
                             type={showApiKey ? "text" : "password"}
                             value={apiKey}
                             onChange={(e) => setApiKey(e.target.value)}
-                            placeholder={hasApiKey ? `Current: ${apiKeyMasked}` : "sk-ant-..."}
+                            placeholder={hasApiKey ? `Current: ${apiKeyMasked}` : "sk-bf-..."}
                             className="w-full px-3 py-2.5 pr-10 bg-[var(--sky-surface-overlay)] border border-[var(--sky-border)] rounded-lg text-sm text-white placeholder-[var(--sky-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)]/50 focus:border-[var(--sky-blue)]/50"
                         />
                         <button
@@ -147,8 +146,13 @@ export function LLMSettings() {
                     <p className="text-xs text-[var(--sky-text-muted)] mt-1.5">
                         {hasApiKey
                             ? "Leave blank to keep the current key. Enter a new key to replace it."
-                            : "Falls back to the server environment variable if not set here."}
+                            : "Falls back to BIFROST_API_KEY on the server if not set here."}
                     </p>
+                    {legacyKeyIgnored && (
+                        <p className="text-xs text-amber-300 mt-1.5">
+                            An older non-Bifrost key is saved here and is being ignored. Enter a Bifrost virtual key to replace it.
+                        </p>
+                    )}
                 </div>
 
                 {/* Actions */}
