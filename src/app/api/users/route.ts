@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { v4 as uuidv4 } from "uuid";
 import { hash } from "bcryptjs";
+import { generateTemporaryPassword } from "@/lib/passwords";
 
 export async function POST(request: NextRequest) {
   try {
@@ -120,6 +121,114 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
+    if (body.action === "reset_password") {
+      const { userId } = body;
+      if (!userId || typeof userId !== "string") {
+        return NextResponse.json(
+          { error: "userId is required" },
+          { status: 400 }
+        );
+      }
+      if (userId === userInfo.id) {
+        return NextResponse.json(
+          { error: "Use your account settings to change your own password" },
+          { status: 400 }
+        );
+      }
+
+      const targetUser = await db.user.findFirst({
+        where: {
+          id: userId,
+          organizationId: userInfo.organizationId,
+        },
+        select: { id: true, email: true, name: true },
+      });
+
+      if (!targetUser) {
+        return NextResponse.json({ error: "User not found" }, { status: 404 });
+      }
+
+      const temporaryPassword = generateTemporaryPassword();
+      const passwordHash = await hash(temporaryPassword, 12);
+
+      await db.user.update({
+        where: { id: targetUser.id },
+        data: { passwordHash },
+      });
+
+      await logAudit({
+        organizationId: userInfo.organizationId,
+        userId: userInfo.id,
+        action: "USER_PASSWORD_RESET",
+        resourceType: "user",
+        resourceId: targetUser.id,
+        metadata: { email: targetUser.email, name: targetUser.name },
+        ipAddress: request.headers.get("x-forwarded-for") || undefined,
+        userAgent: request.headers.get("user-agent") || undefined,
+      });
+
+      return NextResponse.json({
+        success: true,
+        temporaryPassword,
+      });
+    }
+
+    if (body.action === "reset_mfa") {
+      const { userId } = body;
+      if (!userId || typeof userId !== "string") {
+        return NextResponse.json(
+          { error: "userId is required" },
+          { status: 400 }
+        );
+      }
+      if (userId === userInfo.id) {
+        return NextResponse.json(
+          { error: "Use your MFA settings to reset your own MFA" },
+          { status: 400 }
+        );
+      }
+
+      const targetUser = await db.user.findFirst({
+        where: {
+          id: userId,
+          organizationId: userInfo.organizationId,
+        },
+        select: { id: true, email: true, name: true },
+      });
+
+      if (!targetUser) {
+        return NextResponse.json({ error: "User not found" }, { status: 404 });
+      }
+
+      await db.$transaction([
+        db.mfaRecoveryCode.deleteMany({ where: { userId: targetUser.id } }),
+        db.user.update({
+          where: { id: targetUser.id },
+          data: {
+            mfaEnabled: false,
+            mfaSecretEncrypted: null,
+            mfaPendingSecretEncrypted: null,
+            mfaPendingSecretCreatedAt: null,
+            mfaEnabledAt: null,
+            mfaLastUsedAt: null,
+          },
+        }),
+      ]);
+
+      await logAudit({
+        organizationId: userInfo.organizationId,
+        userId: userInfo.id,
+        action: "USER_MFA_RESET",
+        resourceType: "user",
+        resourceId: targetUser.id,
+        metadata: { email: targetUser.email, name: targetUser.name },
+        ipAddress: request.headers.get("x-forwarded-for") || undefined,
+        userAgent: request.headers.get("user-agent") || undefined,
+      });
+
+      return NextResponse.json({ success: true });
+    }
+
     return NextResponse.json(
       { error: "Invalid action" },
       { status: 400 }
@@ -153,6 +262,8 @@ export async function GET() {
         role: true,
         active: true,
         lastLogin: true,
+        mfaEnabled: true,
+        mfaLastUsedAt: true,
       },
       orderBy: { name: "asc" },
     });

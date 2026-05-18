@@ -5,6 +5,7 @@ import { Users, Mail, Shield, UserPlus } from "lucide-react";
 import { UserManagement } from "@/components/user-management";
 import { LLMSettings } from "@/components/llm-settings";
 import { MfaSettings } from "@/components/mfa-settings";
+import { AdminUserActions } from "@/components/admin-user-actions";
 import { isAdminRole, roleLabel } from "@/lib/roles";
 
 export default async function SettingsPage({
@@ -31,6 +32,8 @@ export default async function SettingsPage({
     role: string;
     active: boolean;
     lastLogin: Date | null;
+    mfaEnabled: boolean;
+    mfaLastUsedAt: Date | null;
     createdAt: Date;
   }> = [];
   let org: { name: string; slug: string; createdAt: Date } | null = null;
@@ -59,6 +62,8 @@ export default async function SettingsPage({
           role: true,
           active: true,
           lastLogin: true,
+          mfaEnabled: true,
+          mfaLastUsedAt: true,
           createdAt: true,
         },
         orderBy: { createdAt: "asc" },
@@ -156,8 +161,16 @@ export default async function SettingsPage({
                   Status
                 </th>
                 <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  MFA
+                </th>
+                <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Last Login
                 </th>
+                {isAdmin && (
+                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--sky-border)]">
@@ -196,9 +209,34 @@ export default async function SettingsPage({
                       {u.active ? "Active" : "Inactive"}
                     </span>
                   </td>
+                  <td className="px-6 py-4">
+                    <span
+                      className={`inline-flex items-center gap-1.5 text-xs ${u.mfaEnabled ? "text-emerald-400" : "text-amber-300"}`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${u.mfaEnabled ? "bg-emerald-400" : "bg-amber-400"}`}
+                      />
+                      {u.mfaEnabled ? "Enabled" : "Setup required"}
+                    </span>
+                    {u.mfaLastUsedAt && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Last used {formatDateTime(u.mfaLastUsedAt)}
+                      </p>
+                    )}
+                  </td>
                   <td className="px-6 py-4 text-sm text-gray-500">
                     {u.lastLogin ? formatDateTime(u.lastLogin) : "Never"}
                   </td>
+                  {isAdmin && (
+                    <td className="px-6 py-4">
+                      <AdminUserActions
+                        userId={u.id}
+                        currentUserId={userInfo.id}
+                        userName={u.name}
+                        userEmail={u.email}
+                      />
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

@@ -23,6 +23,8 @@ const actionIcons: Record<string, React.ElementType> = {
   SCSEM_ASSESSMENT: FileSpreadsheet,
   USER_CREATE: User,
   USER_UPDATE: User,
+  USER_PASSWORD_RESET: User,
+  USER_MFA_RESET: Shield,
   PII_DETECTED: Shield,
   SETTINGS_UPDATE: Settings,
   MFA_SETUP_STARTED: Shield,
