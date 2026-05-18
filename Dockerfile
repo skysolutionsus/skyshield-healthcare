@@ -33,19 +33,29 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+# Prisma generate needs a DATABASE_URL while building the runtime image. Coolify
+# overrides this at runtime with the real internal PostgreSQL connection string.
+ENV DATABASE_URL="postgresql://postgres:postgres@db:5432/irs_skyshield?schema=public"
 
 RUN apk add --no-cache poppler-utils
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+# Install production dependencies only for the final image. The builder stage
+# still uses dev dependencies for the Next.js/TypeScript build, but exporting the
+# full build-time node_modules layer can make Coolify deployments fail on small
+# hosts during image export.
+COPY package.json package-lock.json* ./
+COPY --from=builder /app/prisma ./prisma
+RUN npm ci --omit=dev --ignore-scripts \
+  && npx prisma generate \
+  && npm cache clean --force
+
 # Copy all necessary files
 COPY --from=builder /app/data ./data
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/package.json ./package.json
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
 
 # Copy source files needed for seed (tsx can import TS directly)
 COPY --from=builder /app/src/lib/xlsx-parser.ts ./src/lib/xlsx-parser.ts
@@ -64,8 +74,6 @@ EXPOSE 3000
 
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
-# Override this in Coolify with the internal PostgreSQL connection string.
-ENV DATABASE_URL="postgresql://postgres:postgres@db:5432/irs_skyshield?schema=public"
 
 # start-period covers the cold-start seed on a fresh DB. The seed parses
 # 58 SCSEM XLSX files and takes several minutes; only runs when the DB is
