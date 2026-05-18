@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   CheckCircle2,
   Copy,
@@ -23,6 +24,7 @@ interface MfaStatus {
 
 interface MfaSettingsProps {
   status: MfaStatus;
+  setupRequested?: boolean;
 }
 
 interface SetupState {
@@ -31,8 +33,13 @@ interface SetupState {
   expiresAt: string;
 }
 
-export function MfaSettings({ status }: MfaSettingsProps) {
+export function MfaSettings({
+  status,
+  setupRequested = false,
+}: MfaSettingsProps) {
   const router = useRouter();
+  const { update } = useSession();
+  const autoSetupStartedRef = useRef(false);
   const [enabled, setEnabled] = useState(status.enabled);
   const [setup, setSetup] = useState<SetupState | null>(null);
   const [setupCode, setSetupCode] = useState("");
@@ -48,6 +55,18 @@ export function MfaSettings({ status }: MfaSettingsProps) {
   const lastUsedAt = status.lastUsedAt
     ? formatDateTime(status.lastUsedAt)
     : "Not recorded";
+
+  useEffect(() => {
+    if (
+      setupRequested &&
+      !enabled &&
+      !setup &&
+      !autoSetupStartedRef.current
+    ) {
+      autoSetupStartedRef.current = true;
+      void startSetup();
+    }
+  }, [setupRequested, enabled, setup]);
 
   async function postMfaAction<T>(
     action: string,
@@ -96,6 +115,7 @@ export function MfaSettings({ status }: MfaSettingsProps) {
       setSetupCode("");
       setRecoveryCodes(data.recoveryCodes);
       setMessage("MFA enabled");
+      await update({ user: { mfaEnabled: true } });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to verify setup");
     }
@@ -108,6 +128,7 @@ export function MfaSettings({ status }: MfaSettingsProps) {
       setChallengeCode("");
       setRecoveryCodes([]);
       setMessage("MFA disabled");
+      await update({ user: { mfaEnabled: false } });
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to disable MFA");
@@ -137,7 +158,11 @@ export function MfaSettings({ status }: MfaSettingsProps) {
 
   function finishRecoveryCodes() {
     setRecoveryCodes([]);
-    router.refresh();
+    if (setupRequested) {
+      router.push("/dashboard");
+    } else {
+      router.refresh();
+    }
   }
 
   return (
@@ -152,7 +177,9 @@ export function MfaSettings({ status }: MfaSettingsProps) {
               Multi-factor authentication
             </h2>
             <p className="text-sm text-[var(--sky-text-secondary)] mt-1">
-              Authenticator app and one-time recovery codes
+              {setupRequested && !enabled
+                ? "Set up an authenticator app to continue"
+                : "Authenticator app and one-time recovery codes"}
             </p>
           </div>
         </div>

@@ -7,9 +7,14 @@ import { LLMSettings } from "@/components/llm-settings";
 import { MfaSettings } from "@/components/mfa-settings";
 import { isAdminRole, roleLabel } from "@/lib/roles";
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mfa?: string }>;
+}) {
   const session = await auth();
   if (!session?.user) return null;
+  const params = await searchParams;
 
   const userInfo = session.user as unknown as {
     id: string;
@@ -116,7 +121,10 @@ export default async function SettingsPage() {
         </p>
       </div>
 
-      <MfaSettings status={mfaStatus} />
+      <MfaSettings
+        status={mfaStatus}
+        setupRequested={params.mfa === "setup"}
+      />
 
       {/* Admin sections */}
       {isAdmin && (

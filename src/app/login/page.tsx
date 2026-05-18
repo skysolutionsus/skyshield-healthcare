@@ -44,7 +44,10 @@ export default function LoginPage() {
       } else if (result?.error) {
         setError("Invalid email or password");
       } else {
-        router.push("/dashboard");
+        const mfaStatus = await fetch("/api/mfa").then((response) =>
+          response.ok ? response.json() : null
+        );
+        router.push(mfaStatus?.enabled ? "/dashboard" : "/settings?mfa=setup");
         router.refresh();
       }
     } catch {

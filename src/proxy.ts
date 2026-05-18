@@ -30,6 +30,27 @@ export default auth((req) => {
   }
 
   const role = (req.auth.user as { role?: string } | undefined)?.role;
+  const mfaEnabled = Boolean(
+    (req.auth.user as { mfaEnabled?: boolean } | undefined)?.mfaEnabled
+  );
+
+  if (
+    !mfaEnabled &&
+    !pathname.startsWith("/settings") &&
+    !pathname.startsWith("/api/mfa")
+  ) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { error: "MFA enrollment required" },
+        { status: 403 }
+      );
+    }
+
+    const setupUrl = new URL("/settings", req.url);
+    setupUrl.searchParams.set("mfa", "setup");
+    return NextResponse.redirect(setupUrl);
+  }
+
   if (!canAccessPath(role, pathname)) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });

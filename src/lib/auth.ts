@@ -12,12 +12,14 @@ declare module "next-auth" {
       id: string;
       role: string;
       organizationId: string;
+      mfaEnabled: boolean;
     } & DefaultSession["user"];
   }
 
   interface User {
     role?: string;
     organizationId?: string;
+    mfaEnabled?: boolean;
   }
 }
 
@@ -135,16 +137,26 @@ const config: NextAuthConfig = {
           name: user.name,
           role: user.role,
           organizationId: user.organizationId,
+          mfaEnabled: user.mfaEnabled,
         };
       },
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.role = user.role;
         token.organizationId = user.organizationId;
         token.userId = user.id;
+        token.mfaEnabled = Boolean(user.mfaEnabled);
+      }
+
+      if (
+        trigger === "update" &&
+        session?.user &&
+        typeof session.user.mfaEnabled === "boolean"
+      ) {
+        token.mfaEnabled = session.user.mfaEnabled;
       }
       return token;
     },
@@ -153,6 +165,7 @@ const config: NextAuthConfig = {
         session.user.id = token.userId as string;
         session.user.role = token.role as string;
         session.user.organizationId = token.organizationId as string;
+        session.user.mfaEnabled = Boolean(token.mfaEnabled);
       }
       return session;
     },

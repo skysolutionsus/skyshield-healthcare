@@ -7,8 +7,10 @@ export const LIMITED_ACCESS_PREFIXES = [
   "/dashboard",
   "/agent",
   "/scsems",
+  "/settings",
   "/api/dashboard",
   "/api/chat",
+  "/api/mfa",
   "/api/scsems",
 ];
 
