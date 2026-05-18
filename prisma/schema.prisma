@@ -67,6 +67,12 @@ model User {
   role           Role      @default(VIEWER)
   organizationId String
   lastLogin      DateTime?
+  mfaEnabled     Boolean   @default(false)
+  mfaSecretEncrypted String?
+  mfaPendingSecretEncrypted String?
+  mfaPendingSecretCreatedAt DateTime?
+  mfaEnabledAt   DateTime?
+  mfaLastUsedAt  DateTime?
   active         Boolean   @default(true)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -77,9 +83,22 @@ model User {
   createdIncidents   Incident[]          @relation("CreatedIncidents")
   incidentActivities IncidentActivity[]
   auditLogs          AuditLog[]
+  mfaRecoveryCodes   MfaRecoveryCode[]
   reportedFalsePositives  FalsePositiveReport[] @relation("ReportedFalsePositives")
   reviewedFalsePositives  FalsePositiveReport[] @relation("ReviewedFalsePositives")
   importedKnowledgeDocuments KnowledgeDocument[] @relation("ImportedKnowledgeDocuments")
+}
+
+model MfaRecoveryCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Invitation {

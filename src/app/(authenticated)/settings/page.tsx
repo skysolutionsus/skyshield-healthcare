@@ -4,6 +4,7 @@ import { formatDateTime, getInitials } from "@/lib/utils";
 import { Users, Mail, Shield, UserPlus } from "lucide-react";
 import { UserManagement } from "@/components/user-management";
 import { LLMSettings } from "@/components/llm-settings";
+import { MfaSettings } from "@/components/mfa-settings";
 import { isAdminRole, roleLabel } from "@/lib/roles";
 
 export default async function SettingsPage() {
@@ -11,6 +12,7 @@ export default async function SettingsPage() {
   if (!session?.user) return null;
 
   const userInfo = session.user as unknown as {
+    id: string;
     role: string;
     organizationId: string;
   };
@@ -33,9 +35,16 @@ export default async function SettingsPage() {
     role: string;
     expiresAt: Date;
   }> = [];
+  let mfaStatus = {
+    enabled: false,
+    enabledAt: null as string | null,
+    lastUsedAt: null as string | null,
+    recoveryCodesRemaining: 0,
+  };
 
   try {
-    [users, org, pendingInvites] = await Promise.all([
+    const [teamUsers, organization, invites, currentUserMfa, recoveryCount] =
+      await Promise.all([
       db.user.findMany({
         where: { organizationId: orgId },
         select: {
@@ -58,7 +67,28 @@ export default async function SettingsPage() {
         select: { id: true, email: true, role: true, expiresAt: true },
         orderBy: { createdAt: "desc" },
       }),
+      db.user.findUnique({
+        where: { id: userInfo.id },
+        select: {
+          mfaEnabled: true,
+          mfaEnabledAt: true,
+          mfaLastUsedAt: true,
+        },
+      }),
+      db.mfaRecoveryCode.count({
+        where: { userId: userInfo.id, usedAt: null },
+      }),
     ]);
+
+    users = teamUsers;
+    org = organization;
+    pendingInvites = invites;
+    mfaStatus = {
+      enabled: currentUserMfa?.mfaEnabled ?? false,
+      enabledAt: currentUserMfa?.mfaEnabledAt?.toISOString() ?? null,
+      lastUsedAt: currentUserMfa?.mfaLastUsedAt?.toISOString() ?? null,
+      recoveryCodesRemaining: recoveryCount,
+    };
   } catch {
     // DB not available
   }
@@ -85,6 +115,8 @@ export default async function SettingsPage() {
           {org?.name || "Organization"} &mdash; Manage users and roles
         </p>
       </div>
+
+      <MfaSettings status={mfaStatus} />
 
       {/* Admin sections */}
       {isAdmin && (
