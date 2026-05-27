@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { auditRequestContext, logAudit, truncateAuditText } from "@/lib/audit";
 import {
     fetchAllBenchmarkExcelFiles,
     fetchAllBenchmarks,
@@ -44,6 +45,21 @@ const MAX_UPDATER_CHANGES = 25;
 const AI_CONTROL_LIMIT = Number(process.env.SCSEM_UPDATER_AI_CONTROL_LIMIT || 500);
 const AI_PROMPT_CHAR_LIMIT = Number(process.env.SCSEM_UPDATER_AI_PROMPT_CHAR_LIMIT || 90000);
 const AI_TIMEOUT_MS = Number(process.env.SCSEM_UPDATER_AI_TIMEOUT_MS || 25000);
+
+function changePreview(changes: any[]) {
+    return changes.slice(0, 25).map((change) => ({
+        id: change.id,
+        action: change.action,
+        testId: change.testId,
+        field: change.field,
+        status: change.status,
+        confidence: change.confidence,
+        currentValue: truncateAuditText(change.currentValue, 1200),
+        proposedValue: truncateAuditText(change.proposedValue, 2400),
+        reason: truncateAuditText(change.reason, 1600),
+        sourceEvidence: change.sourceEvidence || null,
+    }));
+}
 
 function controlsFromParsedSCSEM(parsed: ParsedSCSEM): SCSEMControlEvidence[] {
     return parsed.sheets
@@ -243,6 +259,7 @@ export async function POST(
         if (!session?.user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
+        const user = session.user as unknown as { id: string; organizationId: string };
 
         const updaterSession = readSCSEMUpdaterSession(id);
         updaterSession.status = "analyzing";
@@ -366,6 +383,35 @@ export async function POST(
                 description: "Analysis completed with no proposed changes.",
             });
             writeSCSEMUpdaterSession(updaterSession);
+            await logAudit({
+                organizationId: user.organizationId,
+                userId: user.id,
+                action: "SCSEM_UPDATER_ANALYZE",
+                resourceType: "scsem_updater_session",
+                resourceId: updaterSession.id,
+                metadata: {
+                    input: {
+                        fileName: updaterSession.originalFileName,
+                        inferredTechnology: updaterSession.inferredTechnology,
+                        parsedControls: controls.length,
+                        testCaseSheets: parsed.sheets
+                            .filter((sheet) => sheet.sheetType === "test_cases")
+                            .map((sheet) => sheet.sheetName),
+                    },
+                    output: {
+                        summary: updaterSession.summary,
+                        changeCount: 0,
+                        candidateCounts: {
+                            cisUpdates: updateCandidates.length,
+                            cisNewControls: newControlCandidates.length,
+                            stigUpdates: stigUpdateCandidates.length,
+                            stigNewControls: stigNewControlCandidates.length,
+                        },
+                        auditSources: updaterSession.audit,
+                    },
+                },
+                ...auditRequestContext(request),
+            });
             return NextResponse.json({ session: updaterSession });
         }
 
@@ -572,6 +618,37 @@ Rules:
             description: `Analysis generated ${validChanges.length} proposed change(s).`,
         });
         writeSCSEMUpdaterSession(updaterSession);
+
+        await logAudit({
+            organizationId: user.organizationId,
+            userId: user.id,
+            action: "SCSEM_UPDATER_ANALYZE",
+            resourceType: "scsem_updater_session",
+            resourceId: updaterSession.id,
+            metadata: {
+                input: {
+                    fileName: updaterSession.originalFileName,
+                    inferredTechnology: updaterSession.inferredTechnology,
+                    parsedControls: controls.length,
+                    scsemVersion: parsed.metadata.version,
+                    effectiveDate: parsed.metadata.effectiveDate,
+                    aiUsed: shouldUseAI,
+                },
+                output: {
+                    summary: updaterSession.summary,
+                    changeCount: validChanges.length,
+                    changes: changePreview(validChanges),
+                    candidateCounts: {
+                        cisUpdates: updateCandidates.length,
+                        cisNewControls: newControlCandidates.length,
+                        stigUpdates: stigUpdateCandidates.length,
+                        stigNewControls: stigNewControlCandidates.length,
+                    },
+                    auditSources: updaterSession.audit,
+                },
+            },
+            ...auditRequestContext(request),
+        });
 
         return NextResponse.json({ session: updaterSession });
     } catch (error: any) {

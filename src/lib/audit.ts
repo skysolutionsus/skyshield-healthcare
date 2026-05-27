@@ -11,6 +11,22 @@ export interface AuditLogParams {
   userAgent?: string;
 }
 
+export function auditRequestContext(request: Request): Pick<AuditLogParams, "ipAddress" | "userAgent"> {
+  return {
+    ipAddress:
+      request.headers.get("x-forwarded-for") ||
+      request.headers.get("x-real-ip") ||
+      undefined,
+    userAgent: request.headers.get("user-agent") || undefined,
+  };
+}
+
+export function truncateAuditText(value: string | null | undefined, maxChars = 8000): string {
+  if (!value) return "";
+  if (value.length <= maxChars) return value;
+  return `${value.slice(0, maxChars)}\n\n[Truncated for audit log storage]`;
+}
+
 /**
  * Write an entry to the AuditLog table.
  *

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { auditRequestContext, logAudit } from "@/lib/audit";
 import { createSCSEMUpdaterSession } from "@/lib/scsem-updater-store";
 
 export const runtime = "nodejs";
@@ -18,6 +19,7 @@ export async function POST(request: Request) {
         if (!session?.user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
+        const user = session.user as unknown as { id: string; organizationId: string };
 
         const formData = await request.formData();
         const file = formData.get("file");
@@ -40,6 +42,30 @@ export async function POST(request: Request) {
         }
 
         const updaterSession = createSCSEMUpdaterSession(file.name, buffer);
+        await logAudit({
+            organizationId: user.organizationId,
+            userId: user.id,
+            action: "SCSEM_UPDATER_UPLOAD",
+            resourceType: "scsem_updater_session",
+            resourceId: updaterSession.id,
+            metadata: {
+                input: {
+                    fileName: file.name,
+                    sizeBytes: buffer.length,
+                    extension,
+                },
+                output: {
+                    sessionId: updaterSession.id,
+                    inferredTechnology: updaterSession.inferredTechnology,
+                    totalControls: updaterSession.scsem.totalControls,
+                    testCaseSheets: updaterSession.scsem.testCaseSheets,
+                    scsemVersion: updaterSession.scsem.version,
+                    effectiveDate: updaterSession.scsem.effectiveDate,
+                    uploadedSha256: updaterSession.audit.uploadedSha256,
+                },
+            },
+            ...auditRequestContext(request),
+        });
         return NextResponse.json({ session: updaterSession });
     } catch (error: any) {
         console.error("SCSEM updater upload error:", error);

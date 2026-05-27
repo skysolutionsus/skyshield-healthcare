@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { auditRequestContext, logAudit, truncateAuditText } from "@/lib/audit";
 import {
     readSCSEMUpdaterSession,
     writeSCSEMUpdaterSession,
@@ -30,6 +31,21 @@ function mergeEditableChange(current: SCSEMUpdaterChange, patch: Partial<SCSEMUp
     };
 }
 
+function auditChange(change: SCSEMUpdaterChange) {
+    return {
+        id: change.id,
+        action: change.action,
+        testId: change.testId,
+        field: change.field,
+        status: change.status,
+        confidence: change.confidence,
+        currentValue: truncateAuditText(change.currentValue, 1000),
+        proposedValue: truncateAuditText(change.proposedValue, 1800),
+        reason: truncateAuditText(change.reason, 1200),
+        sourceEvidence: change.sourceEvidence || null,
+    };
+}
+
 export async function PATCH(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
@@ -39,6 +55,7 @@ export async function PATCH(
         if (!session?.user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
+        const user = session.user as unknown as { id: string; organizationId: string };
 
         const { id } = await params;
         const body = await request.json();
@@ -60,6 +77,13 @@ export async function PATCH(
         const updaterSession = readSCSEMUpdaterSession(id);
         const ids = new Set(changeIds.map(String));
         let touched = 0;
+        const affectedChanges: Array<{
+            before: ReturnType<typeof auditChange>;
+            after: ReturnType<typeof auditChange>;
+            previousStatus: SCSEMUpdaterChangeStatus;
+            nextStatus: SCSEMUpdaterChangeStatus;
+            edited: boolean;
+        }> = [];
 
         updaterSession.changes = updaterSession.changes.map((change) => {
             if (!ids.has(change.id)) return change;
@@ -88,6 +112,14 @@ export async function PATCH(
                 });
             }
 
+            affectedChanges.push({
+                before: auditChange(change),
+                after: auditChange(updated),
+                previousStatus,
+                nextStatus: updated.status,
+                edited: Boolean(body.change && body.changeId === change.id),
+            });
+
             return updated;
         });
 
@@ -96,6 +128,30 @@ export async function PATCH(
         }
 
         writeSCSEMUpdaterSession(updaterSession);
+        await logAudit({
+            organizationId: user.organizationId,
+            userId: user.id,
+            action: nextStatus ? "SCSEM_UPDATER_REVIEW" : "SCSEM_UPDATER_EDIT",
+            resourceType: "scsem_updater_session",
+            resourceId: updaterSession.id,
+            metadata: {
+                input: {
+                    changeIds: changeIds.map(String),
+                    requestedStatus: nextStatus || null,
+                    editedChangeId: body.changeId || null,
+                },
+                output: {
+                    touched,
+                    affectedChanges,
+                    totals: {
+                        pending: updaterSession.changes.filter((change) => change.status === "PENDING").length,
+                        approved: updaterSession.changes.filter((change) => change.status === "APPROVED").length,
+                        rejected: updaterSession.changes.filter((change) => change.status === "REJECTED").length,
+                    },
+                },
+            },
+            ...auditRequestContext(request),
+        });
         return NextResponse.json({ session: updaterSession });
     } catch (error: any) {
         console.error("SCSEM updater change update error:", error);

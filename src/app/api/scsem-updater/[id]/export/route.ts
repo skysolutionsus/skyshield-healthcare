@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { auditRequestContext, logAudit } from "@/lib/audit";
 import {
     readSCSEMUpdaterSession,
     resolveUpdaterPath,
@@ -22,11 +23,13 @@ export async function GET(
         if (!session?.user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
+        const user = session.user as unknown as { id: string; organizationId: string };
 
         const { id } = await params;
         const updaterSession = readSCSEMUpdaterSession(id);
         const originalPath = resolveUpdaterPath(updaterSession.originalFilePath);
         const approvedChanges = updaterSession.changes.filter((change) => change.status === "APPROVED");
+        const exportFileName = updatedSCSEMFileName(updaterSession.originalFileName);
         const buffer = approvedChanges.length === 0
             ? fs.readFileSync(originalPath)
             : await buildSCSEMUpdaterWorkbookBuffer(
@@ -35,12 +38,38 @@ export async function GET(
                 originalPath
             );
 
+        await logAudit({
+            organizationId: user.organizationId,
+            userId: user.id,
+            action: "SCSEM_UPDATER_EXPORT",
+            resourceType: "scsem_updater_session",
+            resourceId: updaterSession.id,
+            metadata: {
+                input: {
+                    fileName: updaterSession.originalFileName,
+                    inferredTechnology: updaterSession.inferredTechnology,
+                    approvedChangeIds: approvedChanges.map((change) => change.id),
+                },
+                output: {
+                    exportFileName,
+                    outputSizeBytes: buffer.length,
+                    changeCounts: {
+                        approved: approvedChanges.length,
+                        pending: updaterSession.changes.filter((change) => change.status === "PENDING").length,
+                        rejected: updaterSession.changes.filter((change) => change.status === "REJECTED").length,
+                    },
+                    auditSources: updaterSession.audit,
+                },
+            },
+            ...auditRequestContext(request),
+        });
+
         return new Response(new Uint8Array(buffer), {
             status: 200,
             headers: {
                 "Content-Type":
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                "Content-Disposition": `attachment; filename="${updatedSCSEMFileName(updaterSession.originalFileName)}"`,
+                "Content-Disposition": `attachment; filename="${exportFileName}"`,
             },
         });
     } catch (error: any) {

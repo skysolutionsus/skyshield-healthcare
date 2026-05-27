@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { detectPII } from "@/lib/pii-detection";
-import { logAudit } from "@/lib/audit";
+import { auditRequestContext, logAudit, truncateAuditText } from "@/lib/audit";
 import { handleKnowledgeSearch } from "@/lib/knowledge/agent-tools";
 import { buildFallbackContext } from "@/lib/knowledge/fallback-context";
 import {
@@ -251,6 +251,47 @@ function formatConversationContext(
   return limitText(formatted, MAX_HISTORY_CHARS);
 }
 
+async function writeChatAudit(options: {
+  request: Request;
+  organizationId: string;
+  userId: string;
+  conversationId?: string | null;
+  input: string;
+  output: string;
+  citations: { section: string; text: string }[];
+  retrieval?: {
+    mode: "retrieved" | "degraded-fallback";
+    toolCallsExecuted: number;
+    rounds: number;
+    stopReason: string;
+  };
+  model?: string;
+  demoMode?: boolean;
+}) {
+  await logAudit({
+    organizationId: options.organizationId,
+    userId: options.userId,
+    action: "AI_QUERY",
+    resourceType: "chat",
+    resourceId: options.conversationId || undefined,
+    metadata: {
+      input: {
+        message: truncateAuditText(options.input, 6000),
+        messageLength: options.input.length,
+      },
+      output: {
+        response: truncateAuditText(options.output, 10000),
+        responseLength: options.output.length,
+        citations: options.citations,
+      },
+      retrieval: options.retrieval || null,
+      model: options.model || null,
+      demoMode: Boolean(options.demoMode),
+    },
+    ...auditRequestContext(options.request),
+  });
+}
+
 async function retrieveGroundingContext(message: string): Promise<{
   content: string;
   toolCallsExecuted: number;
@@ -352,11 +393,7 @@ export async function POST(request: NextRequest) {
             types: piiResult.matches.map((m) => m.type),
             confidence: piiResult.matches.map((m) => m.confidence),
           },
-          ipAddress:
-            request.headers.get("x-forwarded-for") ||
-            request.headers.get("x-real-ip") ||
-            undefined,
-          userAgent: request.headers.get("user-agent") || undefined,
+          ...auditRequestContext(request),
         });
       } catch {
         // ignore
@@ -369,23 +406,6 @@ export async function POST(request: NextRequest) {
           "Your message was blocked because it appears to contain sensitive data (FTI/PII) or identifiable state/agency information. This data was NOT sent to any external service. An incident report has been automatically created.",
         piiTypes: piiResult.matches.map((m) => m.type),
       });
-    }
-
-    try {
-      await logAudit({
-        organizationId: userInfo.organizationId,
-        userId: userInfo.id,
-        action: "AI_QUERY",
-        resourceType: "chat",
-        metadata: { questionLength: message.length },
-        ipAddress:
-          request.headers.get("x-forwarded-for") ||
-          request.headers.get("x-real-ip") ||
-          undefined,
-        userAgent: request.headers.get("user-agent") || undefined,
-      });
-    } catch {
-      // ignore
     }
 
     let convId = conversationId;
@@ -476,6 +496,22 @@ Section 3.1: General Requirements`;
         }
       }
 
+      try {
+        await writeChatAudit({
+          request,
+          organizationId: userInfo.organizationId,
+          userId: userInfo.id,
+          conversationId: convId,
+          input: message,
+          output: cleanedResponse,
+          citations,
+          model: "demo",
+          demoMode: true,
+        });
+      } catch {
+        // ignore
+      }
+
       return NextResponse.json({
         response: cleanedResponse,
         citations,
@@ -554,6 +590,12 @@ Section 3.1: General Requirements`;
 
     const citations = extractCitations(finalText);
     const cleanedResponse = cleanResponseText(finalText);
+    const retrievalAudit = {
+      mode: grounding.mode,
+      toolCallsExecuted: grounding.toolCallsExecuted,
+      rounds: 1,
+      stopReason: "stop",
+    };
 
     if (convId) {
       try {
@@ -570,16 +612,27 @@ Section 3.1: General Requirements`;
       }
     }
 
+    try {
+      await writeChatAudit({
+        request,
+        organizationId: userInfo.organizationId,
+        userId: userInfo.id,
+        conversationId: convId,
+        input: message,
+        output: cleanedResponse,
+        citations,
+        retrieval: retrievalAudit,
+        model: llmSettings.model,
+      });
+    } catch {
+      // ignore
+    }
+
     return NextResponse.json({
       response: cleanedResponse,
       citations,
       conversationId: convId,
-      retrieval: {
-        mode: grounding.mode,
-        toolCallsExecuted: grounding.toolCallsExecuted,
-        rounds: 1,
-        stopReason: "stop",
-      },
+      retrieval: retrievalAudit,
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

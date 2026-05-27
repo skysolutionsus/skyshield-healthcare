@@ -1,44 +1,7 @@
 ﻿import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { formatDateTime } from "@/lib/utils";
-import {
-  ScrollText,
-  User,
-  Shield,
-  AlertTriangle,
-  FileSpreadsheet,
-  Settings,
-  MessageSquare,
-  LogIn,
-  Database,
-} from "lucide-react";
 import { AuditLogFilters } from "@/components/audit-log-filters";
-
-const actionIcons: Record<string, React.ElementType> = {
-  LOGIN: LogIn,
-  LOGOUT: LogIn,
-  AI_QUERY: MessageSquare,
-  INCIDENT_CREATE: AlertTriangle,
-  INCIDENT_UPDATE: AlertTriangle,
-  SCSEM_ASSESSMENT: FileSpreadsheet,
-  USER_CREATE: User,
-  USER_UPDATE: User,
-  USER_PASSWORD_RESET: User,
-  USER_MFA_RESET: Shield,
-  PII_DETECTED: Shield,
-  SETTINGS_UPDATE: Settings,
-  MFA_SETUP_STARTED: Shield,
-  MFA_SETUP_FAILED: Shield,
-  MFA_ENABLED: Shield,
-  MFA_FAILURE: Shield,
-  MFA_DISABLE_FAILED: Shield,
-  MFA_DISABLED: Shield,
-  MFA_RECOVERY_REGENERATE_FAILED: Shield,
-  MFA_RECOVERY_REGENERATED: Shield,
-  KNOWLEDGE_DOCUMENT_IMPORT: Database,
-  KNOWLEDGE_DOCUMENT_UPDATE: Database,
-  KNOWLEDGE_DOCUMENT_DELETE: Database,
-};
+import { AuditLogTable, type AuditLogEntry } from "@/components/audit-log-table";
 
 export default async function AuditLogPage({
   searchParams,
@@ -63,7 +26,7 @@ export default async function AuditLogPage({
     ipAddress: string | null;
     userAgent: string | null;
     createdAt: Date;
-    user: { name: string } | null;
+    user: { name: string; email: string } | null;
   }> = [];
   let total = 0;
 
@@ -78,7 +41,7 @@ export default async function AuditLogPage({
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * pageSize,
         take: pageSize,
-        include: { user: { select: { name: true } } },
+        include: { user: { select: { name: true, email: true } } },
       }),
       db.auditLog.count({ where }),
     ]);
@@ -87,6 +50,10 @@ export default async function AuditLogPage({
   }
 
   const totalPages = Math.ceil(total / pageSize);
+  const clientLogs: AuditLogEntry[] = logs.map((log) => ({
+    ...log,
+    createdAt: log.createdAt.toISOString(),
+  }));
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
@@ -107,77 +74,7 @@ export default async function AuditLogPage({
       <AuditLogFilters />
 
       <div className="bg-[var(--sky-surface)] border border-[var(--sky-border)] rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-[var(--sky-border)]">
-                <th className="text-left px-4 py-3 text-xs font-medium text-[var(--sky-text-secondary)] uppercase tracking-wider">
-                  Timestamp
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-[var(--sky-text-secondary)] uppercase tracking-wider">
-                  User
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-[var(--sky-text-secondary)] uppercase tracking-wider">
-                  Action
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-[var(--sky-text-secondary)] uppercase tracking-wider">
-                  Resource
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-[var(--sky-text-secondary)] uppercase tracking-wider">
-                  IP Address
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--sky-border)]">
-              {logs.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center">
-                    <ScrollText className="w-8 h-8 text-gray-300 text-[var(--sky-text-muted)] mx-auto mb-2" />
-                    <p className="text-sm text-gray-500">No audit logs found</p>
-                  </td>
-                </tr>
-              ) : (
-                logs.map((log) => {
-                  const Icon = actionIcons[log.action] || ScrollText;
-                  return (
-                    <tr
-                      key={log.id}
-                      className="hover:bg-white/[0.03] transition-colors"
-                    >
-                      <td className="px-4 py-3 text-sm text-[var(--sky-text-secondary)] whitespace-nowrap">
-                        {formatDateTime(log.createdAt)}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-[var(--sky-text-primary)] whitespace-nowrap">
-                        {log.user?.name || "System"}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <Icon className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-[var(--sky-text-primary)]">
-                            {log.action.replace(/_/g, " ")}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-[var(--sky-text-secondary)] whitespace-nowrap">
-                        {log.resourceType && (
-                          <span>
-                            {log.resourceType}
-                            {log.resourceId
-                              ? ` #${log.resourceId.slice(0, 8)}`
-                              : ""}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-[var(--sky-text-secondary)] font-mono whitespace-nowrap">
-                        {log.ipAddress || "â€”"}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+        <AuditLogTable logs={clientLogs} />
 
         {/* Pagination */}
         {totalPages > 1 && (
