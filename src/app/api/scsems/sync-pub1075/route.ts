@@ -2,15 +2,20 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { isAdminRole } from "@/lib/roles";
+import { detectPub1075Version } from "@/lib/knowledge/ingest";
 import { generateBifrostText, getConfiguredBifrostModel } from "@/lib/ai/bifrost";
 import * as fs from "fs";
 import * as path from "path";
 
-const PUB_1075_CURRENT = {
-    version: "Rev. 11-2021",
-    title: "Tax Information Security Guidelines for Federal, State, and Local Agencies",
-    effectiveDate: "2021-11-01",
-};
+function getCurrentPub1075Version(): string {
+    const pub1075Path = path.join(process.cwd(), "data", "pub1075", "p1075-full-text.md");
+    try {
+        const fullText = fs.readFileSync(pub1075Path, "utf8");
+        return detectPub1075Version(fullText);
+    } catch {
+        return "Unknown";
+    }
+}
 
 /**
  * Extracts relevant sections from the Pub 1075 full-text document
@@ -86,7 +91,7 @@ function extractPub1075Sections(nistIds: string[]): string {
 
         if (sections.length === 0) return "";
 
-        return `\n\n--- ACTUAL IRS PUBLICATION 1075 (${PUB_1075_CURRENT.version}) EXCERPTS ---\nThe following are the EXACT requirements from Pub 1075 for the referenced NIST controls:\n\n${sections.join("\n\n---\n\n")}`;
+        return `\n\n--- ACTUAL IRS PUBLICATION 1075 (${getCurrentPub1075Version()}) EXCERPTS ---\nThe following are the EXACT requirements from Pub 1075 for the referenced NIST controls:\n\n${sections.join("\n\n---\n\n")}`;
 
     } catch (err) {
         console.warn("Could not read Pub 1075 full text:", err);
@@ -116,6 +121,7 @@ export async function POST(request: Request) {
             ? (session.user as unknown as { organizationId: string }).organizationId
             : "system-cron";
         const userId = session?.user?.id || "system";
+        const pub1075Version = getCurrentPub1075Version();
 
         // Get all templates
         const templates = await db.sCSEMTemplate.findMany({});
@@ -128,8 +134,8 @@ export async function POST(request: Request) {
 
         for (const template of templates) {
             // Skip if already reviewed against this Pub 1075 version
-            if (template.lastPub1075Version === PUB_1075_CURRENT.version) {
-                console.log(`  ${template.name}: already reviewed against Pub 1075 ${PUB_1075_CURRENT.version}. Skipping.`);
+            if (template.lastPub1075Version === pub1075Version) {
+                console.log(`  ${template.name}: already reviewed against Pub 1075 ${pub1075Version}. Skipping.`);
                 continue;
             }
 
@@ -180,7 +186,7 @@ export async function POST(request: Request) {
                 `${c.testId} | NIST: ${c.nistId} | ${c.nistControlName || "—"} | Criticality: ${c.criticality || "—"}\n  Procedure: ${(c.testProcedures || "").substring(0, 150)}\n  Expected: ${(c.expectedResults || "").substring(0, 150)}`
             ).join("\n\n");
 
-            const prompt = `You are an IRS Safeguards compliance expert. You have been given ACTUAL EXCERPTS from IRS Publication 1075 (${PUB_1075_CURRENT.version}) below. Use these excerpts as the authoritative source.
+            const prompt = `You are an IRS Safeguards compliance expert. You have been given ACTUAL EXCERPTS from IRS Publication 1075 (${pub1075Version}) below. Use these excerpts as the authoritative source.
 
 SCSEM TEMPLATE: ${template.name} (${template.category})
 
@@ -219,11 +225,12 @@ RULES:
 
             let responseText = await generateBifrostText({
                 model: getConfiguredBifrostModel("BIFROST_SCSEM_MODEL"),
-                maxTokens: 1400,
+                maxTokens: 2500,
                 temperature: 0.2, // Lower temperature for more precise compliance work
                 system: "You are a precise IRS Publication 1075 compliance analyst. You only cite requirements that appear in the actual document excerpts provided to you.",
                 prompt,
             });
+
             responseText = responseText.replace(/```json/gi, "").replace(/```/g, "").trim();
 
             let payload;
@@ -269,7 +276,7 @@ RULES:
                     resourceId: review.id,
                     metadata: {
                         templateName: template.name,
-                        pub1075Version: PUB_1075_CURRENT.version,
+                        pub1075Version,
                         previousVersion: template.lastPub1075Version,
                         changesCount: validChanges.length,
                         usedRealPub1075Content: hasPub1075Content,
@@ -287,7 +294,7 @@ RULES:
         return NextResponse.json({
             success: true,
             message: `Generated Pub 1075 compliance reviews for ${updatesGenerated} template(s).`,
-            pub1075Version: PUB_1075_CURRENT.version,
+            pub1075Version,
             count: updatesGenerated,
         });
 

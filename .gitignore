@@ -142,6 +142,10 @@ vite.config.ts.timestamp-*
 *.sqlite
 *.sqlite-journal
 
+# Runtime workbook/audit snapshots
+data/scsem-updater/
+data/cis-benchmarks/
+
 # Test scripts
 test-cis-*.ts
 test-prisma-*.ts

@@ -28,7 +28,7 @@ import { isAdminRole, roleLabel } from "@/lib/roles";
 const limitedNavigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "AI Agent", href: "/agent", icon: MessageSquare },
-  { name: "SCSEM Library (WIP)", href: "/scsems", icon: FileSpreadsheet },
+  { name: "SCSEM Updater", href: "/scsems", icon: FileSpreadsheet },
 ];
 
 const adminNavigation = [

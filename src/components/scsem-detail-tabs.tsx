@@ -54,6 +54,7 @@ interface SCSEMChangeLogEntry {
 interface SCSEMDetailData {
     sheets: SCSEMSheet[];
     changeLogs: SCSEMChangeLogEntry[];
+    importError?: string | null;
 }
 
 function formatDate(dateStr: string): string {
@@ -78,7 +79,7 @@ export function SCSEMDetailTabs({ templateId }: { templateId: string }) {
                 const res = await fetch(`/api/scsems/${templateId}`);
                 if (res.ok) {
                     const json = await res.json();
-                    setData({ sheets: json.sheets, changeLogs: json.changeLogs });
+                    setData({ sheets: json.sheets, changeLogs: json.changeLogs, importError: json.importError || null });
                     // Default to: test_cases with controls > any sheet with controls > first sheet
                     const testSheet = json.sheets.find((s: SCSEMSheet) => s.sheetType === "test_cases" && s.controls.length > 0);
                     const anyWithControls = json.sheets.find((s: SCSEMSheet) => s.controls.length > 0);
@@ -106,7 +107,12 @@ export function SCSEMDetailTabs({ templateId }: { templateId: string }) {
         return (
             <div className="text-center py-12 text-[var(--sky-text-secondary)]">
                 <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                No sheet data available for this SCSEM.
+                <p>No sheet data available for this SCSEM.</p>
+                {data?.importError && (
+                    <p className="text-xs text-red-400 mt-2 max-w-2xl mx-auto">
+                        {data.importError}
+                    </p>
+                )}
             </div>
         );
     }
@@ -529,4 +535,3 @@ function RawDataTable({ rows }: { rows: any[][] }) {
         </div>
     );
 }
-

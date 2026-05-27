@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { importSCSEMTemplateWorkbook } from "@/lib/scsem-importer";
 import * as XLSX from "xlsx";
 import * as fs from "fs";
 import * as path from "path";
+import type { ParsedControl, ParsedSCSEM, ParsedSheet } from "@/lib/xlsx-parser";
+import type { SCSEMUpdaterChange, SCSEMUpdaterSession } from "@/lib/scsem-updater-store";
+import { ALLOWED_UPDATE_FIELDS } from "@/lib/scsem-update-engine";
 
 type ExportField =
     | "testId"
@@ -29,6 +29,22 @@ type ExportField =
     | "remediationStatement"
     | "capRequestStatement"
     | "riskRating";
+
+type ExportControl = ParsedControl & {
+    updateHighlight?: boolean;
+};
+
+type ExportSheet = ParsedSheet & {
+    controls: ExportControl[];
+};
+
+type ChangeLogEntry = {
+    version: string;
+    changeDate: Date;
+    description: string;
+    changedBy?: string | null;
+    source: string;
+};
 
 const HEADER_PATTERNS: Array<[ExportField, RegExp[]]> = [
     ["testId", [/^test id$/i]],
@@ -129,8 +145,8 @@ function buildRowByTestId(worksheet: XLSX.WorkSheet, header: ReturnType<typeof f
     return rows;
 }
 
-function getControlValue(control: any, field: ExportField): string {
-    return control[field] || "";
+function getControlValue(control: ExportControl, field: ExportField): string {
+    return String((control as unknown as Record<string, unknown>)[field] || "");
 }
 
 function copyRowFormatting(worksheet: XLSX.WorkSheet, fromRow: number, toRow: number, range: XLSX.Range) {
@@ -148,7 +164,7 @@ function copyRowFormatting(worksheet: XLSX.WorkSheet, fromRow: number, toRow: nu
     }
 }
 
-function patchTestCaseSheet(worksheet: XLSX.WorkSheet, controls: any[]) {
+function patchTestCaseSheet(worksheet: XLSX.WorkSheet, controls: ExportControl[]) {
     const header = findHeader(worksheet);
     if (!header) return;
 
@@ -174,7 +190,7 @@ function patchTestCaseSheet(worksheet: XLSX.WorkSheet, controls: any[]) {
         if (control.updateHighlight) {
             const notesCol = header.columns.get("notesEvidence");
             if (notesCol !== undefined && !control.notesEvidence) {
-                setCellValue(worksheet, row, notesCol, "Updated by SkyShield review");
+                setCellValue(worksheet, row, notesCol, "Updated by SkyShield SCSEM Updater");
             }
         }
     }
@@ -185,7 +201,7 @@ function patchTestCaseSheet(worksheet: XLSX.WorkSheet, controls: any[]) {
     }
 }
 
-function addSkyShieldChangeLog(workbook: XLSX.WorkBook, changeLogs: any[]) {
+function addSkyShieldChangeLog(workbook: XLSX.WorkBook, changeLogs: ChangeLogEntry[]) {
     if (changeLogs.length === 0) return;
 
     const sheetName = "SkyShield Change Log";
@@ -214,10 +230,10 @@ function addSkyShieldChangeLog(workbook: XLSX.WorkBook, changeLogs: any[]) {
     }
 }
 
-function buildReconstructedWorkbook(template: any): XLSX.WorkBook {
+function buildReconstructedWorkbook(sheets: ExportSheet[], changeLogs: ChangeLogEntry[]): XLSX.WorkBook {
     const workbook = XLSX.utils.book_new();
 
-    for (const sheet of template.sheets) {
+    for (const sheet of sheets) {
         let worksheet: XLSX.WorkSheet;
 
         if (sheet.sheetType === "test_cases" && sheet.controls.length > 0) {
@@ -250,7 +266,7 @@ function buildReconstructedWorkbook(template: any): XLSX.WorkBook {
             const rows = [
                 ["Test Cases"],
                 headers,
-                ...sheet.controls.map((control: any) => [
+                ...sheet.controls.map((control) => [
                     control.testId,
                     control.nistId || "",
                     control.nistControlName || "",
@@ -290,15 +306,11 @@ function buildReconstructedWorkbook(template: any): XLSX.WorkBook {
         XLSX.utils.book_append_sheet(workbook, worksheet, sheet.sheetName);
     }
 
-    addSkyShieldChangeLog(workbook, template.changeLogs);
+    addSkyShieldChangeLog(workbook, changeLogs);
     return workbook;
 }
 
-function buildWorkbookFromOriginal(template: any): XLSX.WorkBook | null {
-    const sourcePath = path.isAbsolute(template.filePath)
-        ? template.filePath
-        : path.join(process.cwd(), template.filePath);
-
+function buildWorkbookFromOriginal(sourcePath: string, sheets: ExportSheet[], changeLogs: ChangeLogEntry[]): XLSX.WorkBook | null {
     if (!fs.existsSync(sourcePath)) return null;
 
     const workbook = XLSX.readFile(sourcePath, {
@@ -307,7 +319,7 @@ function buildWorkbookFromOriginal(template: any): XLSX.WorkBook | null {
         sheetStubs: true,
     });
 
-    for (const sheet of template.sheets) {
+    for (const sheet of sheets) {
         if (sheet.sheetType !== "test_cases" || sheet.controls.length === 0) continue;
 
         let worksheet = workbook.Sheets[sheet.sheetName];
@@ -322,72 +334,165 @@ function buildWorkbookFromOriginal(template: any): XLSX.WorkBook | null {
         patchTestCaseSheet(worksheet, sheet.controls);
     }
 
-    addSkyShieldChangeLog(workbook, template.changeLogs);
+    addSkyShieldChangeLog(workbook, changeLogs);
     return workbook;
 }
 
-async function fetchTemplate(id: string) {
-    return db.sCSEMTemplate.findUnique({
-        where: { id },
-        include: {
-            sheets: {
-                orderBy: { sheetIndex: "asc" },
-                include: {
-                    controls: {
-                        orderBy: { rowIndex: "asc" },
-                    },
+function cloneParsedSheets(parsed: ParsedSCSEM): ExportSheet[] {
+    return parsed.sheets.map((sheet) => ({
+        ...sheet,
+        controls: sheet.controls.map((control) => ({ ...control })),
+        changeLogEntries: [...sheet.changeLogEntries],
+    }));
+}
+
+function generateNextTestId(existingTestIds: string[], fallbackPrefix: string): string {
+    let selectedPrefix = `${fallbackPrefix}-`;
+    let selectedWidth = 3;
+    let maxNumber = 0;
+    const prefixCounts = new Map<string, number>();
+
+    for (const testId of existingTestIds) {
+        const match = testId.match(/^(.*?)(\d+)$/);
+        if (!match) continue;
+        const prefix = match[1];
+        prefixCounts.set(prefix, (prefixCounts.get(prefix) || 0) + 1);
+    }
+
+    const mostCommonPrefix = [...prefixCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+    if (mostCommonPrefix) selectedPrefix = mostCommonPrefix;
+
+    for (const testId of existingTestIds) {
+        const match = testId.match(/^(.*?)(\d+)$/);
+        if (!match || match[1] !== selectedPrefix) continue;
+        selectedWidth = Math.max(selectedWidth, match[2].length);
+        maxNumber = Math.max(maxNumber, Number.parseInt(match[2], 10));
+    }
+
+    return `${selectedPrefix}${String(maxNumber + 1).padStart(selectedWidth, "0")}`;
+}
+
+function fallbackPrefix(session: SCSEMUpdaterSession): string {
+    return (session.inferredTechnology || session.originalFileName || "SCSEM")
+        .replace(/[^A-Z0-9]+/gi, "")
+        .slice(0, 10)
+        .toUpperCase() || "SCSEM";
+}
+
+function appendEvidenceNote(existing: string | null, change: SCSEMUpdaterChange): string {
+    const source = [
+        change.sourceEvidence?.cisRecommendation ? `CIS ${change.sourceEvidence.cisRecommendation}` : null,
+        change.sourceEvidence?.stigRecommendation ? `STIG ${change.sourceEvidence.stigRecommendation}` : null,
+        change.sourceEvidence?.pub1075Version ? String(change.sourceEvidence.pub1075Version) : null,
+    ].filter(Boolean).join("; ");
+    const note = `SkyShield SCSEM Updater: ${change.reason}${source ? ` (${source})` : ""}`;
+    return existing ? `${existing}\n${note}` : note;
+}
+
+function applyApprovedChanges(parsed: ParsedSCSEM, session: SCSEMUpdaterSession): {
+    sheets: ExportSheet[];
+    applied: string[];
+} {
+    const sheets = cloneParsedSheets(parsed);
+    const controls = sheets.flatMap((sheet) => sheet.controls);
+    const byTestId = new Map(controls.map((control) => [control.testId, control]));
+    const approvedChanges = session.changes.filter((change) => change.status === "APPROVED");
+    const applied: string[] = [];
+
+    const primarySheet = sheets.find((sheet) => sheet.sheetType === "test_cases" && sheet.controls.length > 0) ||
+        sheets.find((sheet) => sheet.sheetType === "test_cases");
+    const existingTestIds = controls.map((control) => control.testId);
+
+    for (const change of approvedChanges) {
+        if (change.action === "addControl") {
+            if (!primarySheet || !change.newControl) continue;
+
+            const newTestId = generateNextTestId(existingTestIds, fallbackPrefix(session));
+            existingTestIds.push(newTestId);
+            const maxRowIndex = primarySheet.controls.reduce((max, control) => Math.max(max, control.rowIndex), 0);
+            const newControl: ExportControl = {
+                rowIndex: maxRowIndex + 1,
+                testId: newTestId,
+                nistId: change.newControl.nistId || null,
+                nistControlName: change.newControl.nistControlName || null,
+                testMethod: change.newControl.testMethod || "Manual",
+                sectionTitle: change.newControl.sectionTitle || change.proposedValue || null,
+                description: change.newControl.description || null,
+                testProcedures: change.newControl.testProcedures || null,
+                expectedResults: change.newControl.expectedResults || null,
+                actualResults: null,
+                status: null,
+                findingStatement: null,
+                notesEvidence: appendEvidenceNote(null, change),
+                criticality: change.newControl.criticality || "Moderate",
+                issueCode: null,
+                issueCodeDescription: null,
+                cisBenchmarkRef: change.newControl.cisBenchmarkRef || null,
+                recommendationNum: change.newControl.recommendationNum || null,
+                rationale: change.newControl.rationale || null,
+                impact: change.newControl.impact || null,
+                remediationProcedure: change.newControl.remediationProcedure || null,
+                remediationStatement: null,
+                capRequestStatement: null,
+                riskRating: null,
+                extraColumns: {
+                    source: "scsem_updater",
+                    originalSuggestedTestId: change.testId,
+                    reason: change.reason,
+                    confidence: change.confidence || null,
+                    sourceEvidence: change.sourceEvidence || null,
                 },
-            },
-            changeLogs: {
-                orderBy: { changeDate: "desc" },
-            },
-        },
+                updateHighlight: true,
+            };
+            primarySheet.controls.push(newControl);
+            applied.push(`Added ${newTestId} from ${change.testId}`);
+            continue;
+        }
+
+        if (!ALLOWED_UPDATE_FIELDS.has(change.field)) continue;
+        const control = byTestId.get(change.testId);
+        if (!control) continue;
+
+        (control as unknown as Record<string, unknown>)[change.field] = change.proposedValue;
+        control.notesEvidence = appendEvidenceNote(control.notesEvidence, change);
+        control.updateHighlight = true;
+        applied.push(`Updated ${change.testId} ${change.field}`);
+    }
+
+    return { sheets, applied };
+}
+
+export function buildSCSEMUpdaterWorkbookBuffer(
+    session: SCSEMUpdaterSession,
+    parsed: ParsedSCSEM,
+    originalAbsolutePath: string
+): Buffer {
+    const { sheets, applied } = applyApprovedChanges(parsed, session);
+    const changeLogs: ChangeLogEntry[] = applied.length > 0
+        ? [{
+            version: `SCSEM Updater ${new Date().toISOString().slice(0, 10)}`,
+            changeDate: new Date(),
+            description: `${applied.length} approved SkyShield SCSEM Updater change(s) applied after CIS, STIG, and Pub 1075 review. ${applied.slice(0, 12).join("; ")}`,
+            changedBy: "SkyShield SCSEM Updater",
+            source: "scsem_updater",
+        }]
+        : [];
+
+    const workbook = buildWorkbookFromOriginal(originalAbsolutePath, sheets, changeLogs) ||
+        buildReconstructedWorkbook(sheets, changeLogs);
+
+    return XLSX.write(workbook, {
+        type: "buffer",
+        bookType: "xlsx",
+        cellStyles: true,
     });
 }
 
-export async function GET(
-    request: Request,
-    { params }: { params: Promise<{ id: string }> }
-) {
-    const { id } = await params;
-
-    try {
-        let template = await fetchTemplate(id);
-
-        if (!template) {
-            return NextResponse.json({ error: "SCSEM not found" }, { status: 404 });
-        }
-
-        if (template.sheets.length === 0) {
-            await importSCSEMTemplateWorkbook(template.id, template.filePath);
-            template = await fetchTemplate(id);
-        }
-
-        if (!template) {
-            return NextResponse.json({ error: "SCSEM not found after import" }, { status: 404 });
-        }
-
-        const workbook = buildWorkbookFromOriginal(template) || buildReconstructedWorkbook(template);
-        const buffer = XLSX.write(workbook, {
-            type: "buffer",
-            bookType: "xlsx",
-            cellStyles: true,
-        });
-        const filename = `Safeguards-SCSEM-${template.name.replace(/\s+/g, "-")}.xlsx`;
-
-        return new Response(buffer, {
-            status: 200,
-            headers: {
-                "Content-Type":
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                "Content-Disposition": `attachment; filename="${filename}"`,
-            },
-        });
-    } catch (error: any) {
-        console.error("SCSEM export error:", error);
-        return NextResponse.json(
-            { error: "Failed to export SCSEM" },
-            { status: 500 }
-        );
-    }
+export function updatedSCSEMFileName(originalFileName: string): string {
+    const extension = path.extname(originalFileName) || ".xlsx";
+    const base = path.basename(originalFileName, extension)
+        .replace(/[^a-z0-9._-]+/gi, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "") || "Safeguards-SCSEM";
+    return `${base}-updated.xlsx`;
 }

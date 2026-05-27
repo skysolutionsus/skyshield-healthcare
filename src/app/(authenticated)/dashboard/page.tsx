@@ -209,11 +209,11 @@ export default async function DashboardPage() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {/* IRS SCSEM Templates */}
+        {/* SCSEM Updater */}
         <div className="glass-card rounded-xl p-6 slide-up stagger-1">
           <div className="flex items-center justify-between mb-4">
             <span className="text-sm font-medium" style={{ color: 'var(--sky-text-secondary)' }}>
-              IRS SCSEM Templates
+              SCSEM Updater
             </span>
             <Shield className="w-5 h-5 text-emerald-400" />
           </div>
@@ -225,7 +225,7 @@ export default async function DashboardPage() {
               Active Formats
             </span>
           </div>
-          <p className="text-xs mt-3" style={{ color: 'var(--sky-text-muted)' }}>Managed directly against CIS Benchmarks</p>
+          <p className="text-xs mt-3" style={{ color: 'var(--sky-text-muted)' }}>Upload-driven CIS/STIG review</p>
         </div>
 
         {/* Open Incidents */}
@@ -294,7 +294,7 @@ export default async function DashboardPage() {
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        {/* SCSEM Assessment Donut Chart */}
+        {/* SCSEM Coverage Donut Chart */}
         <div className="glass-card rounded-xl p-6">
           <h2 className="text-lg font-semibold text-white mb-4">
             SCSEM Coverage
@@ -436,7 +436,7 @@ export default async function DashboardPage() {
               <div className="flex items-center gap-3">
                 <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
                 <span className="text-sm font-medium text-emerald-300">
-                  Start SCSEM Assessment
+                  Open SCSEM Updater
                 </span>
               </div>
               <ArrowRight className="w-4 h-4 text-emerald-400 group-hover:translate-x-0.5 transition-transform" />

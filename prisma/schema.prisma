@@ -296,6 +296,14 @@ model CISBenchmarkVersion {
   currentVersion String
   releaseDate    DateTime
   changesSummary String
+  workbenchId    Int?
+  benchmarkTitle String?
+  benchmarkFileName String?
+  benchmarkFilePath String?
+  benchmarkSha256 String?
+  downloadedAt   DateTime?
+  sourceUrl      String?
+  metadata       Json?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

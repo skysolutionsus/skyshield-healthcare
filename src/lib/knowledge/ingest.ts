@@ -37,7 +37,7 @@ export function loadLocalPub1075(): KnowledgeImportInput {
     title: "IRS Publication 1075",
     sourceType: "pub1075",
     sourceName: "p1075-full-text.md",
-    version: "Rev. 11-2021",
+    version: detectPub1075Version(content),
     description: "Tax Information Security Guidelines for Federal, State, and Local Agencies",
     content,
     metadata: {
@@ -47,7 +47,7 @@ export function loadLocalPub1075(): KnowledgeImportInput {
   };
 }
 
-function detectPub1075Version(text: string): string {
+export function detectPub1075Version(text: string): string {
   const revMatch = text.match(/Publication\s+1075\s+\(Rev\.\s*([^)]+)\)/i);
   if (revMatch) return `Rev. ${revMatch[1].trim()}`;
 

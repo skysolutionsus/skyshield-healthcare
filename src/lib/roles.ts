@@ -12,6 +12,7 @@ export const LIMITED_ACCESS_PREFIXES = [
   "/api/chat",
   "/api/mfa",
   "/api/scsems",
+  "/api/scsem-updater",
 ];
 
 export function roleLabel(role?: string | null): string {

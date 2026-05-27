@@ -17,6 +17,13 @@ export interface CISBenchmark {
     profile: Array<{ profileId: string; profileTitle: string }>;
 }
 
+export interface CISExcelFile {
+    workbenchId: number;
+    excelTitle: string;
+    benchmarkTitle: string;
+    excelFileName: string;
+}
+
 /**
  * Reads the local CIS SecureSuite license.xml file.
  * In a real production environment, this might pull from a secret manager or DB.
@@ -104,6 +111,64 @@ export async function fetchAllBenchmarks(token: string): Promise<CISBenchmark[]>
 
     } catch (error) {
         console.error("Error fetching CIS Benchmarks:", error);
+        throw error;
+    }
+}
+
+/**
+ * Fetches the list of available CIS Benchmark Excel workbooks.
+ * These are separate from the benchmark serialization formats and are exposed
+ * through the /excel resource in the SecureSuite Member API.
+ */
+export async function fetchAllBenchmarkExcelFiles(token: string): Promise<CISExcelFile[]> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/excel`, {
+            method: 'GET',
+            headers: {
+                'X-SecureSuite-Token': token,
+                'Accept': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to fetch CIS Benchmark Excel list (${response.status}): ${errorText}`);
+        }
+
+        const data = await response.json();
+        return data.Excel || data;
+    } catch (error) {
+        console.error("Error fetching CIS Benchmark Excel list:", error);
+        throw error;
+    }
+}
+
+/**
+ * Downloads a CIS Benchmark Excel workbook by WorkBench ID.
+ */
+export async function downloadBenchmarkExcel(token: string, workbenchId: number): Promise<Buffer> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/excel/${workbenchId}`, {
+            method: 'GET',
+            headers: {
+                'X-SecureSuite-Token': token,
+                'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            }
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to download CIS Benchmark Excel ${workbenchId} (${response.status}): ${errorText}`);
+        }
+
+        const body = Buffer.from(await response.arrayBuffer());
+        if (!body.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04]))) {
+            throw new Error(`CIS Benchmark Excel ${workbenchId} did not look like an XLSX file.`);
+        }
+
+        return body;
+    } catch (error) {
+        console.error(`Error downloading CIS Benchmark Excel ${workbenchId}:`, error);
         throw error;
     }
 }

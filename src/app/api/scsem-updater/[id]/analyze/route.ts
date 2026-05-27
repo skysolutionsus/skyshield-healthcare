@@ -1,0 +1,391 @@
+import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import {
+    fetchAllBenchmarkExcelFiles,
+    fetchAllBenchmarks,
+    getCISToken,
+} from "@/lib/cis-api";
+import {
+    selectApplicableSTIGProfiles,
+    selectBestCISProfile,
+    selectLatestBenchmarkForTechnology,
+    selectLatestSTIGBenchmarkForTechnology,
+    type SelectedCISProfile,
+} from "@/lib/cis-benchmark-xlsx";
+import {
+    addIdsToChanges,
+    readSCSEMUpdaterSession,
+    resolveUpdaterPath,
+    writeSCSEMUpdaterSession,
+    type SCSEMUpdaterAuditSource,
+} from "@/lib/scsem-updater-store";
+import { parseSCSEMFile, type ParsedSCSEM } from "@/lib/xlsx-parser";
+import {
+    buildComparisonCandidates,
+    buildControlSummary,
+    buildNewControlEvidence,
+    downloadAndParseBenchmark,
+    extractPub1075Sections,
+    parseJsonResponse,
+    validateChanges,
+    type DownloadedBenchmark,
+    type SCSEMControlEvidence,
+} from "@/lib/scsem-update-engine";
+import { generateBifrostText, getConfiguredBifrostModel } from "@/lib/ai/bifrost";
+
+export const runtime = "nodejs";
+
+function controlsFromParsedSCSEM(parsed: ParsedSCSEM): SCSEMControlEvidence[] {
+    return parsed.sheets
+        .filter((sheet) => sheet.sheetType === "test_cases")
+        .flatMap((sheet) => sheet.controls.map((control) => ({
+            id: `${sheet.sheetName}:${control.rowIndex}`,
+            testId: control.testId,
+            nistId: control.nistId,
+            nistControlName: control.nistControlName,
+            testMethod: control.testMethod,
+            sectionTitle: control.sectionTitle,
+            description: control.description,
+            testProcedures: control.testProcedures,
+            expectedResults: control.expectedResults,
+            criticality: control.criticality,
+            cisBenchmarkRef: control.cisBenchmarkRef,
+            recommendationNum: control.recommendationNum,
+            rationale: control.rationale,
+            impact: control.impact,
+            remediationProcedure: control.remediationProcedure,
+        })));
+}
+
+function auditSource(
+    downloaded: DownloadedBenchmark,
+    selectedProfile: SelectedCISProfile | null | undefined
+): SCSEMUpdaterAuditSource {
+    return {
+        workbenchId: downloaded.snapshot.workbenchId,
+        benchmarkTitle: downloaded.snapshot.benchmarkTitle,
+        benchmarkVersion: downloaded.snapshot.benchmarkVersion,
+        releaseDate: downloaded.snapshot.releaseDate.toISOString(),
+        excelTitle: downloaded.snapshot.excelTitle,
+        excelFileName: downloaded.snapshot.excelFileName,
+        filePath: downloaded.snapshot.filePath,
+        sha256: downloaded.snapshot.sha256,
+        downloadedAt: downloaded.snapshot.downloadedAt.toISOString(),
+        selectedProfile: selectedProfile?.profile || null,
+        selectedProfileRecommendationCount: selectedProfile?.totalRecommendationCount || 0,
+        sharedRecommendationCount: selectedProfile?.sharedRecommendationCount || 0,
+        sourceUrl: `https://workbench.cisecurity.org/api/vendor/v1/excel/${downloaded.snapshot.workbenchId}`,
+    };
+}
+
+export async function POST(
+    request: Request,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    const { id } = await params;
+
+    try {
+        const session = await auth();
+        if (!session?.user) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const updaterSession = readSCSEMUpdaterSession(id);
+        updaterSession.status = "analyzing";
+        updaterSession.error = undefined;
+        writeSCSEMUpdaterSession(updaterSession);
+
+        const originalPath = resolveUpdaterPath(updaterSession.originalFilePath);
+        const parsed = parseSCSEMFile(originalPath);
+        const controls = controlsFromParsedSCSEM(parsed);
+        if (controls.length === 0) {
+            throw new Error("No SCSEM test case controls were found in the uploaded workbook.");
+        }
+
+        let cisToken = "";
+        try {
+            cisToken = await getCISToken();
+        } catch (error: any) {
+            throw new Error(`CIS authentication failed: ${error.message || "unknown error"}`);
+        }
+
+        const [allBenchmarks, allExcelFiles] = await Promise.all([
+            fetchAllBenchmarks(cisToken),
+            fetchAllBenchmarkExcelFiles(cisToken),
+        ]);
+
+        const selected = selectLatestBenchmarkForTechnology(
+            updaterSession.inferredTechnology,
+            allBenchmarks,
+            allExcelFiles
+        );
+        const selectedStig = selectLatestSTIGBenchmarkForTechnology(
+            updaterSession.inferredTechnology,
+            allBenchmarks,
+            allExcelFiles
+        );
+
+        if (!selected) {
+            throw new Error(`No matching CIS Benchmark Excel workbook was found for ${updaterSession.inferredTechnology}.`);
+        }
+
+        const downloadedBenchmarks = new Map<number, DownloadedBenchmark>();
+        const downloaded = await downloadAndParseBenchmark(
+            cisToken,
+            selected.benchmark,
+            selected.excel,
+            downloadedBenchmarks
+        );
+        const selectedProfile = selectBestCISProfile(
+            updaterSession.inferredTechnology,
+            controls,
+            downloaded.recommendations
+        );
+
+        if (!selectedProfile) {
+            throw new Error(`No parseable CIS profile was found for ${downloaded.snapshot.benchmarkTitle}.`);
+        }
+
+        let stigDownloaded: DownloadedBenchmark | null = null;
+        let selectedStigProfile: SelectedCISProfile | null = null;
+        let stigUpdateCandidates: ReturnType<typeof buildComparisonCandidates>["updateCandidates"] = [];
+        let stigNewControlCandidates: ReturnType<typeof buildComparisonCandidates>["newControlCandidates"] = [];
+
+        if (selectedStig) {
+            stigDownloaded = await downloadAndParseBenchmark(
+                cisToken,
+                selectedStig.benchmark,
+                selectedStig.excel,
+                downloadedBenchmarks
+            );
+            selectedStigProfile = selectApplicableSTIGProfiles(
+                updaterSession.inferredTechnology,
+                controls,
+                stigDownloaded.recommendations
+            );
+
+            if (selectedStigProfile) {
+                const stigCandidates = buildComparisonCandidates(
+                    controls,
+                    selectedStigProfile.recommendations
+                );
+                stigUpdateCandidates = stigCandidates.updateCandidates;
+                stigNewControlCandidates = stigCandidates.newControlCandidates;
+            }
+        }
+
+        const { updateCandidates, newControlCandidates } = buildComparisonCandidates(
+            controls,
+            selectedProfile.recommendations
+        );
+
+        const pub1075 = extractPub1075Sections([
+            ...updateCandidates.map((candidate) => candidate.control.nistId),
+            ...stigUpdateCandidates.map((candidate) => candidate.control.nistId),
+        ]);
+
+        updaterSession.audit = {
+            ...updaterSession.audit,
+            pub1075Version: pub1075.version,
+            pub1075SourcePath: pub1075.sourcePath,
+            cis: auditSource(downloaded, selectedProfile),
+            stig: stigDownloaded ? auditSource(stigDownloaded, selectedStigProfile) : null,
+        };
+
+        if (
+            updateCandidates.length === 0 &&
+            newControlCandidates.length === 0 &&
+            stigUpdateCandidates.length === 0 &&
+            stigNewControlCandidates.length === 0
+        ) {
+            updaterSession.status = "review_ready";
+            updaterSession.summary = "No CIS or STIG deltas were detected for the uploaded SCSEM workbook.";
+            updaterSession.changes = [];
+            updaterSession.history.push({
+                at: new Date().toISOString(),
+                action: "analyze",
+                description: "Analysis completed with no proposed changes.",
+            });
+            writeSCSEMUpdaterSession(updaterSession);
+            return NextResponse.json({ session: updaterSession });
+        }
+
+        const updateEvidence = updateCandidates
+            .map((candidate) => buildControlSummary(candidate.control, candidate.recommendation, "CIS"))
+            .join("\n\n---\n\n");
+        const newControlEvidence = newControlCandidates
+            .map((recommendation) => buildNewControlEvidence(recommendation, "CIS"))
+            .join("\n\n---\n\n");
+        const stigUpdateEvidence = stigUpdateCandidates
+            .map((candidate) => buildControlSummary(candidate.control, candidate.recommendation, "STIG"))
+            .join("\n\n---\n\n");
+        const stigNewControlEvidence = stigNewControlCandidates
+            .map((recommendation) => buildNewControlEvidence(recommendation, "STIG"))
+            .join("\n\n---\n\n");
+        const stigSourceSummary = stigDownloaded
+            ? selectedStigProfile
+                ? [
+                    `- Title: ${stigDownloaded.snapshot.benchmarkTitle}`,
+                    `- Version: ${stigDownloaded.snapshot.benchmarkVersion}`,
+                    `- Release date: ${stigDownloaded.snapshot.releaseDate.toISOString().slice(0, 10)}`,
+                    `- Selected profile: ${selectedStigProfile.profile}`,
+                    `- Excel snapshot path: ${stigDownloaded.snapshot.filePath}`,
+                    `- Excel SHA-256: ${stigDownloaded.snapshot.sha256}`,
+                    `- Matched existing recommendations: ${selectedStigProfile.sharedRecommendationCount}/${selectedStigProfile.totalRecommendationCount}`,
+                ].join("\n")
+                : `- STIG benchmark found (${stigDownloaded.snapshot.benchmarkTitle} v${stigDownloaded.snapshot.benchmarkVersion}), but no parseable matching profile was selected.`
+            : "- No matching CIS SecureSuite STIG Excel benchmark was found for this SCSEM technology.";
+
+        const prompt = `You are an IRS Safeguards SCSEM update analyst. Propose human-reviewable SCSEM workbook changes using only the evidence below.
+
+Decision policy:
+- IRS Publication 1075 is the governing compliance floor.
+- CIS Benchmark Excel rows are security-hardening evidence.
+- STIG benchmark rows are security-hardening evidence and must be checked alongside CIS.
+- If Pub 1075 is stricter than CIS or STIG, propose Pub 1075-aligned text.
+- If CIS or STIG is stricter and does not conflict with Pub 1075, propose the stricter CIS/STIG-aligned text.
+- If CIS and STIG differ, propose the stricter secure setting when clear; otherwise mark confidence "needs_review".
+- If strictness is ambiguous, include the item only when it is clearly useful for human review and mark confidence "needs_review".
+- Existing IRS SCSEM rows remain the base source of truth.
+- You may propose new SCSEM controls when the CIS or STIG row is missing from the uploaded SCSEM and appears security-relevant.
+- Explain each proposed update with enough detail for a human reviewer to decide quickly.
+
+Uploaded SCSEM:
+- File name: ${updaterSession.originalFileName}
+- Inferred technology: ${updaterSession.inferredTechnology}
+- Dashboard subject: ${parsed.metadata.subject || "unknown"}
+- SCSEM version: ${parsed.metadata.version || "unknown"}
+- Effective date: ${parsed.metadata.effectiveDate || "unknown"}
+- Parsed controls: ${controls.length}
+
+CIS Benchmark:
+- Title: ${downloaded.snapshot.benchmarkTitle}
+- Version: ${downloaded.snapshot.benchmarkVersion}
+- Release date: ${downloaded.snapshot.releaseDate.toISOString().slice(0, 10)}
+- Selected profile: ${selectedProfile.profile}
+- Excel snapshot path: ${downloaded.snapshot.filePath}
+- Excel SHA-256: ${downloaded.snapshot.sha256}
+- Matched existing recommendations: ${selectedProfile.sharedRecommendationCount}/${selectedProfile.totalRecommendationCount}
+
+STIG Benchmark:
+${stigSourceSummary}
+
+Publication 1075:
+- Version: ${pub1075.version}
+- Local source: ${pub1075.sourcePath}
+
+CURRENT SCSEM ROWS MATCHED TO CIS CANDIDATES:
+${updateEvidence || "None"}
+
+POTENTIAL NEW CIS ROWS NOT PRESENT IN THE SCSEM:
+${newControlEvidence || "None"}
+
+CURRENT SCSEM ROWS MATCHED TO STIG CANDIDATES:
+${stigUpdateEvidence || "None"}
+
+POTENTIAL NEW STIG ROWS NOT PRESENT IN THE SCSEM:
+${stigNewControlEvidence || "None"}
+
+PUBLICATION 1075 EXCERPTS FOR REFERENCED NIST CONTROLS:
+${pub1075.excerpts || "No direct Pub 1075 excerpts were found for the candidate NIST controls."}
+
+Return ONLY valid JSON:
+{
+  "summary": "2-3 sentence evidence-based summary of why this uploaded SCSEM needs review.",
+  "changes": [
+    {
+      "action": "updateField",
+      "testId": "exact existing SCSEM Test ID",
+      "field": "testProcedures|expectedResults|remediationProcedure|description|rationale|impact|sectionTitle|findingStatement",
+      "currentValue": "brief current value summary",
+      "proposedValue": "complete replacement text for that field",
+      "reason": "specific reason citing CIS recommendation number, STIG evidence, and Pub 1075 section when available",
+      "confidence": "high|medium|needs_review",
+      "sourceEvidence": {
+        "cisRecommendation": "CIS recommendation number if CIS evidence applies, otherwise null",
+        "cisProfile": "${selectedProfile.profile}",
+        "stigRecommendation": "STIG recommendation number if STIG evidence applies, otherwise null",
+        "stigProfile": "${selectedStigProfile?.profile || ""}",
+        "pub1075Version": "${pub1075.version}"
+      }
+    },
+    {
+      "action": "addControl",
+      "testId": "NEW-CIS-or-STIG-<recommendation>",
+      "field": "newControl",
+      "currentValue": "Not present in current SCSEM",
+      "proposedValue": "short summary of the new control",
+      "reason": "why a new control should be reviewed",
+      "confidence": "high|medium|needs_review",
+      "newControl": {
+        "nistId": null,
+        "nistControlName": "best fit if obvious, otherwise null",
+        "testMethod": "Automated|Manual|Interview|Examine|Test",
+        "sectionTitle": "CIS or STIG recommendation title",
+        "description": "SCSEM-ready description",
+        "testProcedures": "SCSEM-ready audit/test procedure",
+        "expectedResults": "SCSEM-ready expected result",
+        "criticality": "Critical|Significant|Moderate|Limited|Informational",
+        "cisBenchmarkRef": "CIS or STIG section number",
+        "recommendationNum": "CIS or STIG recommendation number",
+        "rationale": "SCSEM-ready rationale",
+        "impact": "SCSEM-ready impact",
+        "remediationProcedure": "SCSEM-ready remediation"
+      },
+      "sourceEvidence": {
+        "cisRecommendation": "CIS recommendation number if CIS evidence applies, otherwise null",
+        "cisProfile": "${selectedProfile.profile}",
+        "stigRecommendation": "STIG recommendation number if STIG evidence applies, otherwise null",
+        "stigProfile": "${selectedStigProfile?.profile || ""}",
+        "pub1075Version": "${pub1075.version}"
+      }
+    }
+  ]
+}
+
+Rules:
+- Include 3-8 total changes.
+- For updateField, only use Test IDs from CURRENT SCSEM ROWS MATCHED TO CIS CANDIDATES or CURRENT SCSEM ROWS MATCHED TO STIG CANDIDATES.
+- For addControl, only use recommendation numbers from POTENTIAL NEW CIS ROWS or POTENTIAL NEW STIG ROWS.
+- Do not claim Pub 1075 says something unless the excerpt is present above.
+- Do not include markdown fences.`;
+
+        const responseText = await generateBifrostText({
+            model: getConfiguredBifrostModel("BIFROST_SCSEM_MODEL"),
+            maxTokens: 5000,
+            temperature: 0.15,
+            system: "You generate precise JSON SCSEM update recommendations grounded in CIS, STIG, and IRS Pub 1075 evidence.",
+            prompt,
+        });
+
+        const payload = parseJsonResponse(responseText);
+        const validChanges = addIdsToChanges(validateChanges(payload.changes || [], controls));
+
+        updaterSession.status = "review_ready";
+        updaterSession.summary = payload.summary || `CIS/STIG review generated for ${updaterSession.inferredTechnology}.`;
+        updaterSession.changes = validChanges;
+        updaterSession.history.push({
+            at: new Date().toISOString(),
+            action: "analyze",
+            description: `Analysis generated ${validChanges.length} proposed change(s).`,
+        });
+        writeSCSEMUpdaterSession(updaterSession);
+
+        return NextResponse.json({ session: updaterSession });
+    } catch (error: any) {
+        console.error("SCSEM updater analysis error:", error);
+        try {
+            const updaterSession = readSCSEMUpdaterSession(id);
+            updaterSession.status = "error";
+            updaterSession.error = error.message || "Failed to analyze uploaded SCSEM workbook.";
+            writeSCSEMUpdaterSession(updaterSession);
+        } catch {
+            // The session may not exist; the response below still carries the failure.
+        }
+
+        return NextResponse.json(
+            { error: error.message || "Failed to analyze uploaded SCSEM workbook." },
+            { status: 500 }
+        );
+    }
+}
