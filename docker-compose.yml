@@ -11,6 +11,9 @@ services:
       - BIFROST_BASE_URL=${BIFROST_BASE_URL:-http://192.168.16.104:8080/v1}
       - BIFROST_MODEL=${BIFROST_MODEL:-azure/claude-sonnet-4-6}
       - BIFROST_EMBEDDING_MODEL=${BIFROST_EMBEDDING_MODEL:-azure/text-embedding-ada-002}
+      - SKYSHIELD_RUNTIME_DATA_DIR=/var/lib/skyshield
+    volumes:
+      - skyshield_runtime_data:/var/lib/skyshield
     depends_on:
       db:
         condition: service_healthy
@@ -35,3 +38,4 @@ services:
 
 volumes:
   postgres_data:
+  skyshield_runtime_data:

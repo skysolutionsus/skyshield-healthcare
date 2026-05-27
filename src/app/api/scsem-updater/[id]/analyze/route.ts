@@ -10,6 +10,7 @@ import {
     selectBestCISProfile,
     selectLatestBenchmarkForTechnology,
     selectLatestSTIGBenchmarkForTechnology,
+    type CISBenchmarkRecommendation,
     type SelectedCISProfile,
 } from "@/lib/cis-benchmark-xlsx";
 import {
@@ -75,6 +76,148 @@ function auditSource(
         selectedProfileRecommendationCount: selectedProfile?.totalRecommendationCount || 0,
         sharedRecommendationCount: selectedProfile?.sharedRecommendationCount || 0,
         sourceUrl: `https://workbench.cisecurity.org/api/vendor/v1/excel/${downloaded.snapshot.workbenchId}`,
+    };
+}
+
+type FallbackUpdateCandidate = {
+    sourceLabel: "CIS" | "STIG";
+    profile: string;
+    control: SCSEMControlEvidence;
+    recommendation: CISBenchmarkRecommendation;
+    score: number;
+};
+
+type FallbackNewCandidate = {
+    sourceLabel: "CIS" | "STIG";
+    profile: string;
+    recommendation: CISBenchmarkRecommendation;
+};
+
+function chooseFallbackField(
+    control: SCSEMControlEvidence,
+    recommendation: CISBenchmarkRecommendation
+): { field: string; currentValue: string; proposedValue: string } | null {
+    const choices = [
+        { field: "testProcedures", currentValue: control.testProcedures || "", proposedValue: recommendation.audit || "" },
+        { field: "remediationProcedure", currentValue: control.remediationProcedure || "", proposedValue: recommendation.remediation || "" },
+        { field: "description", currentValue: control.description || "", proposedValue: recommendation.description || "" },
+        { field: "rationale", currentValue: control.rationale || "", proposedValue: recommendation.rationale || "" },
+        { field: "impact", currentValue: control.impact || "", proposedValue: recommendation.impact || "" },
+    ];
+
+    return choices.find((choice) => choice.proposedValue.trim().length > 0 &&
+        choice.proposedValue.trim() !== choice.currentValue.trim()) || null;
+}
+
+function buildFallbackPayload({
+    technology,
+    cisProfile,
+    stigProfile,
+    pub1075,
+    updateCandidates,
+    newControlCandidates,
+    stigUpdateCandidates,
+    stigNewControlCandidates,
+}: {
+    technology: string;
+    cisProfile: string;
+    stigProfile: string;
+    pub1075: { version: string };
+    updateCandidates: ReturnType<typeof buildComparisonCandidates>["updateCandidates"];
+    newControlCandidates: ReturnType<typeof buildComparisonCandidates>["newControlCandidates"];
+    stigUpdateCandidates: ReturnType<typeof buildComparisonCandidates>["updateCandidates"];
+    stigNewControlCandidates: ReturnType<typeof buildComparisonCandidates>["newControlCandidates"];
+}) {
+    const fallbackUpdates: FallbackUpdateCandidate[] = [
+        ...updateCandidates.map((candidate) => ({
+            ...candidate,
+            sourceLabel: "CIS" as const,
+            profile: cisProfile,
+        })),
+        ...stigUpdateCandidates.map((candidate) => ({
+            ...candidate,
+            sourceLabel: "STIG" as const,
+            profile: stigProfile,
+        })),
+    ].sort((a, b) => b.score - a.score);
+
+    const fallbackNewControls: FallbackNewCandidate[] = [
+        ...newControlCandidates.map((recommendation) => ({
+            recommendation,
+            sourceLabel: "CIS" as const,
+            profile: cisProfile,
+        })),
+        ...stigNewControlCandidates.map((recommendation) => ({
+            recommendation,
+            sourceLabel: "STIG" as const,
+            profile: stigProfile,
+        })),
+    ];
+
+    const changes: any[] = [];
+
+    for (const candidate of fallbackUpdates) {
+        if (changes.length >= 5) break;
+        const selectedField = chooseFallbackField(candidate.control, candidate.recommendation);
+        if (!selectedField) continue;
+
+        changes.push({
+            action: "updateField",
+            testId: candidate.control.testId,
+            field: selectedField.field,
+            currentValue: selectedField.currentValue.slice(0, 1200),
+            proposedValue: selectedField.proposedValue,
+            reason: `${candidate.sourceLabel} ${candidate.recommendation.recommendation} (${candidate.profile}) differs from the uploaded SCSEM row. ${pub1075.version} remains the compliance floor; this fallback proposal should be reviewed for the stricter CIS/STIG/Pub 1075 wording before approval.`,
+            confidence: "needs_review",
+            sourceEvidence: {
+                cisRecommendation: candidate.sourceLabel === "CIS" ? candidate.recommendation.recommendation : null,
+                cisProfile,
+                stigRecommendation: candidate.sourceLabel === "STIG" ? candidate.recommendation.recommendation : null,
+                stigProfile,
+                pub1075Version: pub1075.version,
+            },
+        });
+    }
+
+    for (const candidate of fallbackNewControls) {
+        if (changes.length >= 8) break;
+        const recommendation = candidate.recommendation;
+        changes.push({
+            action: "addControl",
+            testId: `NEW-${candidate.sourceLabel}-${recommendation.recommendation}`,
+            field: "newControl",
+            currentValue: "Not present in current SCSEM",
+            proposedValue: `${candidate.sourceLabel} ${recommendation.recommendation}: ${recommendation.title}`,
+            reason: `${candidate.sourceLabel} ${recommendation.recommendation} appears in the selected benchmark profile but was not mapped in the uploaded SCSEM. ${pub1075.version} should be checked before approval.`,
+            confidence: "needs_review",
+            newControl: {
+                nistId: null,
+                nistControlName: null,
+                testMethod: recommendation.assessmentStatus || "Manual",
+                sectionTitle: recommendation.title,
+                description: recommendation.description,
+                testProcedures: recommendation.audit,
+                expectedResults: recommendation.defaultValue || recommendation.audit,
+                criticality: "Moderate",
+                cisBenchmarkRef: recommendation.section,
+                recommendationNum: recommendation.recommendation,
+                rationale: recommendation.rationale,
+                impact: recommendation.impact,
+                remediationProcedure: recommendation.remediation,
+            },
+            sourceEvidence: {
+                cisRecommendation: candidate.sourceLabel === "CIS" ? recommendation.recommendation : null,
+                cisProfile,
+                stigRecommendation: candidate.sourceLabel === "STIG" ? recommendation.recommendation : null,
+                stigProfile,
+                pub1075Version: pub1075.version,
+            },
+        });
+    }
+
+    return {
+        summary: `Generated fallback review items for ${technology} because the AI response was not valid JSON. Each item is marked needs_review and is grounded directly in the selected CIS/STIG workbook evidence with ${pub1075.version} as the compliance floor.`,
+        changes,
     };
 }
 
@@ -358,7 +501,22 @@ Rules:
             prompt,
         });
 
-        const payload = parseJsonResponse(responseText);
+        let payload: any;
+        try {
+            payload = parseJsonResponse(responseText);
+        } catch (error) {
+            console.warn("SCSEM updater AI JSON parse failed; using deterministic fallback changes.", error);
+            payload = buildFallbackPayload({
+                technology: updaterSession.inferredTechnology,
+                cisProfile: selectedProfile.profile,
+                stigProfile: selectedStigProfile?.profile || "",
+                pub1075,
+                updateCandidates,
+                newControlCandidates,
+                stigUpdateCandidates,
+                stigNewControlCandidates,
+            });
+        }
         const validChanges = addIdsToChanges(validateChanges(payload.changes || [], controls));
 
         updaterSession.status = "review_ready";

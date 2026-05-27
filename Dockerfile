@@ -24,7 +24,7 @@ RUN npx prisma generate
 RUN mkdir -p data
 RUN npm run build
 
-# Pre-compile the seed script so it can run without tsx in production
+# Pre-compile tsx so lightweight startup scripts can run in production.
 RUN npx tsx --tsconfig tsconfig.json -e "console.log('tsx works')" 2>/dev/null || true
 
 # Stage 3: Production
@@ -41,6 +41,7 @@ RUN apk add --no-cache poppler-utils
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
+RUN mkdir -p /var/lib/skyshield && chown -R nextjs:nodejs /var/lib/skyshield
 
 # Install production dependencies only for the final image. The builder stage
 # still uses dev dependencies for the Next.js/TypeScript build, but exporting the
@@ -57,7 +58,7 @@ COPY --from=builder /app/data ./data
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 
-# Copy source files needed for seed (tsx can import TS directly)
+# Copy source files needed for lightweight startup scripts and optional legacy seed.
 COPY --from=builder /app/src/lib/xlsx-parser.ts ./src/lib/xlsx-parser.ts
 COPY --from=builder /app/src/lib/db.ts ./src/lib/db.ts
 COPY --from=builder /app/assets ./assets
@@ -74,11 +75,11 @@ EXPOSE 3000
 
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
+ENV SKYSHIELD_RUNTIME_DATA_DIR="/var/lib/skyshield"
 
-# start-period covers the cold-start seed on a fresh DB. The seed parses
-# 58 SCSEM XLSX files and takes several minutes; only runs when the DB is
-# empty, so subsequent deploys are fast.
-HEALTHCHECK --interval=30s --timeout=3s --start-period=420s --retries=3 \
+# The updater is upload-driven now, so startup no longer parses all bundled
+# SCSEM workbooks before the app can become healthy.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/api/health || exit 1
 
 ENTRYPOINT ["/app/entrypoint.sh"]

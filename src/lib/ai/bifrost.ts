@@ -3,7 +3,7 @@ export const DEFAULT_BIFROST_EMBEDDING_MODEL = "azure/text-embedding-ada-002";
 export const DEFAULT_BIFROST_BASE_URL = "http://192.168.16.104:8080/v1";
 
 type JsonObject = Record<string, unknown>;
-const DEFAULT_MAX_OUTPUT_TOKENS = 1600;
+const DEFAULT_MAX_OUTPUT_TOKENS = 6000;
 
 export interface BifrostToolCall {
   id: string;

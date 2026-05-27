@@ -17,28 +17,17 @@ until npx prisma migrate deploy; do
   sleep 5
 done
 
-# Check if seed data exists
-echo "Checking if database needs seeding..."
-NEEDS_SEED=$(node -e "
-const { PrismaClient } = require('@prisma/client');
-const p = new PrismaClient();
-p.sCSEMSheet.count()
-  .then(c => { console.log(c === 0 ? 'yes' : 'no'); return p.\$disconnect(); })
-  .catch(e => { console.log('yes'); return p.\$disconnect(); });
-" 2>/dev/null)
-
-echo "Needs seed: ${NEEDS_SEED}"
-
-if [ "$NEEDS_SEED" = "yes" ] || [ -z "$NEEDS_SEED" ]; then
-  echo "Seeding database with SCSEM XLSX data (this may take 2-3 minutes)..."
-  NODE_OPTIONS="--max-old-space-size=4096" npx tsx prisma/seed.ts 2>&1 || echo "Warning: Seed encountered an issue"
-  echo "Seed complete."
+if [ "${SKYSHIELD_SYNC_PRODUCTION_USERS:-true}" != "false" ]; then
+  echo "Syncing baseline organization and users..."
+  npx tsx scripts/sync-production-users.ts 2>&1 || echo "Warning: user sync encountered an issue"
 else
-  echo "Database already has SCSEM data. Skipping seed."
+  echo "Skipping baseline user sync."
 fi
 
-echo "Backfilling CIS technology mapping on SCSEM templates..."
-npx tsx scripts/backfill-cis-technology.ts 2>&1 || echo "Warning: CIS backfill encountered an issue"
+if [ "${SKYSHIELD_RUN_LEGACY_SCSEM_SEED:-false}" = "true" ]; then
+  echo "Running legacy SCSEM seed. This parses all bundled SCSEM workbooks and may take several minutes..."
+  NODE_OPTIONS="--max-old-space-size=4096" npx tsx prisma/seed.ts 2>&1 || echo "Warning: legacy seed encountered an issue"
+fi
 
 echo "Starting Next.js server..."
 exec npm start

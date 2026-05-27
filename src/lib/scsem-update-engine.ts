@@ -198,10 +198,107 @@ export function buildComparisonCandidates(
 
 export function parseJsonResponse(text: string): any {
     const cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
-    const start = cleaned.indexOf("{");
-    const end = cleaned.lastIndexOf("}");
-    if (start === -1 || end === -1) throw new Error("AI response did not contain a JSON object.");
-    return JSON.parse(cleaned.slice(start, end + 1));
+    const jsonObject = extractBalancedJsonObject(cleaned);
+    const candidates = [
+        jsonObject,
+        repairCommonJsonIssues(jsonObject),
+    ];
+
+    let lastError: unknown = null;
+    for (const candidate of candidates) {
+        try {
+            return JSON.parse(candidate);
+        } catch (error) {
+            lastError = error;
+        }
+    }
+
+    throw lastError instanceof Error
+        ? new Error(`AI response did not contain valid JSON: ${lastError.message}`)
+        : new Error("AI response did not contain valid JSON.");
+}
+
+function extractBalancedJsonObject(text: string): string {
+    const start = text.indexOf("{");
+    if (start === -1) throw new Error("AI response did not contain a JSON object.");
+
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let index = start; index < text.length; index++) {
+        const char = text[index];
+
+        if (inString) {
+            if (escaped) {
+                escaped = false;
+            } else if (char === "\\") {
+                escaped = true;
+            } else if (char === "\"") {
+                inString = false;
+            }
+            continue;
+        }
+
+        if (char === "\"") {
+            inString = true;
+            continue;
+        }
+
+        if (char === "{") depth++;
+        if (char === "}") depth--;
+        if (depth === 0) return text.slice(start, index + 1);
+    }
+
+    return text.slice(start);
+}
+
+function repairCommonJsonIssues(jsonText: string): string {
+    let repaired = jsonText
+        .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "")
+        .replace(/[“”]/g, "\"")
+        .replace(/[‘’]/g, "'");
+
+    repaired = insertMissingCommasBetweenObjects(repaired);
+    repaired = repaired.replace(/,\s*([}\]])/g, "$1");
+    return repaired;
+}
+
+function insertMissingCommasBetweenObjects(jsonText: string): string {
+    let repaired = "";
+    let inString = false;
+    let escaped = false;
+
+    for (let index = 0; index < jsonText.length; index++) {
+        const char = jsonText[index];
+        repaired += char;
+
+        if (inString) {
+            if (escaped) {
+                escaped = false;
+            } else if (char === "\\") {
+                escaped = true;
+            } else if (char === "\"") {
+                inString = false;
+            }
+            continue;
+        }
+
+        if (char === "\"") {
+            inString = true;
+            continue;
+        }
+
+        if (char !== "}") continue;
+
+        let nextIndex = index + 1;
+        while (/\s/.test(jsonText[nextIndex] || "")) nextIndex++;
+        if (jsonText[nextIndex] === "{") {
+            repaired += ",";
+        }
+    }
+
+    return repaired;
 }
 
 export function validateChanges(rawChanges: any[], controls: SCSEMControlEvidence[]): any[] {
