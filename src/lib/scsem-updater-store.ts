@@ -2,6 +2,11 @@ import * as fs from "fs";
 import * as path from "path";
 import { createHash, randomUUID } from "crypto";
 import { parseSCSEMFile } from "@/lib/xlsx-parser";
+import {
+    resolveRuntimeFilePath,
+    runtimeDataDir,
+    storedPathForRuntimeFile,
+} from "@/lib/runtime-storage";
 
 export type SCSEMUpdaterStatus = "uploaded" | "analyzing" | "review_ready" | "error";
 export type SCSEMUpdaterChangeStatus = "PENDING" | "APPROVED" | "REJECTED";
@@ -89,7 +94,9 @@ export interface SCSEMUpdaterSession {
     };
 }
 
-const BASE_DIR = path.join(process.cwd(), "data", "scsem-updater");
+function baseDir(): string {
+    return runtimeDataDir("scsem-updater");
+}
 
 function sha256(buffer: Buffer): string {
     return createHash("sha256").update(buffer).digest("hex");
@@ -112,7 +119,7 @@ function safeSessionId(id: string): string {
 }
 
 function sessionDir(id: string): string {
-    return path.join(BASE_DIR, safeSessionId(id));
+    return path.join(baseDir(), safeSessionId(id));
 }
 
 function sessionJsonPath(id: string): string {
@@ -153,12 +160,10 @@ export function inferSCSEMTechnology(originalFileName: string, subject?: string 
 }
 
 export function resolveUpdaterPath(storedPath: string): string {
-    return path.isAbsolute(storedPath) ? storedPath : path.join(process.cwd(), storedPath);
+    return resolveRuntimeFilePath(storedPath);
 }
 
 export function createSCSEMUpdaterSession(originalFileName: string, workbookBuffer: Buffer): SCSEMUpdaterSession {
-    fs.mkdirSync(BASE_DIR, { recursive: true });
-
     const id = randomUUID();
     const dir = sessionDir(id);
     fs.mkdirSync(dir, { recursive: true });
@@ -171,7 +176,7 @@ export function createSCSEMUpdaterSession(originalFileName: string, workbookBuff
     const session: SCSEMUpdaterSession = {
         id,
         originalFileName,
-        originalFilePath: path.relative(process.cwd(), absoluteFilePath),
+        originalFilePath: storedPathForRuntimeFile(absoluteFilePath),
         uploadedAt: new Date().toISOString(),
         inferredTechnology: inferSCSEMTechnology(originalFileName, parsed.metadata.subject),
         status: "uploaded",

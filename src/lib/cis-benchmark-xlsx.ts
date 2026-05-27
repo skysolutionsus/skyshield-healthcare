@@ -4,6 +4,7 @@ import * as path from "path";
 import { createHash } from "crypto";
 import type { CISBenchmark, CISExcelFile } from "@/lib/cis-api";
 import type { ParsedControl } from "@/lib/xlsx-parser";
+import { runtimeDataDir, storedPathForRuntimeFile } from "@/lib/runtime-storage";
 
 export interface CISBenchmarkSnapshot {
     workbenchId: number;
@@ -199,7 +200,7 @@ export function saveCISBenchmarkSnapshot(
 ): CISBenchmarkSnapshot {
     const hash = sha256(workbookBuffer);
     const fileName = safePathPart(excel.excelFileName || `cis-${benchmark.workbenchId}.xlsx`);
-    const snapshotDir = path.join(process.cwd(), "data", "cis-benchmarks", String(benchmark.workbenchId));
+    const snapshotDir = path.join(runtimeDataDir("cis-benchmarks"), String(benchmark.workbenchId));
     const filePath = path.join(snapshotDir, fileName);
     const downloadedAt = new Date();
 
@@ -213,7 +214,7 @@ export function saveCISBenchmarkSnapshot(
         releaseDate: parseCISDate(benchmark.benchmarkStatus?.statusDate),
         excelTitle: excel.excelTitle,
         excelFileName: excel.excelFileName,
-        filePath: path.relative(process.cwd(), filePath),
+        filePath: storedPathForRuntimeFile(filePath),
         sha256: hash,
         downloadedAt,
     };
