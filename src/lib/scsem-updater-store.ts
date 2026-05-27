@@ -145,7 +145,11 @@ function cleanTechnologyName(value: string): string {
         .replace(/^Microsoft Server\b/i, "Microsoft Windows Server")
         .replace(/^Windows Server\b/i, "Microsoft Windows Server")
         .replace(/^Windows 1([01])\b/i, "Microsoft Windows 1$1")
+        .replace(/\bRed Hat Linux\b/i, "Red Hat Enterprise Linux")
         .replace(/\bRHEL\b/i, "Red Hat Enterprise Linux")
+        .replace(/\s*\(\s*Red Hat Enterprise Linux\s*\)\s*/gi, " ")
+        .replace(/\b(Red Hat Enterprise Linux)\s+\1\b/ig, "$1")
+        .replace(/\s+/g, " ")
         .trim();
 
     return cleaned;
