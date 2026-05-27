@@ -112,6 +112,27 @@ const STATUS_STYLES: Record<ChangeStatus, string> = {
     REJECTED: "bg-red-500/10 text-red-300 border-red-500/25",
 };
 
+async function readApiJson<T>(res: Response, fallbackMessage: string): Promise<T> {
+    const text = await res.text();
+    if (!text) return {} as T;
+
+    try {
+        return JSON.parse(text) as T;
+    } catch {
+        const isHtml = text.trimStart().startsWith("<");
+        const compactText = text
+            .replace(/<[^>]+>/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+            .slice(0, 180);
+        const status = `${res.status}${res.statusText ? ` ${res.statusText}` : ""}`;
+
+        throw new Error(isHtml
+            ? `${fallbackMessage}: the server returned an HTML error page instead of JSON (${status}). The analysis may have timed out or hit the app error page; retry after the latest deploy finishes.`
+            : `${fallbackMessage}: the server returned an unreadable response (${status})${compactText ? `: ${compactText}` : "."}`);
+    }
+}
+
 export function SCSEMUpdater() {
     const inputRef = useRef<HTMLInputElement | null>(null);
     const [session, setSession] = useState<UpdaterSession | null>(null);
@@ -146,7 +167,7 @@ export function SCSEMUpdater() {
                 method: "POST",
                 body: formData,
             });
-            const data = await res.json();
+            const data = await readApiJson<{ error?: string; session: UpdaterSession }>(res, "Upload failed");
             if (!res.ok) throw new Error(data.error || "Upload failed.");
             setSession(data.session);
             setExpandedChangeId(null);
@@ -166,7 +187,7 @@ export function SCSEMUpdater() {
             const res = await fetch(`/api/scsem-updater/${session.id}/analyze`, {
                 method: "POST",
             });
-            const data = await res.json();
+            const data = await readApiJson<{ error?: string; session: UpdaterSession }>(res, "Analysis failed");
             if (!res.ok) throw new Error(data.error || "Analysis failed.");
             setSession(data.session);
             setExpandedChangeId(data.session?.changes?.[0]?.id || null);
@@ -188,7 +209,7 @@ export function SCSEMUpdater() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ changeId, status, change }),
             });
-            const data = await res.json();
+            const data = await readApiJson<{ error?: string; session: UpdaterSession }>(res, "Could not update change");
             if (!res.ok) throw new Error(data.error || "Could not update change.");
             setSession(data.session);
         } catch (err: any) {
@@ -213,7 +234,7 @@ export function SCSEMUpdater() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ changeIds: pendingIds, status }),
             });
-            const data = await res.json();
+            const data = await readApiJson<{ error?: string; session: UpdaterSession }>(res, "Could not update changes");
             if (!res.ok) throw new Error(data.error || "Could not update changes.");
             setSession(data.session);
         } catch (err: any) {
@@ -231,7 +252,7 @@ export function SCSEMUpdater() {
             const res = await fetch(`/api/scsem-updater/${session.id}/undo`, {
                 method: "POST",
             });
-            const data = await res.json();
+            const data = await readApiJson<{ error?: string; session: UpdaterSession }>(res, "Could not undo review action");
             if (!res.ok) throw new Error(data.error || "Could not undo review action.");
             setSession(data.session);
         } catch (err: any) {

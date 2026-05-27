@@ -41,6 +41,9 @@ const UPDATER_CANDIDATE_LIMITS = {
     maxNewControlCandidates: 15,
 };
 const MAX_UPDATER_CHANGES = 25;
+const AI_CONTROL_LIMIT = Number(process.env.SCSEM_UPDATER_AI_CONTROL_LIMIT || 500);
+const AI_PROMPT_CHAR_LIMIT = Number(process.env.SCSEM_UPDATER_AI_PROMPT_CHAR_LIMIT || 90000);
+const AI_TIMEOUT_MS = Number(process.env.SCSEM_UPDATER_AI_TIMEOUT_MS || 25000);
 
 function controlsFromParsedSCSEM(parsed: ParsedSCSEM): SCSEMControlEvidence[] {
     return parsed.sheets
@@ -120,6 +123,7 @@ function buildFallbackPayload({
     cisProfile,
     stigProfile,
     pub1075,
+    fallbackReason,
     updateCandidates,
     newControlCandidates,
     stigUpdateCandidates,
@@ -129,6 +133,7 @@ function buildFallbackPayload({
     cisProfile: string;
     stigProfile: string;
     pub1075: { version: string };
+    fallbackReason?: string;
     updateCandidates: ReturnType<typeof buildComparisonCandidates>["updateCandidates"];
     newControlCandidates: ReturnType<typeof buildComparisonCandidates>["newControlCandidates"];
     stigUpdateCandidates: ReturnType<typeof buildComparisonCandidates>["updateCandidates"];
@@ -222,7 +227,7 @@ function buildFallbackPayload({
     }
 
     return {
-        summary: `Generated fallback review items for ${technology} because the AI response was not valid JSON. Each item is marked needs_review and is grounded directly in the selected CIS/STIG workbook evidence with ${pub1075.version} as the compliance floor.`,
+        summary: `Generated deterministic review items for ${technology}${fallbackReason ? ` because ${fallbackReason}` : ""}. Each item is marked needs_review and is grounded directly in the selected CIS/STIG workbook evidence with ${pub1075.version} as the compliance floor.`,
         changes,
     };
 }
@@ -501,29 +506,53 @@ Rules:
 - Do not claim Pub 1075 says something unless the excerpt is present above.
 - Do not include markdown fences.`;
 
-        const responseText = await generateBifrostText({
-            model: getConfiguredBifrostModel("BIFROST_SCSEM_MODEL"),
-            maxTokens: 9000,
-            temperature: 0.15,
-            system: "You generate precise JSON SCSEM update recommendations grounded in CIS, STIG, and IRS Pub 1075 evidence.",
-            prompt,
-        });
-
         let payload: any;
-        try {
-            payload = parseJsonResponse(responseText);
-        } catch (error) {
-            console.warn("SCSEM updater AI JSON parse failed; using deterministic fallback changes.", error);
+        const shouldUseAI = controls.length <= AI_CONTROL_LIMIT && prompt.length <= AI_PROMPT_CHAR_LIMIT;
+
+        if (!shouldUseAI) {
             payload = buildFallbackPayload({
                 technology: updaterSession.inferredTechnology,
                 cisProfile: selectedProfile.profile,
                 stigProfile: selectedStigProfile?.profile || "",
                 pub1075,
+                fallbackReason: `the uploaded workbook has ${controls.length} parsed controls, so the updater used deterministic benchmark diffs to keep the interactive request within deploy limits`,
                 updateCandidates,
                 newControlCandidates,
                 stigUpdateCandidates,
                 stigNewControlCandidates,
             });
+        } else {
+            const abortController = new AbortController();
+            const timeout = setTimeout(() => abortController.abort(), AI_TIMEOUT_MS);
+
+            try {
+                const responseText = await generateBifrostText({
+                    model: getConfiguredBifrostModel("BIFROST_SCSEM_MODEL"),
+                    maxTokens: 9000,
+                    temperature: 0.15,
+                    system: "You generate precise JSON SCSEM update recommendations grounded in CIS, STIG, and IRS Pub 1075 evidence.",
+                    prompt,
+                    signal: abortController.signal,
+                });
+                payload = parseJsonResponse(responseText);
+            } catch (error) {
+                console.warn("SCSEM updater AI analysis failed; using deterministic fallback changes.", error);
+                payload = buildFallbackPayload({
+                    technology: updaterSession.inferredTechnology,
+                    cisProfile: selectedProfile.profile,
+                    stigProfile: selectedStigProfile?.profile || "",
+                    pub1075,
+                    fallbackReason: error instanceof Error && error.name === "AbortError"
+                        ? "the AI analysis exceeded the interactive timeout"
+                        : "the AI response could not be used safely",
+                    updateCandidates,
+                    newControlCandidates,
+                    stigUpdateCandidates,
+                    stigNewControlCandidates,
+                });
+            } finally {
+                clearTimeout(timeout);
+            }
         }
         const validChanges = addIdsToChanges(validateChanges(payload.changes || [], controls, MAX_UPDATER_CHANGES));
 

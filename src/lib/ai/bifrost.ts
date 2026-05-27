@@ -287,6 +287,7 @@ export async function generateBifrostText(options: {
   prompt: string;
   maxTokens?: number;
   temperature?: number;
+  signal?: AbortSignal;
 }): Promise<string> {
   const messages: BifrostChatMessage[] = [];
   if (options.system) {
@@ -301,7 +302,7 @@ export async function generateBifrostText(options: {
       temperature: options.temperature,
       messages,
     },
-    { apiKey: options.apiKey, baseUrl: options.baseUrl }
+    { apiKey: options.apiKey, baseUrl: options.baseUrl, signal: options.signal }
   );
 
   return extractBifrostMessageText(response.choices?.[0]?.message?.content).trim();
