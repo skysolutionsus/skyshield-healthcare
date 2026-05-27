@@ -149,11 +149,17 @@ export function buildNewControlEvidence(recommendation: CISBenchmarkRecommendati
 
 export function buildComparisonCandidates(
     controls: SCSEMControlEvidence[],
-    recommendations: CISBenchmarkRecommendation[]
+    recommendations: CISBenchmarkRecommendation[],
+    options: {
+        maxUpdateCandidates?: number;
+        maxNewControlCandidates?: number;
+    } = {}
 ): {
     updateCandidates: Array<{ control: SCSEMControlEvidence; recommendation: CISBenchmarkRecommendation; score: number }>;
     newControlCandidates: CISBenchmarkRecommendation[];
 } {
+    const maxUpdateCandidates = options.maxUpdateCandidates ?? 10;
+    const maxNewControlCandidates = options.maxNewControlCandidates ?? 10;
     const recById = new Map(recommendations.map((rec) => [rec.recommendation, rec]));
     const scsemRecommendationIds = new Set(
         controls
@@ -191,8 +197,8 @@ export function buildComparisonCandidates(
         });
 
     return {
-        updateCandidates: updateCandidates.slice(0, 10),
-        newControlCandidates: newControlCandidates.slice(0, 10),
+        updateCandidates: updateCandidates.slice(0, maxUpdateCandidates),
+        newControlCandidates: newControlCandidates.slice(0, maxNewControlCandidates),
     };
 }
 
@@ -301,7 +307,7 @@ function insertMissingCommasBetweenObjects(jsonText: string): string {
     return repaired;
 }
 
-export function validateChanges(rawChanges: any[], controls: SCSEMControlEvidence[]): any[] {
+export function validateChanges(rawChanges: any[], controls: SCSEMControlEvidence[], maxChanges = 8): any[] {
     const existingTestIds = new Set(controls.map((control) => control.testId));
 
     return rawChanges
@@ -320,7 +326,7 @@ export function validateChanges(rawChanges: any[], controls: SCSEMControlEvidenc
                 typeof change.proposedValue === "string" &&
                 change.proposedValue.trim().length > 0;
         })
-        .slice(0, 8);
+        .slice(0, maxChanges);
 }
 
 export async function downloadAndParseBenchmark(

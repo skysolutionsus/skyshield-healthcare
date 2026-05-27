@@ -29,7 +29,7 @@ export async function GET(
         const approvedChanges = updaterSession.changes.filter((change) => change.status === "APPROVED");
         const buffer = approvedChanges.length === 0
             ? fs.readFileSync(originalPath)
-            : buildSCSEMUpdaterWorkbookBuffer(
+            : await buildSCSEMUpdaterWorkbookBuffer(
                 updaterSession,
                 parseSCSEMFile(originalPath),
                 originalPath

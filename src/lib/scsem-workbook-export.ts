@@ -46,8 +46,12 @@ type ChangeLogEntry = {
     source: string;
 };
 
+type XlsxPopulateWorkbook = any;
+type XlsxPopulateSheet = any;
+type LogField = "version" | "date" | "description" | "author" | "source" | "target";
+
 const HEADER_PATTERNS: Array<[ExportField, RegExp[]]> = [
-    ["testId", [/^test id$/i]],
+    ["testId", [/^test id\b/i]],
     ["nistId", [/^nist id$/i]],
     ["nistControlName", [/^nist control/i]],
     ["testMethod", [/^test method$/i]],
@@ -71,6 +75,20 @@ const HEADER_PATTERNS: Array<[ExportField, RegExp[]]> = [
     ["capRequestStatement", [/^cap request/i]],
     ["riskRating", [/^risk rating$/i]],
 ];
+
+const LOG_HEADER_PATTERNS: Array<[LogField, RegExp[]]> = [
+    ["version", [/version/i, /release/i]],
+    ["date", [/date/i]],
+    ["description", [/description/i, /change/i, /summary/i, /revision/i]],
+    ["author", [/author/i, /changed by/i, /^by$/i]],
+    ["source", [/source/i]],
+    ["target", [/test case/i, /control/i, /\btab\b/i]],
+];
+
+async function loadXlsxPopulate(): Promise<any> {
+    const mod = await import("xlsx-populate");
+    return (mod as any).default || mod;
+}
 
 function cellText(worksheet: XLSX.WorkSheet, row: number, col: number): string {
     const cell = worksheet[XLSX.utils.encode_cell({ r: row, c: col })];
@@ -99,6 +117,18 @@ function matchHeader(header: string): ExportField | null {
         if (patterns.some((pattern) => pattern.test(normalized))) return field;
     }
     return null;
+}
+
+function matchLogHeader(header: string): LogField | null {
+    const normalized = normalizeHeader(header);
+    for (const [field, patterns] of LOG_HEADER_PATTERNS) {
+        if (patterns.some((pattern) => pattern.test(normalized))) return field;
+    }
+    return null;
+}
+
+function isExportField(value: string): value is ExportField {
+    return HEADER_PATTERNS.some(([field]) => field === value);
 }
 
 function findHeader(worksheet: XLSX.WorkSheet): {
@@ -137,12 +167,42 @@ function buildRowByTestId(worksheet: XLSX.WorkSheet, header: ReturnType<typeof f
     const rows = new Map<string, number>();
     if (!header) return rows;
 
-    for (let row = header.headerRow + 1; row <= header.range.e.r; row++) {
+    const maxRow = Math.min(header.range.e.r, header.headerRow + 10000);
+    for (let row = header.headerRow + 1; row <= maxRow; row++) {
         const testId = cellText(worksheet, row, header.testIdCol);
         if (testId) rows.set(testId, row);
     }
 
     return rows;
+}
+
+function findLogHeader(worksheet: XLSX.WorkSheet): {
+    headerRow: number;
+    columns: Map<LogField, number>;
+    range: XLSX.Range;
+} | null {
+    const ref = worksheet["!ref"];
+    if (!ref) return null;
+
+    const range = XLSX.utils.decode_range(ref);
+    const maxHeaderRow = Math.min(range.e.r, range.s.r + 20);
+
+    for (let row = range.s.r; row <= maxHeaderRow; row++) {
+        const columns = new Map<LogField, number>();
+
+        for (let col = range.s.c; col <= range.e.c; col++) {
+            const header = cellText(worksheet, row, col);
+            const field = matchLogHeader(header);
+            if (!field || columns.has(field)) continue;
+            columns.set(field, col);
+        }
+
+        if ((columns.has("description") || columns.has("date")) && columns.size >= 2) {
+            return { headerRow: row, columns, range };
+        }
+    }
+
+    return null;
 }
 
 function getControlValue(control: ExportControl, field: ExportField): string {
@@ -161,6 +221,56 @@ function copyRowFormatting(worksheet: XLSX.WorkSheet, fromRow: number, toRow: nu
             s: source.s,
             z: source.z,
         };
+    }
+}
+
+function setPopulateCellValue(sheet: XlsxPopulateSheet, row: number, col: number, value: unknown) {
+    const nextValue = value === undefined || value === null ? "" : value;
+    sheet.cell(row + 1, col + 1).value(nextValue);
+}
+
+function copyPopulateCellStyle(sourceCell: any, targetCell: any) {
+    if (!sourceCell || !targetCell) return;
+
+    if (sourceCell._style) {
+        targetCell.style(sourceCell._style);
+    } else if (sourceCell._styleId !== undefined && sourceCell._styleId !== null) {
+        targetCell._styleId = sourceCell._styleId;
+        targetCell._style = undefined;
+    }
+
+    if (sourceCell._remainingAttributes) {
+        targetCell._remainingAttributes = { ...sourceCell._remainingAttributes };
+    }
+}
+
+function copyPopulateRowFormatting(
+    sheet: XlsxPopulateSheet,
+    fromRow: number,
+    toRow: number,
+    startCol: number,
+    endCol: number
+) {
+    const sourceRow = sheet.row(fromRow + 1);
+    const targetRow = sheet.row(toRow + 1);
+    const sourceAttributes = sourceRow?._node?.attributes;
+
+    if (sourceAttributes && targetRow?._node) {
+        targetRow._node.attributes = {
+            ...sourceAttributes,
+            r: toRow + 1,
+        };
+    }
+
+    const sourceHeight = sourceRow.height();
+    if (typeof sourceHeight === "number") targetRow.height(sourceHeight);
+    targetRow.hidden(sourceRow.hidden());
+
+    for (let col = startCol; col <= endCol; col++) {
+        copyPopulateCellStyle(
+            sourceRow.cell(col + 1),
+            targetRow.cell(col + 1)
+        );
     }
 }
 
@@ -198,6 +308,138 @@ function patchTestCaseSheet(worksheet: XLSX.WorkSheet, controls: ExportControl[]
     if (appendRow - 1 > header.range.e.r) {
         header.range.e.r = appendRow - 1;
         worksheet["!ref"] = XLSX.utils.encode_range(header.range);
+    }
+}
+
+function approvedFieldMap(session: SCSEMUpdaterSession): Map<string, Set<ExportField>> {
+    const fieldsByTestId = new Map<string, Set<ExportField>>();
+
+    for (const change of session.changes) {
+        if (change.status !== "APPROVED" || change.action === "addControl") continue;
+        if (!isExportField(change.field)) continue;
+
+        const fields = fieldsByTestId.get(change.testId) || new Set<ExportField>();
+        fields.add(change.field);
+        fields.add("notesEvidence");
+        fieldsByTestId.set(change.testId, fields);
+    }
+
+    return fieldsByTestId;
+}
+
+function patchTestCaseSheetPreserving(
+    sheet: XlsxPopulateSheet,
+    readWorksheet: XLSX.WorkSheet,
+    controls: ExportControl[],
+    fieldsByTestId: Map<string, Set<ExportField>>
+) {
+    const header = findHeader(readWorksheet);
+    if (!header) return;
+
+    const originalControls = controls.filter((control) =>
+        (control.extraColumns as Record<string, unknown> | null | undefined)?.source !== "scsem_updater"
+    );
+    const rowByTestId = new Map(originalControls.map((control) => [control.testId, control.rowIndex]));
+    let appendRow = Math.max(
+        header.headerRow + 1,
+        ...originalControls.map((control) => control.rowIndex + 1)
+    );
+
+    for (const control of controls) {
+        let row = rowByTestId.get(control.testId);
+        const isNewRow = row === undefined && control.updateHighlight;
+        const fieldsToWrite = fieldsByTestId.get(control.testId);
+
+        if (!isNewRow && (!fieldsToWrite || fieldsToWrite.size === 0)) continue;
+
+        if (isNewRow) {
+            row = appendRow++;
+            const sourceRow = Math.max(header.headerRow + 1, row - 1);
+            copyPopulateRowFormatting(sheet, sourceRow, row, header.range.s.c, header.range.e.c);
+            rowByTestId.set(control.testId, row);
+        }
+        if (row === undefined) continue;
+
+        const writableFields = isNewRow
+            ? [...header.columns.keys()]
+            : [...(fieldsToWrite || [])];
+
+        for (const field of writableFields) {
+            const col = header.columns.get(field);
+            if (col === undefined) continue;
+            setPopulateCellValue(sheet, row, col, getControlValue(control, field));
+        }
+    }
+}
+
+function logSheetNames(workbook: XLSX.WorkBook): string[] {
+    const names = new Set<string>();
+
+    for (const sheetName of workbook.SheetNames) {
+        const normalized = normalizeHeader(sheetName);
+        if (/\bchange\s*log\b/.test(normalized)) names.add(sheetName);
+        if (normalized.includes("new release") && normalized.includes("change")) names.add(sheetName);
+    }
+
+    return [...names];
+}
+
+function appendLogRowsPreserving(
+    sheet: XlsxPopulateSheet,
+    readWorksheet: XLSX.WorkSheet,
+    entries: ChangeLogEntry[]
+) {
+    if (entries.length === 0) return;
+
+    const header = findLogHeader(readWorksheet);
+    const range = readWorksheet["!ref"]
+        ? XLSX.utils.decode_range(readWorksheet["!ref"])
+        : XLSX.utils.decode_range("A1:E1");
+    const columns = header?.columns || new Map([
+        ["version", 0],
+        ["date", 1],
+        ["description", 2],
+        ["author", 3],
+        ["source", 4],
+    ] as Array<[LogField, number]>);
+    const endCol = Math.max(range.e.c, ...columns.values(), 4);
+    let appendRow = range.e.r + 1;
+
+    for (const entry of entries) {
+        const sourceRow = Math.max(header ? header.headerRow + 1 : range.s.r, appendRow - 1);
+        copyPopulateRowFormatting(sheet, sourceRow, appendRow, range.s.c, endCol);
+
+        const values = {
+            version: entry.version,
+            date: entry.changeDate.toISOString().slice(0, 10),
+            description: entry.description,
+            author: entry.changedBy || "",
+            source: entry.source,
+            target: "Approved SCSEM updater changes",
+        };
+
+        for (const [field, value] of Object.entries(values) as Array<[keyof typeof values, string]>) {
+            const col = columns.get(field);
+            if (col === undefined) continue;
+            setPopulateCellValue(sheet, appendRow, col, value);
+        }
+
+        appendRow++;
+    }
+}
+
+function appendWorkbookLogSheetsPreserving(
+    workbook: XlsxPopulateWorkbook,
+    readWorkbook: XLSX.WorkBook,
+    changeLogs: ChangeLogEntry[]
+) {
+    if (changeLogs.length === 0) return;
+
+    for (const sheetName of logSheetNames(readWorkbook)) {
+        const sheet = workbook.sheet(sheetName);
+        const readWorksheet = readWorkbook.Sheets[sheetName];
+        if (!sheet || !readWorksheet) continue;
+        appendLogRowsPreserving(sheet, readWorksheet, changeLogs);
     }
 }
 
@@ -338,6 +580,40 @@ function buildWorkbookFromOriginal(sourcePath: string, sheets: ExportSheet[], ch
     return workbook;
 }
 
+async function buildWorkbookFromOriginalPreserving(
+    sourcePath: string,
+    sheets: ExportSheet[],
+    changeLogs: ChangeLogEntry[],
+    session: SCSEMUpdaterSession
+): Promise<Buffer | null> {
+    if (!fs.existsSync(sourcePath)) return null;
+
+    const XlsxPopulate = await loadXlsxPopulate();
+    const originalBuffer = fs.readFileSync(sourcePath);
+    const workbook = await XlsxPopulate.fromDataAsync(originalBuffer);
+    const readWorkbook = XLSX.readFile(sourcePath, {
+        cellDates: true,
+        cellStyles: true,
+        sheetStubs: true,
+    });
+    const fieldsByTestId = approvedFieldMap(session);
+
+    for (const sheet of sheets) {
+        if (sheet.sheetType !== "test_cases" || sheet.controls.length === 0) continue;
+
+        const populateSheet = workbook.sheet(sheet.sheetName);
+        const readWorksheet = readWorkbook.Sheets[sheet.sheetName];
+        if (!populateSheet || !readWorksheet) continue;
+
+        patchTestCaseSheetPreserving(populateSheet, readWorksheet, sheet.controls, fieldsByTestId);
+    }
+
+    appendWorkbookLogSheetsPreserving(workbook, readWorkbook, changeLogs);
+
+    const output = await workbook.outputAsync({ type: "nodebuffer" });
+    return Buffer.isBuffer(output) ? output : Buffer.from(output);
+}
+
 function cloneParsedSheets(parsed: ParsedSCSEM): ExportSheet[] {
     return parsed.sheets.map((sheet) => ({
         ...sheet,
@@ -462,11 +738,11 @@ function applyApprovedChanges(parsed: ParsedSCSEM, session: SCSEMUpdaterSession)
     return { sheets, applied };
 }
 
-export function buildSCSEMUpdaterWorkbookBuffer(
+export async function buildSCSEMUpdaterWorkbookBuffer(
     session: SCSEMUpdaterSession,
     parsed: ParsedSCSEM,
     originalAbsolutePath: string
-): Buffer {
+): Promise<Buffer> {
     const { sheets, applied } = applyApprovedChanges(parsed, session);
     const changeLogs: ChangeLogEntry[] = applied.length > 0
         ? [{
@@ -477,6 +753,14 @@ export function buildSCSEMUpdaterWorkbookBuffer(
             source: "scsem_updater",
         }]
         : [];
+
+    const preservedWorkbook = await buildWorkbookFromOriginalPreserving(
+        originalAbsolutePath,
+        sheets,
+        changeLogs,
+        session
+    );
+    if (preservedWorkbook) return preservedWorkbook;
 
     const workbook = buildWorkbookFromOriginal(originalAbsolutePath, sheets, changeLogs) ||
         buildReconstructedWorkbook(sheets, changeLogs);

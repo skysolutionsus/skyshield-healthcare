@@ -36,6 +36,12 @@ import { generateBifrostText, getConfiguredBifrostModel } from "@/lib/ai/bifrost
 
 export const runtime = "nodejs";
 
+const UPDATER_CANDIDATE_LIMITS = {
+    maxUpdateCandidates: 25,
+    maxNewControlCandidates: 15,
+};
+const MAX_UPDATER_CHANGES = 25;
+
 function controlsFromParsedSCSEM(parsed: ParsedSCSEM): SCSEMControlEvidence[] {
     return parsed.sheets
         .filter((sheet) => sheet.sheetType === "test_cases")
@@ -157,7 +163,7 @@ function buildFallbackPayload({
     const changes: any[] = [];
 
     for (const candidate of fallbackUpdates) {
-        if (changes.length >= 5) break;
+        if (changes.length >= 15) break;
         const selectedField = chooseFallbackField(candidate.control, candidate.recommendation);
         if (!selectedField) continue;
 
@@ -180,7 +186,7 @@ function buildFallbackPayload({
     }
 
     for (const candidate of fallbackNewControls) {
-        if (changes.length >= 8) break;
+        if (changes.length >= MAX_UPDATER_CHANGES) break;
         const recommendation = candidate.recommendation;
         changes.push({
             action: "addControl",
@@ -310,7 +316,8 @@ export async function POST(
             if (selectedStigProfile) {
                 const stigCandidates = buildComparisonCandidates(
                     controls,
-                    selectedStigProfile.recommendations
+                    selectedStigProfile.recommendations,
+                    UPDATER_CANDIDATE_LIMITS
                 );
                 stigUpdateCandidates = stigCandidates.updateCandidates;
                 stigNewControlCandidates = stigCandidates.newControlCandidates;
@@ -319,7 +326,8 @@ export async function POST(
 
         const { updateCandidates, newControlCandidates } = buildComparisonCandidates(
             controls,
-            selectedProfile.recommendations
+            selectedProfile.recommendations,
+            UPDATER_CANDIDATE_LIMITS
         );
 
         const pub1075 = extractPub1075Sections([
@@ -487,7 +495,7 @@ Return ONLY valid JSON:
 }
 
 Rules:
-- Include 3-8 total changes.
+- Include up to ${MAX_UPDATER_CHANGES} total changes. Prioritize every cell-level delta that clearly needs human review, but do not create low-value wording churn.
 - For updateField, only use Test IDs from CURRENT SCSEM ROWS MATCHED TO CIS CANDIDATES or CURRENT SCSEM ROWS MATCHED TO STIG CANDIDATES.
 - For addControl, only use recommendation numbers from POTENTIAL NEW CIS ROWS or POTENTIAL NEW STIG ROWS.
 - Do not claim Pub 1075 says something unless the excerpt is present above.
@@ -495,7 +503,7 @@ Rules:
 
         const responseText = await generateBifrostText({
             model: getConfiguredBifrostModel("BIFROST_SCSEM_MODEL"),
-            maxTokens: 5000,
+            maxTokens: 9000,
             temperature: 0.15,
             system: "You generate precise JSON SCSEM update recommendations grounded in CIS, STIG, and IRS Pub 1075 evidence.",
             prompt,
@@ -517,7 +525,7 @@ Rules:
                 stigNewControlCandidates,
             });
         }
-        const validChanges = addIdsToChanges(validateChanges(payload.changes || [], controls));
+        const validChanges = addIdsToChanges(validateChanges(payload.changes || [], controls, MAX_UPDATER_CHANGES));
 
         updaterSession.status = "review_ready";
         updaterSession.summary = payload.summary || `CIS/STIG review generated for ${updaterSession.inferredTechnology}.`;
