@@ -279,25 +279,22 @@ export async function POST(
             allExcelFiles
         );
 
-        if (!selected) {
-            throw new Error(`No matching CIS Benchmark Excel workbook was found for ${updaterSession.inferredTechnology}.`);
-        }
-
         const downloadedBenchmarks = new Map<number, DownloadedBenchmark>();
-        const downloaded = await downloadAndParseBenchmark(
-            cisToken,
-            selected.benchmark,
-            selected.excel,
-            downloadedBenchmarks
-        );
-        const selectedProfile = selectBestCISProfile(
-            updaterSession.inferredTechnology,
-            controls,
-            downloaded.recommendations
-        );
+        let downloaded: DownloadedBenchmark | null = null;
+        let selectedProfile: SelectedCISProfile | null = null;
 
-        if (!selectedProfile) {
-            throw new Error(`No parseable CIS profile was found for ${downloaded.snapshot.benchmarkTitle}.`);
+        if (selected) {
+            downloaded = await downloadAndParseBenchmark(
+                cisToken,
+                selected.benchmark,
+                selected.excel,
+                downloadedBenchmarks
+            );
+            selectedProfile = selectBestCISProfile(
+                updaterSession.inferredTechnology,
+                controls,
+                downloaded.recommendations
+            );
         }
 
         let stigDownloaded: DownloadedBenchmark | null = null;
@@ -329,11 +326,17 @@ export async function POST(
             }
         }
 
-        const { updateCandidates, newControlCandidates } = buildComparisonCandidates(
-            controls,
-            selectedProfile.recommendations,
-            UPDATER_CANDIDATE_LIMITS
-        );
+        if (!selectedProfile && !selectedStigProfile) {
+            throw new Error(`No matching CIS or STIG Benchmark Excel workbook/profile was found for ${updaterSession.inferredTechnology}. Some IRS SCSEMs are generic or product-specific and do not have a direct CIS SecureSuite Excel equivalent.`);
+        }
+
+        const { updateCandidates, newControlCandidates } = selectedProfile
+            ? buildComparisonCandidates(
+                controls,
+                selectedProfile.recommendations,
+                UPDATER_CANDIDATE_LIMITS
+            )
+            : { updateCandidates: [], newControlCandidates: [] };
 
         const pub1075 = extractPub1075Sections([
             ...updateCandidates.map((candidate) => candidate.control.nistId),
@@ -344,7 +347,7 @@ export async function POST(
             ...updaterSession.audit,
             pub1075Version: pub1075.version,
             pub1075SourcePath: pub1075.sourcePath,
-            cis: auditSource(downloaded, selectedProfile),
+            cis: downloaded ? auditSource(downloaded, selectedProfile) : null,
             stig: stigDownloaded ? auditSource(stigDownloaded, selectedStigProfile) : null,
         };
 
@@ -415,13 +418,17 @@ Uploaded SCSEM:
 - Parsed controls: ${controls.length}
 
 CIS Benchmark:
-- Title: ${downloaded.snapshot.benchmarkTitle}
-- Version: ${downloaded.snapshot.benchmarkVersion}
-- Release date: ${downloaded.snapshot.releaseDate.toISOString().slice(0, 10)}
-- Selected profile: ${selectedProfile.profile}
-- Excel snapshot path: ${downloaded.snapshot.filePath}
-- Excel SHA-256: ${downloaded.snapshot.sha256}
-- Matched existing recommendations: ${selectedProfile.sharedRecommendationCount}/${selectedProfile.totalRecommendationCount}
+${downloaded && selectedProfile
+                ? [
+                    `- Title: ${downloaded.snapshot.benchmarkTitle}`,
+                    `- Version: ${downloaded.snapshot.benchmarkVersion}`,
+                    `- Release date: ${downloaded.snapshot.releaseDate.toISOString().slice(0, 10)}`,
+                    `- Selected profile: ${selectedProfile.profile}`,
+                    `- Excel snapshot path: ${downloaded.snapshot.filePath}`,
+                    `- Excel SHA-256: ${downloaded.snapshot.sha256}`,
+                    `- Matched existing recommendations: ${selectedProfile.sharedRecommendationCount}/${selectedProfile.totalRecommendationCount}`,
+                ].join("\n")
+                : "- No matching CIS Benchmark Excel workbook/profile was selected for this SCSEM technology."}
 
 STIG Benchmark:
 ${stigSourceSummary}
@@ -459,7 +466,7 @@ Return ONLY valid JSON:
       "confidence": "high|medium|needs_review",
       "sourceEvidence": {
         "cisRecommendation": "CIS recommendation number if CIS evidence applies, otherwise null",
-        "cisProfile": "${selectedProfile.profile}",
+        "cisProfile": "${selectedProfile?.profile || ""}",
         "stigRecommendation": "STIG recommendation number if STIG evidence applies, otherwise null",
         "stigProfile": "${selectedStigProfile?.profile || ""}",
         "pub1075Version": "${pub1075.version}"
@@ -490,7 +497,7 @@ Return ONLY valid JSON:
       },
       "sourceEvidence": {
         "cisRecommendation": "CIS recommendation number if CIS evidence applies, otherwise null",
-        "cisProfile": "${selectedProfile.profile}",
+        "cisProfile": "${selectedProfile?.profile || ""}",
         "stigRecommendation": "STIG recommendation number if STIG evidence applies, otherwise null",
         "stigProfile": "${selectedStigProfile?.profile || ""}",
         "pub1075Version": "${pub1075.version}"
@@ -512,7 +519,7 @@ Rules:
         if (!shouldUseAI) {
             payload = buildFallbackPayload({
                 technology: updaterSession.inferredTechnology,
-                cisProfile: selectedProfile.profile,
+                cisProfile: selectedProfile?.profile || "",
                 stigProfile: selectedStigProfile?.profile || "",
                 pub1075,
                 fallbackReason: `the uploaded workbook has ${controls.length} parsed controls, so the updater used deterministic benchmark diffs to keep the interactive request within deploy limits`,
@@ -539,7 +546,7 @@ Rules:
                 console.warn("SCSEM updater AI analysis failed; using deterministic fallback changes.", error);
                 payload = buildFallbackPayload({
                     technology: updaterSession.inferredTechnology,
-                    cisProfile: selectedProfile.profile,
+                    cisProfile: selectedProfile?.profile || "",
                     stigProfile: selectedStigProfile?.profile || "",
                     pub1075,
                     fallbackReason: error instanceof Error && error.name === "AbortError"

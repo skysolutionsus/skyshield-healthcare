@@ -135,10 +135,11 @@ function cleanTechnologyName(value: string): string {
         .replace(/\.(xlsx|xlsm|xls)$/i, "")
         .replace(/^Safeguards[-_\s]*SCSEM[-_\s]*/i, "")
         .replace(/^SCSEM[-_\s]*/i, "")
-        .replace(/[-_\s]+v\d+(?:[._]\d+)*(?:[-_\s]+\d{6,8})?$/i, "")
-        .replace(/[-_\s]+\d{1,2}[-_]\d{1,2}[-_]\d{2,4}$/i, "")
         .replace(/[_-]+/g, " ")
         .replace(/\s+/g, " ")
+        .replace(/\s+\d{6,8}$/i, "")
+        .replace(/\s+\d{1,2}\s+\d{1,2}\s+\d{2,4}$/i, "")
+        .replace(/\s+v(?:ersion\s*)?\d+(?:[\s.]\d+){0,4}$/i, "")
         .trim();
 
     cleaned = cleaned

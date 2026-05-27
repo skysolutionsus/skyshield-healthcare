@@ -79,6 +79,93 @@ function normalizeTitle(value: string): string {
         .trim();
 }
 
+function normalizeBenchmarkSearchText(value: string | null | undefined): string {
+    return normalizeText(value)
+        .replace(/\bms\s+sql\b/g, "sql server")
+        .replace(/\bsqlserver\b/g, "sql server")
+        .replace(/\bred\s+hat\s+linux\b/g, "red hat enterprise linux")
+        .replace(/\brhel\b/g, "red hat enterprise linux")
+        .replace(/\boel\b/g, "oracle linux")
+        .replace(/\boracle\s+enterprise\s+linux\b/g, "oracle linux")
+        .replace(/\bmicrosoft\s+server\b/g, "microsoft windows server")
+        .replace(/\bwindows\s+1([01])\b/g, "microsoft windows 1$1")
+        .replace(/\bwindows\s+server\b/g, "microsoft windows server")
+        .replace(/\s+\d{6,8}$/g, "")
+        .replace(/\s+\d{1,2}\s+\d{1,2}\s+\d{2,4}$/g, "")
+        .replace(/\s+v(?:ersion\s*)?\d+(?:\s+\d+){0,4}$/g, "")
+        .replace(/\bcis\b/g, " ")
+        .replace(/\bbenchmark\b/g, " ")
+        .replace(/\bstig\b/g, " ")
+        .replace(/\bprofile\b/g, " ")
+        .replace(/\blevel\s+\d+\b/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+const MATCH_STOPWORDS = new Set([
+    "and",
+    "for",
+    "the",
+    "with",
+    "edition",
+    "editions",
+    "enterprise",
+    "server",
+    "desktop",
+    "workstation",
+    "standalone",
+    "stand",
+    "alone",
+]);
+
+function searchTokens(value: string): Set<string> {
+    return new Set(value
+        .split(/\s+/)
+        .map((token) => token.trim())
+        .filter((token) => token.length > 1)
+        .filter((token) => !MATCH_STOPWORDS.has(token)));
+}
+
+function numericTokens(value: string): Set<string> {
+    return new Set(value.match(/\b\d{1,4}\b/g) || []);
+}
+
+function matchingScore(technology: string, titleText: string): number {
+    const normalizedTechnology = normalizeBenchmarkSearchText(technology);
+    const normalizedTitle = normalizeBenchmarkSearchText(titleText);
+    if (!normalizedTechnology || !normalizedTitle) return 0;
+
+    if (normalizedTitle.includes(normalizedTechnology) || normalizedTechnology.includes(normalizedTitle)) {
+        return 1000;
+    }
+
+    const technologyTokens = searchTokens(normalizedTechnology);
+    const titleTokens = searchTokens(normalizedTitle);
+    if (technologyTokens.size === 0 || titleTokens.size === 0) return 0;
+
+    let matched = 0;
+    for (const token of technologyTokens) {
+        if (titleTokens.has(token)) matched++;
+    }
+
+    const recall = matched / technologyTokens.size;
+    const precision = matched / Math.min(titleTokens.size, technologyTokens.size + 3);
+    let score = (recall * 75) + (precision * 25);
+
+    const technologyNumbers = numericTokens(normalizedTechnology);
+    const titleNumbers = numericTokens(normalizedTitle);
+    if (technologyNumbers.size > 0) {
+        const sharedNumber = [...technologyNumbers].some((token) => titleNumbers.has(token));
+        if (!sharedNumber) score -= 35;
+        else score += 20;
+    }
+
+    if (/\bwindows\b/.test(normalizedTechnology) !== /\bwindows\b/.test(normalizedTitle)) score -= 25;
+    if (/\blinux\b/.test(normalizedTechnology) !== /\blinux\b/.test(normalizedTitle)) score -= 20;
+
+    return score;
+}
+
 function parseVersion(value: string | null | undefined): number[] {
     return (value || "")
         .split(".")
@@ -154,27 +241,36 @@ function selectLatestBenchmarkByKind(
     excelFiles: CISExcelFile[],
     kind: "benchmark" | "stig"
 ): { benchmark: CISBenchmark; excel: CISExcelFile } | null {
-    const normalizedTechnology = normalizeTitle(technology);
     const excelById = new Map(excelFiles.map((excel) => [Number(excel.workbenchId), excel]));
 
     const candidates = benchmarks
         .map((benchmark) => ({
             benchmark,
             excel: excelById.get(Number(benchmark.workbenchId)),
-            normalizedTitle: normalizeTitle(benchmark.benchmarkTitle),
+            score: 0,
         }))
-        .filter((candidate): candidate is { benchmark: CISBenchmark; excel: CISExcelFile; normalizedTitle: string } =>
+        .filter((candidate): candidate is { benchmark: CISBenchmark; excel: CISExcelFile; score: number } =>
             Boolean(candidate.excel)
         )
-        .filter(({ benchmark, excel, normalizedTitle }) => {
+        .map((candidate) => {
+            const titleText = `${candidate.benchmark.benchmarkTitle} ${candidate.excel.excelTitle} ${candidate.excel.excelFileName}`;
+            return {
+                ...candidate,
+                score: matchingScore(technology, titleText),
+            };
+        })
+        .filter(({ benchmark, excel, score }) => {
             const titleText = `${benchmark.benchmarkTitle} ${excel.excelTitle} ${excel.excelFileName}`;
             const isStig = /\bSTIG\b/i.test(titleText);
             if (kind === "benchmark" && EXCLUDED_TITLE_PATTERNS.some((pattern) => pattern.test(titleText))) return false;
             if (kind === "stig" && (!isStig || EXCLUDED_STIG_TITLE_PATTERNS.some((pattern) => pattern.test(titleText)))) return false;
-            return normalizedTitle.includes(normalizedTechnology) || normalizedTechnology.includes(normalizedTitle);
+            return score >= 65;
         });
 
     candidates.sort((a, b) => {
+        const scoreDiff = b.score - a.score;
+        if (scoreDiff !== 0) return scoreDiff;
+
         const acceptedScore =
             Number((b.benchmark.benchmarkStatus?.status || "").toLowerCase() === "accepted") -
             Number((a.benchmark.benchmarkStatus?.status || "").toLowerCase() === "accepted");
