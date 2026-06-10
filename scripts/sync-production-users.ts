@@ -6,6 +6,18 @@ const prisma = new PrismaClient();
 const adminPassword = process.env.SEED_ADMIN_PASSWORD || "SkyShield2026!";
 const csrPassword =
   process.env.SEED_COMPUTER_SECURITY_REVIEW_PASSWORD || "ComputerSecurity2026!";
+const invitedUserPassword =
+  process.env.SEED_INVITED_USER_PASSWORD || csrPassword;
+
+function nameFromEmail(email: string) {
+  const localPart = email.split("@")[0] || email;
+
+  return localPart
+    .split(/[._-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
 
 async function main() {
   const org = await prisma.organization.upsert({
@@ -16,6 +28,7 @@ async function main() {
 
   const adminPasswordHash = await hash(adminPassword, 12);
   const csrPasswordHash = await hash(csrPassword, 12);
+  const invitedUserPasswordHash = await hash(invitedUserPassword, 12);
 
   const users = [
     {
@@ -68,6 +81,46 @@ async function main() {
       },
     });
     console.log(`Synced ${user.email} as ${user.role}`);
+  }
+
+  const pendingInvitations = await prisma.invitation.findMany({
+    where: {
+      used: false,
+      expiresAt: { gt: new Date() },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  for (const invitation of pendingInvitations) {
+    const existingUser = await prisma.user.findUnique({
+      where: { email: invitation.email },
+      select: { id: true },
+    });
+
+    await prisma.user.upsert({
+      where: { email: invitation.email },
+      update: {
+        role: invitation.role,
+        organizationId: invitation.organizationId,
+        active: true,
+      },
+      create: {
+        email: invitation.email,
+        name: nameFromEmail(invitation.email),
+        role: invitation.role,
+        passwordHash: invitedUserPasswordHash,
+        organizationId: invitation.organizationId,
+      },
+    });
+
+    await prisma.invitation.update({
+      where: { id: invitation.id },
+      data: { used: true },
+    });
+
+    console.log(
+      `${existingUser ? "Activated existing" : "Provisioned invited"} user ${invitation.email} as ${invitation.role}`
+    );
   }
 }
 

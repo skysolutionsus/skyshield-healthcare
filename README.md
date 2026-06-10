@@ -382,6 +382,7 @@ Keep `AUTH_SECRET` stable across deploys. Rotating it invalidates sessions and m
 | `SKYSHIELD_RUN_LEGACY_SCSEM_SEED` | unset/false | Run the legacy Prisma seed during startup |
 | `SEED_ADMIN_PASSWORD` | script default | Password used by `scripts/sync-production-users.ts` for configured admin users |
 | `SEED_COMPUTER_SECURITY_REVIEW_PASSWORD` | script default | Password used by `scripts/sync-production-users.ts` for configured Computer Security Review users |
+| `SEED_INVITED_USER_PASSWORD` | `SEED_COMPUTER_SECURITY_REVIEW_PASSWORD` | Temporary password used when startup provisions active pending invitations |
 
 The legacy `prisma/seed.ts` resets several data tables and imports bundled SCSEM templates. Use it intentionally in local development. Do not treat it as a normal production startup task.
 
@@ -500,6 +501,7 @@ SKYSHIELD_SYNC_PRODUCTION_USERS=true
 SKYSHIELD_RUN_LEGACY_SCSEM_SEED=false
 SEED_ADMIN_PASSWORD=rotate-this
 SEED_COMPUTER_SECURITY_REVIEW_PASSWORD=rotate-this-too
+SEED_INVITED_USER_PASSWORD=rotate-this-invite-password-too
 ```
 
 ## Scripts
