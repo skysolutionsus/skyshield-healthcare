@@ -272,6 +272,35 @@ function lastVisibleDataRow(
     return rows.find((row) => !rowHidden(worksheet, row)) ?? rows[0] ?? null;
 }
 
+function autoFilterNodes(sheet: XlsxPopulateSheet): any[] {
+    const children = sheet?._node?.children;
+    if (!Array.isArray(children)) return [];
+    return children.filter((child: any) => child?.name === "autoFilter");
+}
+
+function currentAutoFilterRef(sheet: XlsxPopulateSheet): string | null {
+    return autoFilterNodes(sheet)[0]?.attributes?.ref || null;
+}
+
+function setExistingAutoFilterRef(sheet: XlsxPopulateSheet, ref: string) {
+    const children = sheet?._node?.children;
+    if (!Array.isArray(children)) return;
+
+    const filters = autoFilterNodes(sheet);
+    const [filter, ...duplicates] = filters;
+    if (!filter) return;
+
+    filter.attributes = {
+        ...(filter.attributes || {}),
+        ref,
+    };
+
+    for (const duplicate of duplicates) {
+        const index = children.indexOf(duplicate);
+        if (index >= 0) children.splice(index, 1);
+    }
+}
+
 function extendPopulateAutoFilter(
     sheet: XlsxPopulateSheet,
     readWorksheet: XLSX.WorkSheet,
@@ -283,12 +312,53 @@ function extendPopulateAutoFilter(
     const range = XLSX.utils.decode_range(ref);
     if (throughRow <= range.e.r) return;
 
-    sheet.range(
-        range.s.r + 1,
-        range.s.c + 1,
-        throughRow + 1,
-        range.e.c + 1
-    ).autoFilter();
+    range.e.r = throughRow;
+    setExistingAutoFilterRef(sheet, XLSX.utils.encode_range(range));
+}
+
+function quoteSheetName(sheetName: string): string {
+    return `'${sheetName.replace(/'/g, "''")}'`;
+}
+
+function absoluteRangeRef(ref: string): string {
+    const range = XLSX.utils.decode_range(ref);
+    const start = `$${XLSX.utils.encode_col(range.s.c)}$${range.s.r + 1}`;
+    const end = `$${XLSX.utils.encode_col(range.e.c)}$${range.e.r + 1}`;
+    return `${start}:${end}`;
+}
+
+function syncWorkbookAutoFilterDefinedNames(
+    workbook: XlsxPopulateWorkbook,
+    readWorkbook: XLSX.WorkBook
+) {
+    const definedNames = workbook?._node?.children?.find((child: any) => child?.name === "definedNames");
+    const children = definedNames?.children;
+    if (!Array.isArray(children)) return;
+
+    const filterRefsBySheetId = new Map<number, string>();
+    for (const [index, sheetName] of readWorkbook.SheetNames.entries()) {
+        const sheet = workbook.sheet(sheetName);
+        const ref = sheet ? currentAutoFilterRef(sheet) : null;
+        if (!ref) continue;
+        setExistingAutoFilterRef(sheet, ref);
+        filterRefsBySheetId.set(index, `${quoteSheetName(sheetName)}!${absoluteRangeRef(ref)}`);
+    }
+
+    const seenFilterSheets = new Set<number>();
+    definedNames.children = children.filter((child: any) => {
+        if (child?.name !== "definedName" || child?.attributes?.name !== "_xlnm._FilterDatabase") {
+            return true;
+        }
+
+        const localSheetId = Number(child.attributes.localSheetId);
+        if (!Number.isFinite(localSheetId)) return true;
+        if (seenFilterSheets.has(localSheetId)) return false;
+
+        const nextRef = filterRefsBySheetId.get(localSheetId);
+        if (nextRef) child.children = [nextRef];
+        seenFilterSheets.add(localSheetId);
+        return true;
+    });
 }
 
 function findLogHeader(worksheet: XLSX.WorkSheet): {
@@ -703,6 +773,7 @@ async function buildTemplateWorkbookFromOriginalPreserving(
     }
 
     appendWorkbookLogSheetsPreserving(workbook, readWorkbook, changeLogs);
+    syncWorkbookAutoFilterDefinedNames(workbook, readWorkbook);
     forceWorkbookRecalculation(workbook);
 
     const output = await workbook.outputAsync({ type: "nodebuffer" });
@@ -877,6 +948,7 @@ async function buildWorkbookFromOriginalPreserving(
     }
 
     appendWorkbookLogSheetsPreserving(workbook, readWorkbook, changeLogs);
+    syncWorkbookAutoFilterDefinedNames(workbook, readWorkbook);
     forceWorkbookRecalculation(workbook);
 
     const output = await workbook.outputAsync({ type: "nodebuffer" });
