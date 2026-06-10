@@ -50,6 +50,28 @@ type XlsxPopulateWorkbook = any;
 type XlsxPopulateSheet = any;
 type LogField = "version" | "date" | "description" | "author" | "source" | "target";
 
+type TemplateWorkbookExport = {
+    filePath: string;
+    sheets: Array<{
+        sheetName: string;
+        sheetType: string;
+        sheetIndex: number;
+        rawData?: unknown;
+        controls: Array<Record<string, any> & {
+            testId: string;
+            rowIndex: number;
+            updateHighlight?: boolean;
+        }>;
+    }>;
+    changeLogs?: Array<{
+        version: string;
+        changeDate: Date | string;
+        description: string;
+        changedBy?: string | null;
+        source: string;
+    }>;
+};
+
 const HEADER_PATTERNS: Array<[ExportField, RegExp[]]> = [
     ["testId", [/^test id\b/i]],
     ["nistId", [/^nist id$/i]],
@@ -88,6 +110,20 @@ const LOG_HEADER_PATTERNS: Array<[LogField, RegExp[]]> = [
 async function loadXlsxPopulate(): Promise<any> {
     const mod = await import("xlsx-populate");
     return (mod as any).default || mod;
+}
+
+function workbookExtension(fileName: string): ".xlsx" | ".xlsm" {
+    return path.extname(fileName).toLowerCase() === ".xlsm" ? ".xlsm" : ".xlsx";
+}
+
+function hasVbaProject(buffer: Buffer): boolean {
+    return buffer.includes(Buffer.from("xl/vbaProject.bin"));
+}
+
+function assertVbaPreserved(input: Buffer, output: Buffer) {
+    if (hasVbaProject(input) && !hasVbaProject(output)) {
+        throw new Error("Macro-enabled workbook export lost the VBA project.");
+    }
 }
 
 function cellText(worksheet: XLSX.WorkSheet, row: number, col: number): string {
@@ -336,14 +372,8 @@ function patchTestCaseSheetPreserving(
     const header = findHeader(readWorksheet);
     if (!header) return;
 
-    const originalControls = controls.filter((control) =>
-        (control.extraColumns as Record<string, unknown> | null | undefined)?.source !== "scsem_updater"
-    );
-    const rowByTestId = new Map(originalControls.map((control) => [control.testId, control.rowIndex]));
-    let appendRow = Math.max(
-        header.headerRow + 1,
-        ...originalControls.map((control) => control.rowIndex + 1)
-    );
+    const rowByTestId = buildRowByTestId(readWorksheet, header);
+    let appendRow = Math.max(header.range.e.r + 1, header.headerRow + 1);
 
     for (const control of controls) {
         let row = rowByTestId.get(control.testId);
@@ -441,6 +471,120 @@ function appendWorkbookLogSheetsPreserving(
         if (!sheet || !readWorksheet) continue;
         appendLogRowsPreserving(sheet, readWorksheet, changeLogs);
     }
+}
+
+function toExportControl(control: TemplateWorkbookExport["sheets"][number]["controls"][number]): ExportControl {
+    return {
+        rowIndex: control.rowIndex,
+        testId: control.testId,
+        nistId: control.nistId || null,
+        nistControlName: control.nistControlName || null,
+        testMethod: control.testMethod || null,
+        sectionTitle: control.sectionTitle || null,
+        description: control.description || null,
+        testProcedures: control.testProcedures || null,
+        expectedResults: control.expectedResults || null,
+        actualResults: control.actualResults || null,
+        status: control.status || null,
+        findingStatement: control.findingStatement || null,
+        notesEvidence: control.notesEvidence || (control.updateHighlight ? "Updated by SkyShield review" : null),
+        criticality: control.criticality || null,
+        issueCode: control.issueCode || null,
+        issueCodeDescription: control.issueCodeDescription || null,
+        cisBenchmarkRef: control.cisBenchmarkRef || null,
+        recommendationNum: control.recommendationNum || null,
+        rationale: control.rationale || null,
+        impact: control.impact || null,
+        remediationProcedure: control.remediationProcedure || null,
+        remediationStatement: control.remediationStatement || null,
+        capRequestStatement: control.capRequestStatement || null,
+        riskRating: control.riskRating || null,
+        extraColumns: (control.extraColumns as Record<string, unknown> | null | undefined) || null,
+        updateHighlight: Boolean(control.updateHighlight),
+    };
+}
+
+function toExportSheets(template: TemplateWorkbookExport): ExportSheet[] {
+    return template.sheets.map((sheet) => ({
+        sheetName: sheet.sheetName,
+        sheetType: sheet.sheetType as ExportSheet["sheetType"],
+        sheetIndex: sheet.sheetIndex,
+        rawData: (sheet.rawData as any[][] | null | undefined) || null,
+        controls: sheet.controls.map(toExportControl),
+        changeLogEntries: [],
+    }));
+}
+
+function toChangeLogEntries(template: TemplateWorkbookExport): ChangeLogEntry[] {
+    return (template.changeLogs || [])
+        .filter((entry) => entry.source !== "xlsx_import")
+        .map((entry) => {
+            const changeDate = entry.changeDate instanceof Date
+                ? entry.changeDate
+                : new Date(entry.changeDate);
+
+            return {
+                version: entry.version || "SkyShield Update",
+                changeDate: Number.isNaN(changeDate.getTime()) ? new Date() : changeDate,
+                description: entry.description || "SkyShield SCSEM update",
+                changedBy: entry.changedBy || null,
+                source: entry.source || "skyshield",
+            };
+        });
+}
+
+function allWritableFieldsByTestId(controls: ExportControl[]): Map<string, Set<ExportField>> {
+    const fields = new Set<ExportField>(HEADER_PATTERNS.map(([field]) => field));
+    const fieldsByTestId = new Map<string, Set<ExportField>>();
+
+    for (const control of controls) {
+        if (!control.updateHighlight) continue;
+        fieldsByTestId.set(control.testId, fields);
+    }
+
+    return fieldsByTestId;
+}
+
+async function buildTemplateWorkbookFromOriginalPreserving(
+    sourcePath: string,
+    sheets: ExportSheet[],
+    changeLogs: ChangeLogEntry[]
+): Promise<Buffer | null> {
+    if (!fs.existsSync(sourcePath)) return null;
+
+    const originalBuffer = fs.readFileSync(sourcePath);
+    const changedControls = sheets.flatMap((sheet) => sheet.controls).filter((control) => control.updateHighlight);
+    if (changedControls.length === 0 && changeLogs.length === 0) return originalBuffer;
+
+    const XlsxPopulate = await loadXlsxPopulate();
+    const workbook = await XlsxPopulate.fromDataAsync(originalBuffer);
+    const readWorkbook = XLSX.readFile(sourcePath, {
+        cellDates: true,
+        cellStyles: true,
+        sheetStubs: true,
+    });
+
+    for (const sheet of sheets) {
+        if (sheet.sheetType !== "test_cases" || sheet.controls.length === 0) continue;
+
+        const populateSheet = workbook.sheet(sheet.sheetName);
+        const readWorksheet = readWorkbook.Sheets[sheet.sheetName];
+        if (!populateSheet || !readWorksheet) continue;
+
+        patchTestCaseSheetPreserving(
+            populateSheet,
+            readWorksheet,
+            sheet.controls,
+            allWritableFieldsByTestId(sheet.controls)
+        );
+    }
+
+    appendWorkbookLogSheetsPreserving(workbook, readWorkbook, changeLogs);
+
+    const output = await workbook.outputAsync({ type: "nodebuffer" });
+    const outputBuffer = Buffer.isBuffer(output) ? output : Buffer.from(output);
+    assertVbaPreserved(originalBuffer, outputBuffer);
+    return outputBuffer;
 }
 
 function addSkyShieldChangeLog(workbook: XLSX.WorkBook, changeLogs: ChangeLogEntry[]) {
@@ -611,7 +755,9 @@ async function buildWorkbookFromOriginalPreserving(
     appendWorkbookLogSheetsPreserving(workbook, readWorkbook, changeLogs);
 
     const output = await workbook.outputAsync({ type: "nodebuffer" });
-    return Buffer.isBuffer(output) ? output : Buffer.from(output);
+    const outputBuffer = Buffer.isBuffer(output) ? output : Buffer.from(output);
+    assertVbaPreserved(originalBuffer, outputBuffer);
+    return outputBuffer;
 }
 
 function cloneParsedSheets(parsed: ParsedSCSEM): ExportSheet[] {
@@ -738,6 +884,28 @@ function applyApprovedChanges(parsed: ParsedSCSEM, session: SCSEMUpdaterSession)
     return { sheets, applied };
 }
 
+export async function buildSCSEMTemplateWorkbookBuffer(template: TemplateWorkbookExport): Promise<Buffer> {
+    const sourcePath = path.isAbsolute(template.filePath)
+        ? template.filePath
+        : path.join(process.cwd(), template.filePath);
+    const sheets = toExportSheets(template);
+    const changeLogs = toChangeLogEntries(template);
+
+    const preservedWorkbook = await buildTemplateWorkbookFromOriginalPreserving(
+        sourcePath,
+        sheets,
+        changeLogs
+    );
+    if (preservedWorkbook) return preservedWorkbook;
+
+    const workbook = buildReconstructedWorkbook(sheets, changeLogs);
+    return XLSX.write(workbook, {
+        type: "buffer",
+        bookType: "xlsx",
+        cellStyles: true,
+    });
+}
+
 export async function buildSCSEMUpdaterWorkbookBuffer(
     session: SCSEMUpdaterSession,
     parsed: ParsedSCSEM,
@@ -773,10 +941,17 @@ export async function buildSCSEMUpdaterWorkbookBuffer(
 }
 
 export function updatedSCSEMFileName(originalFileName: string): string {
-    const extension = path.extname(originalFileName) || ".xlsx";
-    const base = path.basename(originalFileName, extension)
+    const originalExtension = path.extname(originalFileName);
+    const extension = workbookExtension(originalFileName);
+    const base = path.basename(originalFileName, originalExtension || extension)
         .replace(/[^a-z0-9._-]+/gi, "-")
         .replace(/-+/g, "-")
         .replace(/^-|-$/g, "") || "Safeguards-SCSEM";
-    return `${base}-updated.xlsx`;
+    return `${base}-updated${extension}`;
+}
+
+export function excelContentTypeForFileName(fileName: string): string {
+    return workbookExtension(fileName) === ".xlsm"
+        ? "application/vnd.ms-excel.sheet.macroEnabled.12"
+        : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 }

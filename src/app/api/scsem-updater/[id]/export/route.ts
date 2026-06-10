@@ -9,6 +9,7 @@ import {
 import { parseSCSEMFile } from "@/lib/xlsx-parser";
 import {
     buildSCSEMUpdaterWorkbookBuffer,
+    excelContentTypeForFileName,
     updatedSCSEMFileName,
 } from "@/lib/scsem-workbook-export";
 
@@ -67,8 +68,7 @@ export async function GET(
         return new Response(new Uint8Array(buffer), {
             status: 200,
             headers: {
-                "Content-Type":
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "Content-Type": excelContentTypeForFileName(exportFileName),
                 "Content-Disposition": `attachment; filename="${exportFileName}"`,
             },
         });
