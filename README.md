@@ -37,6 +37,47 @@ SkyShield has two important operating principles:
 | Spreadsheets | `xlsx` for parsing, `xlsx-populate` for format-preserving workbook edits |
 | Deployment | Docker, docker-compose, standalone Next output |
 
+## Architecture Layers
+
+SkyShield is currently a full-stack Next.js application. The browser UI is JavaScript/TypeScript rendered by React and Next.js. The backend API is also TypeScript running in the Next.js Node.js runtime. Python is used for local utility scripts and document/PDF generation, not as a production API service.
+
+```mermaid
+flowchart LR
+  User["Reviewer browser"] --> UI["React / Next.js UI\n/scsems, /agent, /audit-log"]
+  UI --> API["Next.js API routes\nNode.js runtime"]
+  API --> Auth["Auth layer\nNextAuth, MFA, RBAC"]
+  API --> Services["Domain services\nSCSEM parser, update engine,\nknowledge retrieval, CIS/STIG clients"]
+  Services --> Storage["Runtime file storage\nuploads, exports, benchmark snapshots"]
+  Services --> DB["PostgreSQL + Prisma\nusers, audit logs, incidents,\nknowledge chunks, settings"]
+  Services --> AI["Bifrost AI APIs\noptional recommendations and embeddings"]
+  Services --> CIS["CIS SecureSuite API\nCIS and STIG benchmark workbooks"]
+```
+
+Cross-cutting security controls sit across the API and service layers: mandatory MFA, role-gated navigation and API access, organization-scoped SCSEM updater sessions, upload size/type/signature validation, PII/FTI blocking before AI calls, audit logging, source workbook hashes, and HTTP security headers.
+
+## SCSEM Update Workflow
+
+```mermaid
+flowchart LR
+  Upload["Upload IRS SCSEM workbook"] --> Parse["Parse workbook\ninfer technology and controls"]
+  Parse --> Match["Match latest CIS and STIG\nbenchmark workbooks"]
+  Match --> Snapshot["Store source snapshots\nrelease metadata + SHA-256"]
+  Snapshot --> Compare["Compare current SCSEM rows\nand missing recommendations"]
+  Compare --> Pub["Pull Pub 1075 excerpts\nfor referenced controls"]
+  Pub --> Propose["Generate proposed changes\nAI or deterministic fallback"]
+  Propose --> Review["Human review\napprove, reject, edit, undo"]
+  Review --> Export["Export updated XLSX\napproved changes only"]
+  Export --> Audit["Audit trail\nupload through export"]
+```
+
+Primary API calls for the demo flow:
+
+- `POST /api/scsem-updater/upload` stores the original workbook, validates it, parses metadata, creates an updater session, and logs the upload.
+- `POST /api/scsem-updater/[id]/analyze` selects CIS/STIG benchmark evidence, extracts Pub 1075 context, produces proposed updates, and logs source metadata.
+- `PATCH /api/scsem-updater/[id]/changes` records reviewer edits, approvals, rejections, and batch decisions.
+- `POST /api/scsem-updater/[id]/undo` restores the most recent approve/reject action.
+- `GET /api/scsem-updater/[id]/export` applies approved changes to the original workbook and returns the updated XLSX.
+
 ## Main Workflows
 
 ### AI Compliance Agent
@@ -277,7 +318,7 @@ SkyShield uses credentials auth through NextAuth.
 - TOTP secrets are encrypted.
 - Recovery codes are generated for users and stored as hashes.
 - Admins can reset passwords and reset another user's MFA enrollment.
-- Security headers are applied through `src/proxy.ts`.
+- Security headers are applied globally and reinforced by `src/proxy.ts`.
 
 Roles:
 
@@ -514,10 +555,13 @@ SPEC.md                          Product specification
 - MFA is mandatory for authenticated users.
 - Admin reset actions are audited.
 - Role checks are enforced in `src/proxy.ts` and API handlers.
-- Security headers are added by the proxy.
+- SCSEM updater sessions are scoped to the creator's organization.
+- SCSEM workbook uploads enforce extension, size, and Office Open XML file-signature checks.
+- Security headers are added globally through `next.config.ts` and reinforced for protected routes by `src/proxy.ts`.
 - Runtime uploads should be stored outside the immutable app bundle in production.
 - CIS source files are retained with hashes for traceability.
 - AI output is not considered authoritative by itself. Reviewers must validate proposed changes against Publication 1075, applicable STIG requirements, CIS source workbooks, and agency policy.
+- Production deployments should validate environment-level TLS/FIPS, database encryption, network segmentation, firewall rules, and SIEM forwarding with the hosting agency's boundary and operations teams.
 
 ## Troubleshooting
 

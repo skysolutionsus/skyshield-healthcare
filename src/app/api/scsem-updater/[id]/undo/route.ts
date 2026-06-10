@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { auditRequestContext, logAudit, truncateAuditText } from "@/lib/audit";
 import {
-    readSCSEMUpdaterSession,
+    readSCSEMUpdaterSessionForUser,
     writeSCSEMUpdaterSession,
     type SCSEMUpdaterHistoryEntry,
 } from "@/lib/scsem-updater-store";
@@ -46,7 +46,7 @@ export async function POST(
         const user = session.user as unknown as { id: string; organizationId: string };
 
         const { id } = await params;
-        const updaterSession = readSCSEMUpdaterSession(id);
+        const updaterSession = readSCSEMUpdaterSessionForUser(id, user);
         const lastStatusChange = latestStatusHistory(updaterSession.history);
         if (!lastStatusChange) {
             return NextResponse.json({ error: "No review action is available to undo." }, { status: 400 });

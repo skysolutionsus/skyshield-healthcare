@@ -70,6 +70,8 @@ export interface SCSEMUpdaterSession {
     id: string;
     originalFileName: string;
     originalFilePath: string;
+    organizationId?: string;
+    createdByUserId?: string;
     uploadedAt: string;
     inferredTechnology: string;
     status: SCSEMUpdaterStatus;
@@ -168,7 +170,11 @@ export function resolveUpdaterPath(storedPath: string): string {
     return resolveRuntimeFilePath(storedPath);
 }
 
-export function createSCSEMUpdaterSession(originalFileName: string, workbookBuffer: Buffer): SCSEMUpdaterSession {
+export function createSCSEMUpdaterSession(
+    originalFileName: string,
+    workbookBuffer: Buffer,
+    owner: { organizationId: string; userId: string }
+): SCSEMUpdaterSession {
     const id = randomUUID();
     const dir = sessionDir(id);
     fs.mkdirSync(dir, { recursive: true });
@@ -182,6 +188,8 @@ export function createSCSEMUpdaterSession(originalFileName: string, workbookBuff
         id,
         originalFileName,
         originalFilePath: storedPathForRuntimeFile(absoluteFilePath),
+        organizationId: owner.organizationId,
+        createdByUserId: owner.userId,
         uploadedAt: new Date().toISOString(),
         inferredTechnology: inferSCSEMTechnology(originalFileName, parsed.metadata.subject),
         status: "uploaded",
@@ -210,6 +218,17 @@ export function readSCSEMUpdaterSession(id: string): SCSEMUpdaterSession {
     const filePath = sessionJsonPath(id);
     if (!fs.existsSync(filePath)) throw new Error("SCSEM updater session not found.");
     return JSON.parse(fs.readFileSync(filePath, "utf8")) as SCSEMUpdaterSession;
+}
+
+export function readSCSEMUpdaterSessionForUser(
+    id: string,
+    user: { organizationId: string }
+): SCSEMUpdaterSession {
+    const session = readSCSEMUpdaterSession(id);
+    if (!session.organizationId || session.organizationId !== user.organizationId) {
+        throw new Error("SCSEM updater session not found.");
+    }
+    return session;
 }
 
 export function writeSCSEMUpdaterSession(session: SCSEMUpdaterSession): void {

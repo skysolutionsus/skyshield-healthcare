@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { auditRequestContext, logAudit, truncateAuditText } from "@/lib/audit";
 import {
-    readSCSEMUpdaterSession,
+    readSCSEMUpdaterSessionForUser,
     writeSCSEMUpdaterSession,
     type SCSEMUpdaterChange,
     type SCSEMUpdaterChangeStatus,
@@ -74,7 +74,7 @@ export async function PATCH(
             return NextResponse.json({ error: "Missing change id." }, { status: 400 });
         }
 
-        const updaterSession = readSCSEMUpdaterSession(id);
+        const updaterSession = readSCSEMUpdaterSessionForUser(id, user);
         const ids = new Set(changeIds.map(String));
         let touched = 0;
         const affectedChanges: Array<{

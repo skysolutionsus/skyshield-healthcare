@@ -13,6 +13,14 @@ function extensionOf(fileName: string): string {
     return match?.[0] || "";
 }
 
+function isOpenXmlWorkbook(buffer: Buffer): boolean {
+    return buffer.length >= 4 &&
+        buffer[0] === 0x50 &&
+        buffer[1] === 0x4b &&
+        buffer[2] === 0x03 &&
+        buffer[3] === 0x04;
+}
+
 export async function POST(request: Request) {
     try {
         const session = await auth();
@@ -41,7 +49,14 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Uploaded workbook was empty." }, { status: 400 });
         }
 
-        const updaterSession = createSCSEMUpdaterSession(file.name, buffer);
+        if (!isOpenXmlWorkbook(buffer)) {
+            return NextResponse.json({ error: "Uploaded file is not a valid Office Open XML workbook." }, { status: 400 });
+        }
+
+        const updaterSession = createSCSEMUpdaterSession(file.name, buffer, {
+            organizationId: user.organizationId,
+            userId: user.id,
+        });
         await logAudit({
             organizationId: user.organizationId,
             userId: user.id,

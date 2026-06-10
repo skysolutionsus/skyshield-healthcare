@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { readSCSEMUpdaterSession } from "@/lib/scsem-updater-store";
+import { readSCSEMUpdaterSessionForUser } from "@/lib/scsem-updater-store";
 
 export const runtime = "nodejs";
 
@@ -15,7 +15,8 @@ export async function GET(
         }
 
         const { id } = await params;
-        const updaterSession = readSCSEMUpdaterSession(id);
+        const user = session.user as unknown as { organizationId: string };
+        const updaterSession = readSCSEMUpdaterSessionForUser(id, user);
         return NextResponse.json({ session: updaterSession });
     } catch (error: any) {
         const status = error.message?.includes("not found") ? 404 : 500;

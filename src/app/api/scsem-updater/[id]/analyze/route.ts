@@ -16,7 +16,7 @@ import {
 } from "@/lib/cis-benchmark-xlsx";
 import {
     addIdsToChanges,
-    readSCSEMUpdaterSession,
+    readSCSEMUpdaterSessionForUser,
     resolveUpdaterPath,
     writeSCSEMUpdaterSession,
     type SCSEMUpdaterAuditSource,
@@ -253,15 +253,16 @@ export async function POST(
     { params }: { params: Promise<{ id: string }> }
 ) {
     const { id } = await params;
+    let user: { id: string; organizationId: string } | null = null;
 
     try {
         const session = await auth();
         if (!session?.user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
-        const user = session.user as unknown as { id: string; organizationId: string };
+        user = session.user as unknown as { id: string; organizationId: string };
 
-        const updaterSession = readSCSEMUpdaterSession(id);
+        const updaterSession = readSCSEMUpdaterSessionForUser(id, user);
         updaterSession.status = "analyzing";
         updaterSession.error = undefined;
         writeSCSEMUpdaterSession(updaterSession);
@@ -654,7 +655,10 @@ Rules:
     } catch (error: any) {
         console.error("SCSEM updater analysis error:", error);
         try {
-            const updaterSession = readSCSEMUpdaterSession(id);
+            const updaterSession = user
+                ? readSCSEMUpdaterSessionForUser(id, user)
+                : null;
+            if (!updaterSession) throw new Error("SCSEM updater session not found.");
             updaterSession.status = "error";
             updaterSession.error = error.message || "Failed to analyze uploaded SCSEM workbook.";
             writeSCSEMUpdaterSession(updaterSession);

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { auditRequestContext, logAudit } from "@/lib/audit";
 import {
-    readSCSEMUpdaterSession,
+    readSCSEMUpdaterSessionForUser,
     resolveUpdaterPath,
 } from "@/lib/scsem-updater-store";
 import { parseSCSEMFile } from "@/lib/xlsx-parser";
@@ -27,7 +27,7 @@ export async function GET(
         const user = session.user as unknown as { id: string; organizationId: string };
 
         const { id } = await params;
-        const updaterSession = readSCSEMUpdaterSession(id);
+        const updaterSession = readSCSEMUpdaterSessionForUser(id, user);
         const originalPath = resolveUpdaterPath(updaterSession.originalFilePath);
         const approvedChanges = updaterSession.changes.filter((change) => change.status === "APPROVED");
         const exportFileName = updatedSCSEMFileName(updaterSession.originalFileName);
