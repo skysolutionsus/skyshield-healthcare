@@ -263,14 +263,14 @@ export function SCSEMUpdateReview({ templateId, templateName, review }: SCSEMUpd
                             {isExpanded && (
                                 <div className="px-4 pb-4 border-t border-[var(--sky-border)] pt-4">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="bg-red-900/10 border border-red-900/30 rounded-lg p-3">
-                                            <span className="text-[10px] font-bold uppercase tracking-wider text-red-400 mb-1 block">
+                                        <div className="bg-red-950/30 border border-red-500/25 rounded-lg p-3">
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-red-200 mb-1 block">
                                                 Current ({isNewControl ? "SCSEM" : FIELD_LABELS[change.field] || change.field})
                                             </span>
-                                            <p className="text-sm text-gray-300 whitespace-pre-wrap">{change.currentValue}</p>
+                                            <p className="text-sm text-[var(--sky-text-primary)] whitespace-pre-wrap">{change.currentValue}</p>
                                         </div>
-                                        <div className="bg-emerald-900/10 border border-emerald-900/30 rounded-lg p-3">
-                                            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 mb-1 block">
+                                        <div className="bg-emerald-950/30 border border-emerald-500/25 rounded-lg p-3">
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-200 mb-1 block">
                                                 Proposed
                                             </span>
                                             {isNewControl ? (
@@ -288,7 +288,7 @@ export function SCSEMUpdateReview({ templateId, templateName, review }: SCSEMUpd
                                                         className="min-h-[180px]"
                                                     />
                                                     <div>
-                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--sky-text-secondary)] mb-1 block">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--sky-text-primary)] mb-1 block">
                                                             Reason
                                                         </span>
                                                         <Textarea
@@ -344,7 +344,7 @@ function NewControlEditor({
     return (
         <div className="space-y-3">
             <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--sky-text-secondary)] mb-1 block">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--sky-text-primary)] mb-1 block">
                     Summary
                 </span>
                 <Textarea
@@ -357,7 +357,7 @@ function NewControlEditor({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {shortFields.map(([field, label]) => (
                     <label key={field} className="block">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--sky-text-secondary)] mb-1 block">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--sky-text-primary)] mb-1 block">
                             {label}
                         </span>
                         <input
@@ -371,7 +371,7 @@ function NewControlEditor({
 
             {longFields.map(([field, label]) => (
                 <div key={field}>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--sky-text-secondary)] mb-1 block">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--sky-text-primary)] mb-1 block">
                         {label}
                     </span>
                     <Textarea
@@ -383,7 +383,7 @@ function NewControlEditor({
             ))}
 
             <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--sky-text-secondary)] mb-1 block">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--sky-text-primary)] mb-1 block">
                     Reason
                 </span>
                 <Textarea

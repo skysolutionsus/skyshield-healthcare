@@ -602,14 +602,14 @@ function ChangeReview({
             {expanded && (
                 <div className="border-t border-[var(--sky-border)] p-4">
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                        <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3">
-                            <span className="mb-2 block text-[10px] font-bold uppercase text-red-300">
+                        <div className="rounded-lg border border-red-500/25 bg-red-950/30 p-3">
+                            <span className="mb-2 block text-[10px] font-bold uppercase text-red-200">
                                 Current {isNewControl ? "SCSEM" : FIELD_LABELS[change.field] || change.field}
                             </span>
-                            <p className="whitespace-pre-wrap text-sm leading-6 text-gray-300">{change.currentValue}</p>
+                            <p className="whitespace-pre-wrap text-sm leading-6 text-[var(--sky-text-primary)]">{change.currentValue}</p>
                         </div>
-                        <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3">
-                            <span className="mb-2 block text-[10px] font-bold uppercase text-emerald-300">
+                        <div className="rounded-lg border border-emerald-500/25 bg-emerald-950/30 p-3">
+                            <span className="mb-2 block text-[10px] font-bold uppercase text-emerald-200">
                                 Proposed
                             </span>
                             {isNewControl ? (
@@ -627,7 +627,7 @@ function ChangeReview({
                                         className="min-h-[180px]"
                                     />
                                     <div>
-                                        <span className="mb-1 block text-[10px] font-bold uppercase text-[var(--sky-text-secondary)]">
+                                        <span className="mb-1 block text-[10px] font-bold uppercase text-[var(--sky-text-primary)]">
                                             Explanation
                                         </span>
                                         <Textarea
@@ -706,7 +706,7 @@ function NewControlEditor({
     return (
         <div className="space-y-3">
             <div>
-                <span className="mb-1 block text-[10px] font-bold uppercase text-[var(--sky-text-secondary)]">
+                <span className="mb-1 block text-[10px] font-bold uppercase text-[var(--sky-text-primary)]">
                     Summary
                 </span>
                 <Textarea
@@ -719,7 +719,7 @@ function NewControlEditor({
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {shortFields.map(([field, label]) => (
                     <label key={field} className="block">
-                        <span className="mb-1 block text-[10px] font-bold uppercase text-[var(--sky-text-secondary)]">
+                        <span className="mb-1 block text-[10px] font-bold uppercase text-[var(--sky-text-primary)]">
                             {label}
                         </span>
                         <input
@@ -733,7 +733,7 @@ function NewControlEditor({
 
             {longFields.map(([field, label]) => (
                 <div key={field}>
-                    <span className="mb-1 block text-[10px] font-bold uppercase text-[var(--sky-text-secondary)]">
+                    <span className="mb-1 block text-[10px] font-bold uppercase text-[var(--sky-text-primary)]">
                         {label}
                     </span>
                     <Textarea
@@ -745,7 +745,7 @@ function NewControlEditor({
             ))}
 
             <div>
-                <span className="mb-1 block text-[10px] font-bold uppercase text-[var(--sky-text-secondary)]">
+                <span className="mb-1 block text-[10px] font-bold uppercase text-[var(--sky-text-primary)]">
                     Explanation
                 </span>
                 <Textarea

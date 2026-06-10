@@ -44,6 +44,10 @@ type ChangeLogEntry = {
     description: string;
     changedBy?: string | null;
     source: string;
+    details?: Array<{
+        target: string;
+        description: string;
+    }>;
 };
 
 type XlsxPopulateWorkbook = any;
@@ -124,6 +128,25 @@ function assertVbaPreserved(input: Buffer, output: Buffer) {
     if (hasVbaProject(input) && !hasVbaProject(output)) {
         throw new Error("Macro-enabled workbook export lost the VBA project.");
     }
+}
+
+function forceWorkbookRecalculation(workbook: XlsxPopulateWorkbook) {
+    const workbookNode = workbook?._node;
+    const children = workbookNode?.children;
+    if (!Array.isArray(children)) return;
+
+    let calcPr = children.find((child: any) => child?.name === "calcPr");
+    if (!calcPr) {
+        calcPr = { name: "calcPr", attributes: {}, children: [] };
+        children.push(calcPr);
+    }
+
+    calcPr.attributes = {
+        ...(calcPr.attributes || {}),
+        calcMode: "auto",
+        fullCalcOnLoad: "1",
+        forceFullCalc: "1",
+    };
 }
 
 function cellText(worksheet: XLSX.WorkSheet, row: number, col: number): string {
@@ -212,6 +235,62 @@ function buildRowByTestId(worksheet: XLSX.WorkSheet, header: ReturnType<typeof f
     return rows;
 }
 
+function rowHidden(worksheet: XLSX.WorkSheet, row: number): boolean {
+    return Boolean(worksheet["!rows"]?.[row]?.hidden);
+}
+
+function rowHasValue(
+    worksheet: XLSX.WorkSheet,
+    row: number,
+    startCol: number,
+    endCol: number
+): boolean {
+    for (let col = startCol; col <= endCol; col++) {
+        if (cellText(worksheet, row, col)) return true;
+    }
+    return false;
+}
+
+function lastNonEmptyRow(
+    worksheet: XLSX.WorkSheet,
+    startRow: number,
+    endRow: number,
+    startCol: number,
+    endCol: number
+): number {
+    for (let row = endRow; row >= startRow; row--) {
+        if (rowHasValue(worksheet, row, startCol, endCol)) return row;
+    }
+    return startRow - 1;
+}
+
+function lastVisibleDataRow(
+    worksheet: XLSX.WorkSheet,
+    rowByTestId: Map<string, number>
+): number | null {
+    const rows = [...rowByTestId.values()].sort((a, b) => b - a);
+    return rows.find((row) => !rowHidden(worksheet, row)) ?? rows[0] ?? null;
+}
+
+function extendPopulateAutoFilter(
+    sheet: XlsxPopulateSheet,
+    readWorksheet: XLSX.WorkSheet,
+    throughRow: number
+) {
+    const ref = (readWorksheet as any)["!autofilter"]?.ref;
+    if (!ref) return;
+
+    const range = XLSX.utils.decode_range(ref);
+    if (throughRow <= range.e.r) return;
+
+    sheet.range(
+        range.s.r + 1,
+        range.s.c + 1,
+        throughRow + 1,
+        range.e.c + 1
+    ).autoFilter();
+}
+
 function findLogHeader(worksheet: XLSX.WorkSheet): {
     headerRow: number;
     columns: Map<LogField, number>;
@@ -265,6 +344,21 @@ function setPopulateCellValue(sheet: XlsxPopulateSheet, row: number, col: number
     sheet.cell(row + 1, col + 1).value(nextValue);
 }
 
+function excelDateSerial(date: Date): number {
+    const utcDate = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+    const excelEpoch = Date.UTC(1899, 11, 30);
+    return Math.floor((utcDate - excelEpoch) / 86_400_000);
+}
+
+function adjustFormulaRows(formula: string, fromRow: number, toRow: number): string {
+    const fromExcelRow = fromRow + 1;
+    const toExcelRow = toRow + 1;
+    return formula.replace(
+        new RegExp(`(\\$?[A-Z]{1,3}\\$?)${fromExcelRow}(?!\\d)`, "g"),
+        `$1${toExcelRow}`
+    );
+}
+
 function copyPopulateCellStyle(sourceCell: any, targetCell: any) {
     if (!sourceCell || !targetCell) return;
 
@@ -285,7 +379,8 @@ function copyPopulateRowFormatting(
     fromRow: number,
     toRow: number,
     startCol: number,
-    endCol: number
+    endCol: number,
+    options: { hidden?: boolean; copyFormulas?: boolean } = {}
 ) {
     const sourceRow = sheet.row(fromRow + 1);
     const targetRow = sheet.row(toRow + 1);
@@ -300,13 +395,19 @@ function copyPopulateRowFormatting(
 
     const sourceHeight = sourceRow.height();
     if (typeof sourceHeight === "number") targetRow.height(sourceHeight);
-    targetRow.hidden(sourceRow.hidden());
+    targetRow.hidden(options.hidden ?? sourceRow.hidden());
 
     for (let col = startCol; col <= endCol; col++) {
-        copyPopulateCellStyle(
-            sourceRow.cell(col + 1),
-            targetRow.cell(col + 1)
-        );
+        const sourceCell = sourceRow.cell(col + 1);
+        const targetCell = targetRow.cell(col + 1);
+        copyPopulateCellStyle(sourceCell, targetCell);
+
+        if (options.copyFormulas) {
+            const formula = sourceCell.formula?.();
+            if (formula && formula !== "SHARED") {
+                targetCell.formula(adjustFormulaRows(formula, fromRow, toRow));
+            }
+        }
     }
 }
 
@@ -373,7 +474,11 @@ function patchTestCaseSheetPreserving(
     if (!header) return;
 
     const rowByTestId = buildRowByTestId(readWorksheet, header);
-    let appendRow = Math.max(header.range.e.r + 1, header.headerRow + 1);
+    const initialSourceRow = lastVisibleDataRow(readWorksheet, rowByTestId);
+    let appendRow = initialSourceRow === null
+        ? Math.max(header.headerRow + 1, header.range.s.r)
+        : initialSourceRow + 1;
+    let sourceRowForNewControls = initialSourceRow;
 
     for (const control of controls) {
         let row = rowByTestId.get(control.testId);
@@ -384,9 +489,13 @@ function patchTestCaseSheetPreserving(
 
         if (isNewRow) {
             row = appendRow++;
-            const sourceRow = Math.max(header.headerRow + 1, row - 1);
-            copyPopulateRowFormatting(sheet, sourceRow, row, header.range.s.c, header.range.e.c);
+            const sourceRow = sourceRowForNewControls ?? Math.max(header.headerRow + 1, row - 1);
+            copyPopulateRowFormatting(sheet, sourceRow, row, header.range.s.c, header.range.e.c, {
+                hidden: false,
+                copyFormulas: true,
+            });
             rowByTestId.set(control.testId, row);
+            sourceRowForNewControls = row;
         }
         if (row === undefined) continue;
 
@@ -400,6 +509,8 @@ function patchTestCaseSheetPreserving(
             setPopulateCellValue(sheet, row, col, getControlValue(control, field));
         }
     }
+
+    extendPopulateAutoFilter(sheet, readWorksheet, appendRow - 1);
 }
 
 function logSheetNames(workbook: XLSX.WorkBook): string[] {
@@ -432,29 +543,41 @@ function appendLogRowsPreserving(
         ["author", 3],
         ["source", 4],
     ] as Array<[LogField, number]>);
-    const endCol = Math.max(range.e.c, ...columns.values(), 4);
-    let appendRow = range.e.r + 1;
+    const endCol = Math.max(range.e.c, ...columns.values());
+    const firstDataRow = header ? header.headerRow + 1 : range.s.r;
+    const lastDataRow = lastNonEmptyRow(readWorksheet, firstDataRow, range.e.r, range.s.c, endCol);
+    let appendRow = Math.max(lastDataRow + 1, firstDataRow);
 
     for (const entry of entries) {
-        const sourceRow = Math.max(header ? header.headerRow + 1 : range.s.r, appendRow - 1);
-        copyPopulateRowFormatting(sheet, sourceRow, appendRow, range.s.c, endCol);
+        const details = columns.has("target") && entry.details?.length
+            ? entry.details
+            : [{ target: "Approved SCSEM updater changes", description: entry.description }];
 
-        const values = {
-            version: entry.version,
-            date: entry.changeDate.toISOString().slice(0, 10),
-            description: entry.description,
-            author: entry.changedBy || "",
-            source: entry.source,
-            target: "Approved SCSEM updater changes",
-        };
+        for (const detail of details) {
+            const sourceRow = Math.max(lastDataRow, header ? header.headerRow + 1 : range.s.r);
+            copyPopulateRowFormatting(sheet, sourceRow, appendRow, range.s.c, endCol, { hidden: false });
 
-        for (const [field, value] of Object.entries(values) as Array<[keyof typeof values, string]>) {
-            const col = columns.get(field);
-            if (col === undefined) continue;
-            setPopulateCellValue(sheet, appendRow, col, value);
+            const values = {
+                version: entry.version,
+                date: excelDateSerial(entry.changeDate),
+                description: detail.description,
+                author: entry.changedBy || "",
+                source: entry.source,
+                target: detail.target,
+            };
+
+            for (const [field, value] of Object.entries(values) as Array<[keyof typeof values, string | Date]>) {
+                const col = columns.get(field);
+                if (col === undefined) continue;
+                setPopulateCellValue(sheet, appendRow, col, value);
+            }
+
+            appendRow++;
         }
+    }
 
-        appendRow++;
+    if ((readWorksheet as any)["!autofilter"]?.ref) {
+        extendPopulateAutoFilter(sheet, readWorksheet, appendRow - 1);
     }
 }
 
@@ -580,6 +703,7 @@ async function buildTemplateWorkbookFromOriginalPreserving(
     }
 
     appendWorkbookLogSheetsPreserving(workbook, readWorkbook, changeLogs);
+    forceWorkbookRecalculation(workbook);
 
     const output = await workbook.outputAsync({ type: "nodebuffer" });
     const outputBuffer = Buffer.isBuffer(output) ? output : Buffer.from(output);
@@ -753,6 +877,7 @@ async function buildWorkbookFromOriginalPreserving(
     }
 
     appendWorkbookLogSheetsPreserving(workbook, readWorkbook, changeLogs);
+    forceWorkbookRecalculation(workbook);
 
     const output = await workbook.outputAsync({ type: "nodebuffer" });
     const outputBuffer = Buffer.isBuffer(output) ? output : Buffer.from(output);
@@ -809,6 +934,29 @@ function appendEvidenceNote(existing: string | null, change: SCSEMUpdaterChange)
     ].filter(Boolean).join("; ");
     const note = `SkyShield SCSEM Updater: ${change.reason}${source ? ` (${source})` : ""}`;
     return existing ? `${existing}\n${note}` : note;
+}
+
+function changeLogDetail(applied: string): { target: string; description: string } {
+    const updated = applied.match(/^Updated\s+(.+?)\s+(.+)$/);
+    if (updated) {
+        return {
+            target: updated[1],
+            description: `Updated ${updated[2]} by SkyShield SCSEM Updater.`,
+        };
+    }
+
+    const added = applied.match(/^Added\s+(.+?)(?:\s+from\s+(.+))?$/);
+    if (added) {
+        return {
+            target: added[1],
+            description: "Added control by SkyShield SCSEM Updater.",
+        };
+    }
+
+    return {
+        target: "Approved SCSEM updater changes",
+        description: applied,
+    };
 }
 
 function applyApprovedChanges(parsed: ParsedSCSEM, session: SCSEMUpdaterSession): {
@@ -919,6 +1067,7 @@ export async function buildSCSEMUpdaterWorkbookBuffer(
             description: `${applied.length} approved SkyShield SCSEM Updater change(s) applied after CIS, STIG, and Pub 1075 review. ${applied.slice(0, 12).join("; ")}`,
             changedBy: "SkyShield SCSEM Updater",
             source: "scsem_updater",
+            details: applied.map(changeLogDetail),
         }]
         : [];
 
