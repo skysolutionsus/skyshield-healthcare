@@ -66,7 +66,7 @@ async function main() {
     {
       email: "jcochran@skysolutions.com",
       name: "Jack Cochran",
-      role: "COMPUTER_SECURITY_REVIEW" as const,
+      role: "ADMIN" as const,
       passwordHash: jackCochranPasswordHash,
     },
   ];
