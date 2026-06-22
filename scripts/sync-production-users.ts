@@ -8,6 +8,8 @@ const csrPassword =
   process.env.SEED_COMPUTER_SECURITY_REVIEW_PASSWORD || "ComputerSecurity2026!";
 const invitedUserPassword =
   process.env.SEED_INVITED_USER_PASSWORD || csrPassword;
+const jackCochranPasswordHash =
+  "$2b$12$q98m4ao9.3t42NJDxsVw8.pq4PW.QjzXbl1fMsPRihQQEzYXyIspu";
 
 function nameFromEmail(email: string) {
   const localPart = email.split("@")[0] || email;
@@ -60,6 +62,12 @@ async function main() {
       name: "Folami Lofinmakin",
       role: "COMPUTER_SECURITY_REVIEW" as const,
       passwordHash: csrPasswordHash,
+    },
+    {
+      email: "jcochran@skysolutions.com",
+      name: "Jack Cochran",
+      role: "COMPUTER_SECURITY_REVIEW" as const,
+      passwordHash: jackCochranPasswordHash,
     },
   ];
 
