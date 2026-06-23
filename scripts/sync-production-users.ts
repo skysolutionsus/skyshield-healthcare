@@ -10,6 +10,8 @@ const invitedUserPassword =
   process.env.SEED_INVITED_USER_PASSWORD || csrPassword;
 const jackCochranPasswordHash =
   "$2b$12$q98m4ao9.3t42NJDxsVw8.pq4PW.QjzXbl1fMsPRihQQEzYXyIspu";
+const paulJohnsonPasswordHash =
+  "$2b$12$psblO4H1rjfWhbnlS.5SW..aXtmraECyWsHS.AGhj7MLVPDko.8d6";
 
 function nameFromEmail(email: string) {
   const localPart = email.split("@")[0] || email;
@@ -68,6 +70,12 @@ async function main() {
       name: "Jack Cochran",
       role: "ADMIN" as const,
       passwordHash: jackCochranPasswordHash,
+    },
+    {
+      email: "pjohnson@skysolutions.com",
+      name: "Paul Johnson",
+      role: "ADMIN" as const,
+      passwordHash: paulJohnsonPasswordHash,
     },
   ];
 
