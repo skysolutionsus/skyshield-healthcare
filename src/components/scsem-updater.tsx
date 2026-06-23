@@ -413,14 +413,14 @@ export function SCSEMUpdater() {
                 </section>
             )}
 
-            {session?.audit.cis && (
+            {session && (session.audit.cis || session.audit.stig || session.audit.pub1075Version) && (
                 <section className="mb-6 rounded-xl border border-[var(--sky-border)] bg-[var(--sky-surface)] p-5">
                     <div className="mb-4 flex items-center gap-2">
                         <ShieldCheck className="h-5 w-5 text-[var(--sky-light)]" />
                         <h2 className="text-base font-semibold text-white">Evidence Sources</h2>
                     </div>
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                        <AuditSourceCard title="CIS Benchmark" source={session.audit.cis} />
+                        <AuditSourceCard title="CIS Benchmark" source={session.audit.cis || null} />
                         <AuditSourceCard title="STIG Benchmark" source={session.audit.stig || null} />
                         <article className="rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] p-4">
                             <p className="text-xs font-semibold uppercase text-[var(--sky-text-muted)]">Publication 1075</p>

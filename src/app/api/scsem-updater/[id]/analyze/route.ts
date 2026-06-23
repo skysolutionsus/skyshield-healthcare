@@ -344,10 +344,6 @@ export async function POST(
             }
         }
 
-        if (!selectedProfile && !selectedStigProfile) {
-            throw new Error(`No matching CIS or STIG Benchmark Excel workbook/profile was found for ${updaterSession.inferredTechnology}. Some IRS SCSEMs are generic or product-specific and do not have a direct CIS SecureSuite Excel equivalent.`);
-        }
-
         const { updateCandidates, newControlCandidates } = selectedProfile
             ? buildComparisonCandidates(
                 controls,
@@ -356,10 +352,15 @@ export async function POST(
             )
             : { updateCandidates: [], newControlCandidates: [] };
 
-        const pub1075 = extractPub1075Sections([
+        const candidateNistIds = [
             ...updateCandidates.map((candidate) => candidate.control.nistId),
             ...stigUpdateCandidates.map((candidate) => candidate.control.nistId),
-        ]);
+        ];
+        const pub1075 = extractPub1075Sections(
+            candidateNistIds.length > 0
+                ? candidateNistIds
+                : controls.map((control) => control.nistId)
+        );
 
         updaterSession.audit = {
             ...updaterSession.audit,
@@ -368,6 +369,48 @@ export async function POST(
             cis: downloaded ? auditSource(downloaded, selectedProfile) : null,
             stig: stigDownloaded ? auditSource(stigDownloaded, selectedStigProfile) : null,
         };
+
+        if (!selectedProfile && !selectedStigProfile) {
+            updaterSession.status = "review_ready";
+            updaterSession.summary = `No matching CIS or STIG Benchmark Excel workbook/profile was found for ${updaterSession.inferredTechnology}. The uploaded SCSEM parsed successfully with ${controls.length} controls, but this IRS SCSEM appears to be generic or product-specific and has no direct CIS SecureSuite benchmark equivalent, so no benchmark-driven changes were generated.`;
+            updaterSession.changes = [];
+            updaterSession.history.push({
+                at: new Date().toISOString(),
+                action: "analyze",
+                description: "Analysis completed without a matching CIS or STIG benchmark source.",
+            });
+            writeSCSEMUpdaterSession(updaterSession);
+            await logAudit({
+                organizationId: user.organizationId,
+                userId: user.id,
+                action: "SCSEM_UPDATER_ANALYZE",
+                resourceType: "scsem_updater_session",
+                resourceId: updaterSession.id,
+                metadata: {
+                    input: {
+                        fileName: updaterSession.originalFileName,
+                        inferredTechnology: updaterSession.inferredTechnology,
+                        parsedControls: controls.length,
+                        testCaseSheets: parsed.sheets
+                            .filter((sheet) => sheet.sheetType === "test_cases")
+                            .map((sheet) => sheet.sheetName),
+                    },
+                    output: {
+                        summary: updaterSession.summary,
+                        changeCount: 0,
+                        candidateCounts: {
+                            cisUpdates: 0,
+                            cisNewControls: 0,
+                            stigUpdates: 0,
+                            stigNewControls: 0,
+                        },
+                        auditSources: updaterSession.audit,
+                    },
+                },
+                ...auditRequestContext(request),
+            });
+            return NextResponse.json({ session: updaterSession });
+        }
 
         if (
             updateCandidates.length === 0 &&
