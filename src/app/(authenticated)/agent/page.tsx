@@ -603,7 +603,7 @@ export default function AgentPage() {
                   Office of Safeguards AI Agent
                 </h2>
                 <p className="text-xs text-[var(--sky-text-muted)]">
-                  All responses cite Pub 1075 sections
+                  Responses follow the Safeguards inquiry format
                 </p>
               </div>
             </div>
@@ -633,7 +633,8 @@ export default function AgentPage() {
               </h3>
               <p className="text-sm text-[var(--sky-text-secondary)] mb-8 leading-relaxed">
                 Ask any question about IRS Office of Safeguards compliance
-                requirements. Responses are direct, structured, and cite specific sections.
+                requirements. Responses are structured by inquiry with a clear response,
+                support, and references.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full text-left">
                 {SUGGESTED_QUESTIONS.map((q) => (

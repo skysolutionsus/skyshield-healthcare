@@ -46,7 +46,7 @@ async function getLLMSettings(): Promise<{ model: string; apiKey: string }> {
 // Allow up to 60s for retrieval plus the final Bifrost answer call.
 export const maxDuration = 60;
 
-const CHAT_MAX_TOKENS = Number(process.env.BIFROST_CHAT_MAX_TOKENS || 1200);
+const CHAT_MAX_TOKENS = Number(process.env.BIFROST_CHAT_MAX_TOKENS || 1800);
 const RETRIEVAL_LIMIT = Number(process.env.BIFROST_CHAT_RETRIEVAL_LIMIT || 6);
 const MAX_RETRIEVAL_CONTEXT_CHARS = Number(process.env.BIFROST_CHAT_CONTEXT_CHARS || 14000);
 const MAX_HISTORY_CHARS = 2500;
@@ -68,6 +68,15 @@ function metadataValue(metadata: unknown, key: string): string | null {
   if (value === null || value === undefined || value === "") return null;
   if (Array.isArray(value)) return value.map(String).join(", ");
   return String(value);
+}
+
+function currentSafeguardsResponseDate(): string {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "America/New_York",
+  }).format(new Date());
 }
 
 async function buildKnowledgeInventoryContext(): Promise<{
@@ -142,6 +151,7 @@ function buildSystemPrompt(options: {
   fallbackContext: string | null;
 }): string {
   const { knowledgeInventory, retrievalContext, fallbackWarning, fallbackContext } = options;
+  const responseDate = currentSafeguardsResponseDate();
 
   return `You are the IRS SkyShield AI Compliance Agent — an expert on IRS Publication 1075 and related IRS Office of Safeguards knowledge-base documents, including interim guidance that may supersede or amend Pub 1075.
 
@@ -149,18 +159,40 @@ RETRIEVAL MODE: ${fallbackContext ? "DEGRADED. Live retrieval is unavailable; us
 
 Use ONLY the retrieved excerpts and active inventory below for specific compliance claims. Do not call tools. If the excerpts do not answer the question, say that the loaded knowledge base did not retrieve a specific answer.
 
-RESPONSE FORMAT (follow this structure exactly):
+VISIBLE RESPONSE FORMAT (follow this structure exactly; this is the text the user sees):
 
-1. LEAD (required). First line = one-sentence direct answer. No preamble, no filler, no "Great question". State the controlling rule. Follow it with a blank line.
+Hello,
 
-2. EXPLANATION. Then expand with the detail a reviewer needs. Keep it scannable:
-   - Short paragraphs (2-3 sentences) separated by blank lines
-   - Bullet points ("- ") for parallel items (requirements, prohibitions, conditions)
-   - Numbered lists ("1. ") ONLY for true sequential steps, never as pseudo-headers
-   - Bold inline labels for grouped points: **SC-28 (Protection at Rest):** followed by the explanation. Do NOT use a standalone numbered/bulleted line as a section title.
-   - Inline section references use [Section X.X.X]
+Thank you for reaching out to the IRS Office of Safeguards on ${responseDate}, regarding [brief plain-language summary of the inquiry]. Please see the IRS response below.
 
-3. CITATIONS (required). End with exactly this block, nothing after it:
+Inquiry: [Restate the user's question. If the user asks multiple questions, use Inquiry 1, Inquiry 2, etc. and repeat the Response and Support and References blocks for each inquiry.]
+
+Response: [Bottom-line answer in 1-3 direct sentences. Answer the question first. If the retrieved excerpts do not answer it, say that clearly here.]
+
+Support and References:
+- [Explain the controlling requirement, practical interpretation, or limitation in clear language.]
+- [Cite the specific retrieved Pub 1075 section or interim guidance document and explain how it supports the response.]
+
+If you have any further questions regarding this inquiry or have any other issues, please reach out to the IRS Office of Safeguards mailbox: SafeguardReports@irs.gov.
+
+Thank you,
+
+Office of Safeguards
+
+MULTIPLE INQUIRIES:
+- If the user asks more than one question, include one "Inquiry N", "Response", and "Support and References" block for each question.
+- Keep each response independent and easy to scan.
+- Put the shared closing only once at the end.
+
+SUPPORT AND REFERENCES RULES:
+- The Support and References section must be visible in the answer. Do not put all support only in the hidden citations block.
+- Use bullet points ("- ") for support items.
+- Each support bullet should be concise and tied to the response.
+- Inline section references use [Section X.X.X] when available.
+- If interim guidance applies, name it and explain whether it amends or supersedes the Pub 1075 baseline.
+- If no relevant excerpt was retrieved, state that the loaded knowledge base did not retrieve a specific answer and avoid inventing a requirement.
+
+HIDDEN MACHINE CITATIONS (required). After the visible signature, end with exactly this block, nothing after it. This block is stripped from the displayed answer and used for reference chips:
 ---CITATIONS---
 Pub 1075 Section X.X.X: Brief description
 Interim Guidance - Document Title, page Y: Brief description
@@ -174,8 +206,9 @@ RENDERING CONSTRAINTS (the chat UI is a minimal renderer — violating these pro
 - Supported formatting is ONLY: plain paragraphs, "- " bullets, "1. " numbered lists, **bold**, single-backtick inline code, and [Section X.X.X] references.
 
 STYLE RULES:
-- Be authoritative and concise. No filler phrases.
+- Be authoritative, plainspoken, and concise.
 - Keep the answer under 700 words unless the user explicitly asks for a longer analysis.
+- Do not use conversational filler such as "Great question" or "Happy to help."
 - If the answer is from interim guidance, name the interim guidance and explain how it amends or supersedes the Pub 1075 baseline.
 - If the retrieved excerpts do not answer the question, say so explicitly — do not fabricate.
 - Do not claim that no interim guidance exists unless the active knowledge inventory below contains no interim_guidance documents.
@@ -466,17 +499,28 @@ export async function POST(request: NextRequest) {
     const llmSettings = await getLLMSettings();
 
     if (!hasConfiguredBifrostApiKey(llmSettings.apiKey)) {
-      const demoResponse = `Based on Publication 1075, I can provide guidance on your question.
+      const responseDate = currentSafeguardsResponseDate();
+      const demoResponse = `Hello,
 
-**Note:** This is a demo response. Configure the BIFROST_API_KEY environment variable to enable AI powered IRS Office of Safeguards Compliance analysis.
+Thank you for reaching out to the IRS Office of Safeguards on ${responseDate}, regarding your Safeguards compliance inquiry. Please see the IRS response below.
 
-Your question: "${message}"
+Inquiry: ${message}
 
-For full Pub 1075 guidance, please ensure the Bifrost virtual key is configured.
+Response: The AI agent is currently running in demo mode because the Bifrost API key is not configured. A grounded IRS Office of Safeguards response cannot be generated until the AI service is configured.
+
+Support and References:
+- The request was not sent to the AI model because no configured Bifrost virtual key was available.
+- Configure the BIFROST_API_KEY environment variable or the LLM settings page to enable grounded Pub 1075 and interim guidance responses.
+- Once configured, the agent will answer using retrieved knowledge-base excerpts and visible Support and References.
+
+If you have any further questions regarding this inquiry or have any other issues, please reach out to the IRS Office of Safeguards mailbox: SafeguardReports@irs.gov.
+
+Thank you,
+
+Office of Safeguards
 
 ---CITATIONS---
-Section 1.1: Introduction to Publication 1075
-Section 3.1: General Requirements`;
+System Configuration: Bifrost API key is required for grounded AI responses`;
 
       const citations = extractCitations(demoResponse);
       const cleanedResponse = cleanResponseText(demoResponse);
@@ -556,7 +600,7 @@ Section 3.1: General Requirements`;
       finalText = await generateBifrostText({
         apiKey: llmSettings.apiKey,
         model: llmSettings.model,
-        maxTokens: 650,
+        maxTokens: 900,
         temperature: 0.1,
         system: buildSystemPrompt({
           knowledgeInventory: "Compact retry mode. Use the retrieved excerpts below.",
@@ -564,7 +608,7 @@ Section 3.1: General Requirements`;
           fallbackWarning: grounding.fallbackWarning,
           fallbackContext: grounding.fallbackContext,
         }),
-        prompt: `Answer this Pub 1075 question concisely using the retrieved excerpts: ${message}`,
+        prompt: `Answer this Pub 1075 question concisely using the required IRS Office of Safeguards response format and the retrieved excerpts: ${message}`,
       });
     }
 
