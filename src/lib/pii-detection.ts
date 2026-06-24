@@ -522,6 +522,42 @@ const US_STATES_AND_TERRITORIES = [
 const STATE_DEPT_RE =
   /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+(?:Department|Dept\.?)\s+of\s+(?:Revenue|Taxation|Finance|Tax(?:es)?|Treasury)\b/gi;
 
+const STATE_TERRITORY_ABBREVIATIONS = new Set([
+  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", "GA", "HI",
+  "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN",
+  "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH",
+  "OK", "OR", "PA", "PR", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA",
+  "VI", "WA", "WV", "WI", "WY", "GU", "AS", "MP",
+]);
+
+const KNOWN_AGENCY_ABBREVIATIONS = new Set([
+  "SSA", "CMS", "DHS", "DOJ", "DOD", "HHS", "ED", "DOL", "DOE", "FBI",
+  "DEA", "ATF", "CBP", "ICE", "USSS", "USMS", "NSA", "DIA", "GAO", "OPM",
+  "VA",
+]);
+
+const AGENCY_CONTEXT_WORDS =
+  "(?:Department|Dept\\.?|Agency|Office|Division|Bureau|Administration|Authority|Commission|Board)";
+
+const ABBREVIATED_AGENCY_OF_RE = new RegExp(
+  `\\b${AGENCY_CONTEXT_WORDS}\\s+of\\s+([A-Z]{2})\\b`,
+  "gi"
+);
+
+const ABBREVIATED_STATE_AGENCY_RE = new RegExp(
+  `\\b([A-Z]{2})\\s+${AGENCY_CONTEXT_WORDS}\\b`,
+  "gi"
+);
+
+const ABBREVIATED_REQUESTER_RE =
+  /\b([A-Z]{2,5})\s+(?:is\s+|are\s+|was\s+|were\s+)?(?:asking|asked|requesting|requested|wants|needs|requires|says|inquired)\b/gi;
+
+function isProtectedAgencyAbbreviation(value: string): boolean {
+  const normalized = value.toUpperCase();
+  return STATE_TERRITORY_ABBREVIATIONS.has(normalized) ||
+    KNOWN_AGENCY_ABBREVIATIONS.has(normalized);
+}
+
 function detectAgencyNames(text: string): PiiMatch[] {
   const matches: PiiMatch[] = [];
   const lowerText = text.toLowerCase();
@@ -549,6 +585,44 @@ function detectAgencyNames(text: string): PiiMatch[] {
     matches.push({
       type: "AGENCY_NAME",
       pattern: `[STATE AGENCY: ${redact(m[0])}]`,
+      position: m.index!,
+      confidence: "HIGH",
+    });
+  }
+
+  // Abbreviated state/territory agency patterns, e.g. "Department of VA" or
+  // "VA Department". Generic "agency" or "customer" without a named
+  // abbreviation is intentionally allowed.
+  for (const m of text.matchAll(ABBREVIATED_AGENCY_OF_RE)) {
+    const abbreviation = m[1].toUpperCase();
+    if (!isProtectedAgencyAbbreviation(abbreviation)) continue;
+    matches.push({
+      type: "AGENCY_NAME",
+      pattern: `[AGENCY ABBREVIATION: ${redact(m[0])}]`,
+      position: m.index!,
+      confidence: "HIGH",
+    });
+  }
+
+  for (const m of text.matchAll(ABBREVIATED_STATE_AGENCY_RE)) {
+    const abbreviation = m[1].toUpperCase();
+    if (!isProtectedAgencyAbbreviation(abbreviation)) continue;
+    matches.push({
+      type: "AGENCY_NAME",
+      pattern: `[AGENCY ABBREVIATION: ${redact(m[0])}]`,
+      position: m.index!,
+      confidence: "HIGH",
+    });
+  }
+
+  for (const m of text.matchAll(ABBREVIATED_REQUESTER_RE)) {
+    const abbreviation = m[1].toUpperCase();
+    if (!isProtectedAgencyAbbreviation(abbreviation)) continue;
+    const before = text.slice(Math.max(0, m.index! - 20), m.index!);
+    if (/(?:Department|Dept\.?)\s+of\s*$/i.test(before)) continue;
+    matches.push({
+      type: "AGENCY_NAME",
+      pattern: `[AGENCY ABBREVIATION: ${redact(m[0])}]`,
       position: m.index!,
       confidence: "HIGH",
     });
