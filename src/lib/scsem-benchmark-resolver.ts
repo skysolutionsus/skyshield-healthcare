@@ -1,0 +1,406 @@
+import type { CISBenchmark, CISExcelFile } from "@/lib/cis-api";
+import {
+    normalizeRecommendation,
+    selectApplicableSTIGProfiles,
+    selectBestCISProfile,
+    selectLatestBenchmarkForTechnology,
+    selectLatestSTIGBenchmarkForTechnology,
+    type SelectedCISProfile,
+} from "@/lib/cis-benchmark-xlsx";
+import {
+    downloadAndParseBenchmark,
+    type DownloadedBenchmark,
+} from "@/lib/scsem-update-engine";
+import type { ParsedControl, ParsedSCSEM } from "@/lib/xlsx-parser";
+
+export type ResolvedBenchmarkKind = "CIS" | "STIG";
+
+export interface ResolvedBenchmarkSource {
+    kind: ResolvedBenchmarkKind;
+    matchQuery: string;
+    matchedSheets: string[];
+    selectedProfile: SelectedCISProfile;
+    downloaded: DownloadedBenchmark;
+    sheetRecommendationCount: number;
+    sharedRecommendationCount: number;
+}
+
+export interface ResolveSCSEMBenchmarkSourcesInput {
+    token: string;
+    technology: string;
+    parsed: ParsedSCSEM;
+    benchmarks: CISBenchmark[];
+    excelFiles: CISExcelFile[];
+    downloadedBenchmarks: Map<number, DownloadedBenchmark>;
+}
+
+type CandidateSelection = {
+    query: string;
+    downloaded: DownloadedBenchmark;
+    selectedProfile: SelectedCISProfile;
+    sheetRecommendationCount: number;
+    sharedRecommendationCount: number;
+    score: number;
+};
+
+function normalizeText(value: string | null | undefined): string {
+    return (value || "")
+        .toLowerCase()
+        .replace(/[_/\\:-]+/g, " ")
+        .replace(/[^a-z0-9.]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+function compactText(value: string | null | undefined): string {
+    return normalizeText(value).replace(/[^a-z0-9]+/g, "");
+}
+
+function unique(values: string[]): string[] {
+    const seen = new Set<string>();
+    const out: string[] = [];
+
+    for (const value of values) {
+        const cleaned = value.replace(/\s+/g, " ").trim();
+        const key = cleaned.toLowerCase();
+        if (!cleaned || seen.has(key)) continue;
+        seen.add(key);
+        out.push(cleaned);
+    }
+
+    return out;
+}
+
+function recommendationCount(controls: Pick<ParsedControl, "recommendationNum">[]): number {
+    return controls.filter((control) =>
+        Boolean(normalizeRecommendation(control.recommendationNum))
+    ).length;
+}
+
+function sheetBaseName(sheetName: string): string {
+    return normalizeText(sheetName)
+        .replace(/\btest cases?\b/g, " ")
+        .replace(/\bgeneral\b/g, " ")
+        .replace(/\bgen\b/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+function isGenericSheetBase(value: string): boolean {
+    const normalized = normalizeText(value);
+    return !normalized ||
+        normalized === "test cases" ||
+        normalized === "general test cases" ||
+        normalized === "gen test cases" ||
+        normalized === "general" ||
+        normalized === "gen";
+}
+
+function aliasesForText(value: string): string[] {
+    const normalized = normalizeText(value);
+    const compact = compactText(value);
+    const aliases: string[] = [];
+
+    if (compact.includes("db2")) {
+        if (compact.includes("13") && (compact.includes("zos") || normalized.includes("z os"))) {
+            aliases.push("IBM Db2 13 for z/OS");
+        }
+        if (compact.includes("121") || compact.includes("12.1")) aliases.push("IBM Db2 12.1");
+        if (compact.includes("11")) aliases.push("IBM Db2 11");
+        aliases.push("IBM Db2");
+    }
+
+    if (compact.includes("apache24") || /apache.*2\s*\.?\s*4/.test(normalized)) {
+        aliases.push("Apache HTTP Server 2.4");
+    } else if (normalized.includes("apache http")) {
+        aliases.push("Apache HTTP Server");
+    }
+
+    if (compact.includes("iis10") || /iis\s*10/.test(normalized)) {
+        aliases.push("Microsoft IIS 10");
+    } else if (/\biis\b/.test(normalized)) {
+        aliases.push("Microsoft IIS");
+    }
+
+    if (compact.includes("tomcat9") || /tomcat\s*9/.test(normalized)) aliases.push("Apache Tomcat 9");
+    else if (normalized.includes("tomcat")) aliases.push("Apache Tomcat");
+
+    if (normalized.includes("nginx")) aliases.push("NGINX");
+    if (normalized.includes("mysql")) aliases.push("MySQL");
+    if (normalized.includes("mongodb")) aliases.push("MongoDB");
+    if (normalized.includes("microsoft sql server") || /\bsql server\b/.test(normalized)) aliases.push("Microsoft SQL Server");
+    if (normalized.includes("oracle database") || normalized === "oracle") aliases.push("Oracle Database");
+    if (normalized.includes("teradata")) aliases.push("Teradata");
+
+    if (normalized.includes("red hat enterprise linux") || normalized.includes("rhel")) {
+        aliases.push("Red Hat Enterprise Linux");
+    }
+    if (normalized.includes("oracle linux") || /\boel\b/.test(normalized)) aliases.push("Oracle Linux");
+    if (normalized.includes("suse")) aliases.push("SUSE Linux Enterprise");
+    if (normalized.includes("debian")) aliases.push("Debian Linux");
+    if (normalized.includes("aix")) aliases.push("IBM AIX");
+    if (normalized.includes("solaris")) aliases.push("Oracle Solaris");
+
+    if (normalized.includes("vmware") || normalized.includes("esxi")) aliases.push("VMware ESXi");
+    if (normalized.includes("windows server 2022")) aliases.push("Microsoft Windows Server 2022");
+    else if (normalized.includes("windows server 2019")) aliases.push("Microsoft Windows Server 2019");
+    else if (normalized.includes("windows server 2016")) aliases.push("Microsoft Windows Server 2016");
+    else if (normalized.includes("windows server 2012")) aliases.push("Microsoft Windows Server 2012 R2");
+    else if (normalized.includes("windows 11")) aliases.push("Microsoft Windows 11");
+    else if (normalized.includes("windows 10")) aliases.push("Microsoft Windows 10");
+    if (normalized.includes("macos") || normalized.includes("mac os")) aliases.push("Apple macOS");
+    if (normalized.includes("rocky")) aliases.push("Rocky Linux");
+    if (normalized.includes("fortigate")) aliases.push("Fortinet FortiGate");
+    if (normalized.includes("check point")) aliases.push("Check Point Firewall");
+    if (normalized.includes("cisco asa")) aliases.push("Cisco ASA");
+    if (normalized.includes("palo alto")) aliases.push("Palo Alto Firewall");
+    if (normalized.includes("apple") && (normalized.includes("ios") || normalized.includes("ipados"))) {
+        aliases.push("Apple iOS");
+    }
+
+    return unique(aliases);
+}
+
+function unsafeBroadQuery(query: string): boolean {
+    const normalized = normalizeText(query);
+    if (/\bgeneric\b/.test(normalized)) return true;
+
+    if (normalized.includes("storage area network") || normalized.includes("network attached storage")) return true;
+
+    return normalized === "web server" ||
+        normalized === "webserver" ||
+        normalized === "generic web server" ||
+        normalized === "san" ||
+        normalized === "nas" ||
+        normalized === "database" ||
+        normalized === "generic database" ||
+        normalized === "application" ||
+        normalized === "generic application" ||
+        normalized === "cloud" ||
+        normalized === "network assessment" ||
+        normalized === "voip network" ||
+        normalized === "wireless networking" ||
+        normalized === "printer" ||
+        normalized === "containers" ||
+        normalized === "operating system" ||
+        normalized === "generic os";
+}
+
+function rawQuery(value: string | null | undefined): string | null {
+    const normalized = normalizeText(value)
+        .replace(/\bscsem\b/g, " ")
+        .replace(/\btest cases?\b/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    if (!normalized || unsafeBroadQuery(normalized)) return null;
+    return normalized;
+}
+
+function workbookLevelQueries(technology: string, parsed: ParsedSCSEM): string[] {
+    return unique([
+        ...aliasesForText(technology),
+        ...aliasesForText(parsed.metadata.subject || ""),
+        rawQuery(technology) || "",
+        rawQuery(parsed.metadata.subject) || "",
+    ]).filter((query) => !unsafeBroadQuery(query));
+}
+
+function sheetQueries(sheetName: string, technology: string, parsed: ParsedSCSEM): string[] {
+    const base = sheetBaseName(sheetName);
+    const sheetAliases = aliasesForText(base);
+    if (sheetAliases.length > 0) {
+        return sheetAliases.filter((query) => !unsafeBroadQuery(query));
+    }
+
+    if (isGenericSheetBase(sheetName) || isGenericSheetBase(base)) {
+        return workbookLevelQueries(technology, parsed);
+    }
+
+    return unique([
+        ...aliasesForText(sheetName),
+        ...workbookLevelQueries(technology, parsed),
+    ]).filter((query) => !unsafeBroadQuery(query));
+}
+
+function sourceKey(kind: ResolvedBenchmarkKind, downloaded: DownloadedBenchmark, profile: string): string {
+    return `${kind}:${Number(downloaded.snapshot.workbenchId)}:${profile}`;
+}
+
+function mergeSource(
+    byKey: Map<string, ResolvedBenchmarkSource>,
+    source: ResolvedBenchmarkSource
+) {
+    const key = sourceKey(source.kind, source.downloaded, source.selectedProfile.profile);
+    const existing = byKey.get(key);
+    if (!existing) {
+        byKey.set(key, source);
+        return;
+    }
+
+    existing.matchQuery = unique([existing.matchQuery, source.matchQuery]).join(", ");
+    existing.matchedSheets = unique([...existing.matchedSheets, ...source.matchedSheets]);
+    existing.sheetRecommendationCount += source.sheetRecommendationCount;
+    existing.sharedRecommendationCount += source.sharedRecommendationCount;
+}
+
+function selectionScore(selection: SelectedCISProfile, sheetRefCount: number): number {
+    if (sheetRefCount <= 0) return 0;
+    const sharedRatio = selection.sharedRecommendationCount / sheetRefCount;
+    const profileRatio = selection.totalRecommendationCount > 0
+        ? selection.sharedRecommendationCount / selection.totalRecommendationCount
+        : 0;
+    return selection.sharedRecommendationCount * 2 + sharedRatio * 100 + profileRatio * 35;
+}
+
+function acceptsSelection(selection: SelectedCISProfile, sheetRefCount: number): boolean {
+    if (sheetRefCount <= 0) return false;
+    const shared = selection.sharedRecommendationCount;
+    const sharedRatio = shared / sheetRefCount;
+
+    if (sheetRefCount <= 5) return shared === sheetRefCount;
+    return shared >= 5 && sharedRatio >= 0.45;
+}
+
+async function evaluateQuery({
+    kind,
+    query,
+    sheetName,
+    controls,
+    token,
+    benchmarks,
+    excelFiles,
+    downloadedBenchmarks,
+}: {
+    kind: ResolvedBenchmarkKind;
+    query: string;
+    sheetName: string;
+    controls: ParsedControl[];
+    token: string;
+    benchmarks: CISBenchmark[];
+    excelFiles: CISExcelFile[];
+    downloadedBenchmarks: Map<number, DownloadedBenchmark>;
+}): Promise<CandidateSelection | null> {
+    const selected = kind === "CIS"
+        ? selectLatestBenchmarkForTechnology(query, benchmarks, excelFiles)
+        : selectLatestSTIGBenchmarkForTechnology(query, benchmarks, excelFiles);
+    if (!selected) return null;
+
+    const downloaded = await downloadAndParseBenchmark(
+        token,
+        selected.benchmark,
+        selected.excel,
+        downloadedBenchmarks
+    );
+    const selectedProfile = kind === "CIS"
+        ? selectBestCISProfile(sheetName, controls, downloaded.recommendations)
+        : selectApplicableSTIGProfiles(sheetName, controls, downloaded.recommendations);
+    if (!selectedProfile) return null;
+
+    const sheetRecommendationCount = recommendationCount(controls);
+    if (!acceptsSelection(selectedProfile, sheetRecommendationCount)) return null;
+
+    return {
+        query,
+        downloaded,
+        selectedProfile,
+        sheetRecommendationCount,
+        sharedRecommendationCount: selectedProfile.sharedRecommendationCount,
+        score: selectionScore(selectedProfile, sheetRecommendationCount),
+    };
+}
+
+async function resolveKindForSheet({
+    kind,
+    queries,
+    sheetName,
+    controls,
+    token,
+    benchmarks,
+    excelFiles,
+    downloadedBenchmarks,
+}: {
+    kind: ResolvedBenchmarkKind;
+    queries: string[];
+    sheetName: string;
+    controls: ParsedControl[];
+    token: string;
+    benchmarks: CISBenchmark[];
+    excelFiles: CISExcelFile[];
+    downloadedBenchmarks: Map<number, DownloadedBenchmark>;
+}): Promise<ResolvedBenchmarkSource | null> {
+    const candidates = await Promise.all(queries.map((query) => evaluateQuery({
+        kind,
+        query,
+        sheetName,
+        controls,
+        token,
+        benchmarks,
+        excelFiles,
+        downloadedBenchmarks,
+    })));
+    const selected = candidates
+        .filter((candidate): candidate is CandidateSelection => Boolean(candidate))
+        .sort((a, b) => b.score - a.score)[0];
+    if (!selected) return null;
+
+    return {
+        kind,
+        matchQuery: selected.query,
+        matchedSheets: [sheetName],
+        selectedProfile: selected.selectedProfile,
+        downloaded: selected.downloaded,
+        sheetRecommendationCount: selected.sheetRecommendationCount,
+        sharedRecommendationCount: selected.sharedRecommendationCount,
+    };
+}
+
+export async function resolveSCSEMBenchmarkSources({
+    token,
+    technology,
+    parsed,
+    benchmarks,
+    excelFiles,
+    downloadedBenchmarks,
+}: ResolveSCSEMBenchmarkSourcesInput): Promise<ResolvedBenchmarkSource[]> {
+    const byKey = new Map<string, ResolvedBenchmarkSource>();
+
+    for (const sheet of parsed.sheets.filter((candidate) => candidate.sheetType === "test_cases")) {
+        const sheetRecommendationCount = recommendationCount(sheet.controls);
+        if (sheet.controls.length === 0 || sheetRecommendationCount === 0) continue;
+
+        const queries = sheetQueries(sheet.sheetName, technology, parsed);
+        if (queries.length === 0) continue;
+
+        const [cisSource, stigSource] = await Promise.all([
+            resolveKindForSheet({
+                kind: "CIS",
+                queries,
+                sheetName: sheet.sheetName,
+                controls: sheet.controls,
+                token,
+                benchmarks,
+                excelFiles,
+                downloadedBenchmarks,
+            }),
+            resolveKindForSheet({
+                kind: "STIG",
+                queries,
+                sheetName: sheet.sheetName,
+                controls: sheet.controls,
+                token,
+                benchmarks,
+                excelFiles,
+                downloadedBenchmarks,
+            }),
+        ]);
+
+        if (cisSource) mergeSource(byKey, cisSource);
+        if (stigSource) mergeSource(byKey, stigSource);
+    }
+
+    return [...byKey.values()].sort((a, b) => {
+        const kindDiff = a.kind.localeCompare(b.kind);
+        if (kindDiff !== 0) return kindDiff;
+        return a.downloaded.snapshot.benchmarkTitle.localeCompare(b.downloaded.snapshot.benchmarkTitle);
+    });
+}

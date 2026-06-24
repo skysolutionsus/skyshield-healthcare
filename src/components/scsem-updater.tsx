@@ -50,6 +50,7 @@ interface UpdaterChange {
 }
 
 interface AuditSource {
+    sourceKind?: "CIS" | "STIG";
     workbenchId: number;
     benchmarkTitle: string;
     benchmarkVersion: string;
@@ -61,6 +62,8 @@ interface AuditSource {
     selectedProfile?: string | null;
     sharedRecommendationCount?: number;
     selectedProfileRecommendationCount?: number;
+    matchedSheets?: string[];
+    matchQuery?: string;
 }
 
 interface UpdaterSession {
@@ -91,6 +94,8 @@ interface UpdaterSession {
         pub1075Version?: string;
         cis?: AuditSource | null;
         stig?: AuditSource | null;
+        cisSources?: AuditSource[];
+        stigSources?: AuditSource[];
     };
 }
 
@@ -156,6 +161,24 @@ export function SCSEMUpdater() {
         const lastUndoIndex = history.map((entry) => entry.action).lastIndexOf("undo");
         return history.slice(lastUndoIndex + 1).some((entry) => entry.action === "status");
     }, [session?.history]);
+
+    const cisAuditSources = useMemo(() => {
+        if (!session) return [];
+        return session.audit.cisSources?.length
+            ? session.audit.cisSources
+            : session.audit.cis
+                ? [session.audit.cis]
+                : [];
+    }, [session]);
+
+    const stigAuditSources = useMemo(() => {
+        if (!session) return [];
+        return session.audit.stigSources?.length
+            ? session.audit.stigSources
+            : session.audit.stig
+                ? [session.audit.stig]
+                : [];
+    }, [session]);
 
     async function uploadFile(file: File) {
         setBusy("upload");
@@ -413,15 +436,31 @@ export function SCSEMUpdater() {
                 </section>
             )}
 
-            {session && (session.audit.cis || session.audit.stig || session.audit.pub1075Version) && (
+            {session && (cisAuditSources.length > 0 || stigAuditSources.length > 0 || session.audit.pub1075Version) && (
                 <section className="mb-6 rounded-xl border border-[var(--sky-border)] bg-[var(--sky-surface)] p-5">
                     <div className="mb-4 flex items-center gap-2">
                         <ShieldCheck className="h-5 w-5 text-[var(--sky-light)]" />
                         <h2 className="text-base font-semibold text-white">Evidence Sources</h2>
                     </div>
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                        <AuditSourceCard title="CIS Benchmark" source={session.audit.cis || null} />
-                        <AuditSourceCard title="STIG Benchmark" source={session.audit.stig || null} />
+                        {cisAuditSources.length > 0
+                            ? cisAuditSources.map((source, index) => (
+                                <AuditSourceCard
+                                    key={`cis-${source.workbenchId}-${index}`}
+                                    title={cisAuditSources.length > 1 ? `CIS Benchmark ${index + 1}` : "CIS Benchmark"}
+                                    source={source}
+                                />
+                            ))
+                            : <AuditSourceCard title="CIS Benchmark" source={null} />}
+                        {stigAuditSources.length > 0
+                            ? stigAuditSources.map((source, index) => (
+                                <AuditSourceCard
+                                    key={`stig-${source.workbenchId}-${index}`}
+                                    title={stigAuditSources.length > 1 ? `STIG Benchmark ${index + 1}` : "STIG Benchmark"}
+                                    source={source}
+                                />
+                            ))
+                            : <AuditSourceCard title="STIG Benchmark" source={null} />}
                         <article className="rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] p-4">
                             <p className="text-xs font-semibold uppercase text-[var(--sky-text-muted)]">Publication 1075</p>
                             <p className="mt-2 text-sm font-medium text-white">{session.audit.pub1075Version || "Unknown"}</p>
@@ -535,6 +574,16 @@ function AuditSourceCard({ title, source }: { title: string; source: AuditSource
                 <span className="col-span-2 truncate" title={source.selectedProfile || ""}>
                     {source.selectedProfile || "Profile not selected"}
                 </span>
+                {source.matchedSheets?.length ? (
+                    <span className="col-span-2 truncate" title={source.matchedSheets.join(", ")}>
+                        Sheets: {source.matchedSheets.join(", ")}
+                    </span>
+                ) : null}
+                {source.matchQuery ? (
+                    <span className="col-span-2 truncate" title={source.matchQuery}>
+                        Query: {source.matchQuery}
+                    </span>
+                ) : null}
                 <span className="col-span-2 truncate font-mono" title={source.sha256}>
                     SHA {source.sha256.slice(0, 16)}...
                 </span>
