@@ -363,6 +363,7 @@ function detectBankAccounts(text: string): PiiMatch[] {
 //   - Titles: Mr./Mrs./Ms./Dr./Rev./Prof. followed by a capitalized word
 //   - Labeled patterns: "Name:", "Taxpayer:", "Client:", "Employee:" followed by words
 //   - Full names (First Last) near PII-context keywords
+//   - Signature/requester patterns, because chat must not process named people
 
 const TITLED_NAME_RE =
   /\b((?:Mr|Mrs|Ms|Miss|Dr|Rev|Prof|Hon|Sgt|Cpl|Pvt|Lt|Capt|Maj|Col|Gen|Cmdr|Adm)\.?)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\b/g;
@@ -372,6 +373,18 @@ const LABELED_NAME_RE =
 
 const FULL_NAME_NEAR_CONTEXT_RE =
   /\b([A-Z][a-z]{1,15}\s+(?:[A-Z]\.\s+)?[A-Z][a-z]{1,20})\b/g;
+
+const SIGNOFF_NAME_RE =
+  /\b(?:thank\s+you|thanks|sincerely|regards|respectfully)[,\s\-–]*\n+\s*(?:[A-Z]\.?\s+)?([A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,25})\b/gim;
+
+const NAME_WITH_ROLE_RE =
+  /\b(?:[A-Z]\.?\s+)?([A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,25})\s*[|,;\-–]\s*(?=(?:Chief|Director|Officer|Manager|Analyst|Coordinator|Administrator|Supervisor|Lead|Engineer|Counsel|Disclosure|Security|Privacy)\b)/g;
+
+const FULL_NAME_REQUESTER_RE =
+  /\b([A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,25})\s+(?:is\s+|are\s+|was\s+|were\s+)?(?:asking|asked|requesting|requested|wants|needs|requires|says|inquired)\b/g;
+
+const STANDALONE_NAME_LINE_RE =
+  /^(?:\s*[A-Z]\.?\s+)?([A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,25})\s*$/gm;
 
 const NAME_CONTEXT_KEYWORDS = [
   "ssn", "social security", "taxpayer", "account", "client", "employee",
@@ -422,6 +435,31 @@ function detectPersonNames(text: string): PiiMatch[] {
       position: m.index!,
       confidence: "MEDIUM",
     });
+  }
+
+  // Signature and requester names — high confidence. These intentionally
+  // catch common email sign-offs and "First Last is asking..." phrasing.
+  const signaturePatterns = [
+    { re: SIGNOFF_NAME_RE, label: "SIGNATURE NAME" },
+    { re: NAME_WITH_ROLE_RE, label: "NAME WITH ROLE" },
+    { re: FULL_NAME_REQUESTER_RE, label: "REQUESTER NAME" },
+    { re: STANDALONE_NAME_LINE_RE, label: "SIGNATURE NAME" },
+  ];
+
+  for (const { re, label } of signaturePatterns) {
+    for (const m of text.matchAll(re)) {
+      const fullMatch = m[0];
+      const name = m[1] || fullMatch;
+      const before = lowerText.slice(Math.max(0, m.index! - 20), m.index!);
+      if (/(?:section|pub|publication|chapter|form|schedule|exhibit)\s*$/i.test(before)) continue;
+
+      matches.push({
+        type: "PERSON_NAME",
+        pattern: `[${label}: ${redact(name)}]`,
+        position: m.index!,
+        confidence: "HIGH",
+      });
+    }
   }
 
   return matches;

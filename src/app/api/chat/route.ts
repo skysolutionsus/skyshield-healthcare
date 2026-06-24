@@ -195,6 +195,8 @@ SUPPORT AND REFERENCES RULES:
 - Each bullet must be one sentence whenever possible.
 - Do not restate the whole analysis in Support and References. Give the controlling source and a short explanation only.
 - Inline source references must use bracketed format when available, for example [Section 2.E.4.2], [Section 1.9.4, SA-9], [Section 2.0], or [Exhibit 7].
+- Support and References may cite only Pub 1075, Office of Safeguards interim guidance, and source material provided below. Never cite the user's message, CAP text, finding text, SCSEM row text, Test ID, or recommendation ID as an authority.
+- If the user includes a CAP finding, SCSEM row, or Test ID, treat it only as context for the question. Do not list it as a reference and do not invent a source title from it.
 - If interim guidance applies, name it and explain whether it amends or supersedes the Pub 1075 baseline.
 - If source material does not support a specific determination, use one concise sentence such as: "For control tailoring or exceptions, contact the Office of Safeguards for a risk-based determination." Do not mention retrieval, excerpts, fallback mode, internal processing, or knowledge-base mechanics.
 
@@ -202,6 +204,11 @@ HIDDEN MACHINE CITATIONS (required). After the visible signature, end with exact
 ---CITATIONS---
 Pub 1075 Section X.X.X: Brief description
 Interim Guidance - Document Title, page Y: Brief description
+
+CITATION RULES:
+- Citations may include only Pub 1075 sections, exhibits, or Office of Safeguards interim guidance documents present in the source material.
+- Do not cite user-provided SCSEM names, CAP findings, Test IDs, recommendation IDs, screenshots, pasted text, or workbook row labels.
+- Never create citations such as "Pub 1075 SCSEM - Virtual Desktop" or "Test ID #GENVDI-22" unless that exact source is present in the provided source material as an Office of Safeguards document.
 
 RENDERING CONSTRAINTS (the chat UI is a minimal renderer — violating these produces visible junk):
 - NEVER output horizontal rule separators ("---", "***", "___") inside the body. The only "---" allowed in the entire response is the "---CITATIONS---" delimiter.
@@ -246,6 +253,14 @@ function extractCitations(
 ): { section: string; text: string }[] {
   const citations: { section: string; text: string }[] = [];
 
+  function isAllowedCitationSection(section: string): boolean {
+    const normalized = section.trim();
+    if (/\b(?:SCSEM|Test ID|GEN[A-Z0-9_-]*-\d+|CAP finding|finding text|user-provided)\b/i.test(normalized)) {
+      return false;
+    }
+    return /^(?:Pub(?:lication)?\s*1075\s+Section|Section|Exhibit|Interim Guidance|IRS Office of Safeguards)/i.test(normalized);
+  }
+
   const citationBlock = response.match(
     /---CITATIONS---\s*([\s\S]*?)(?:$|---)/
   );
@@ -253,7 +268,7 @@ function extractCitations(
     const lines = citationBlock[1].trim().split("\n");
     for (const line of lines) {
       const match = line.match(/^(.{3,180}?):\s*(.+)$/i);
-      if (match) {
+      if (match && isAllowedCitationSection(match[1])) {
         citations.push({ section: match[1], text: match[2].trim() });
       }
     }
