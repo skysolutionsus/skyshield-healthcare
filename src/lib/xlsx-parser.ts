@@ -321,6 +321,19 @@ function parseDashboardMetadata(ws: XLSX.WorkSheet): ParsedSCSEM['metadata'] {
     const data = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '' }) as any[][];
     const metadata: ParsedSCSEM['metadata'] = { subject: null, version: null, effectiveDate: null };
 
+    const extractMetadataDate = (value: string): string | null => {
+        const labeledDate = value.match(/\b(?:SCSEM\s+)?(?:Effective|Release)\s+Date:\s*(.+)$/i)
+            || value.match(/^Date:\s*(.+)$/i);
+        if (!labeledDate) return null;
+
+        const source = labeledDate[1].trim();
+        const numericDate = source.match(/\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/);
+        if (numericDate) return numericDate[0];
+
+        const monthNameDate = source.match(/\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},?\s+\d{4}\b/i);
+        return monthNameDate?.[0].replace(/\s+/g, ' ').replace(/(\d{1,2}),?\s+(\d{4})$/, '$1, $2') || null;
+    };
+
     for (const row of data.slice(0, 20)) {
         for (const cell of (row as any[])) {
             const str = cellStr(cell);
@@ -331,9 +344,9 @@ function parseDashboardMetadata(ws: XLSX.WorkSheet): ParsedSCSEM['metadata'] {
             if (str.includes('SCSEM Version:')) {
                 metadata.version = str.replace(/.*SCSEM Version:\s*/i, '').trim();
             }
-            if (str.includes('Effective Date:') || str.includes('Date:')) {
-                const dateMatch = str.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/);
-                if (dateMatch) metadata.effectiveDate = dateMatch[1];
+            if (str.includes('Effective Date:') || str.includes('Release Date:') || str.match(/^Date:/i)) {
+                const parsedDate = extractMetadataDate(str);
+                if (parsedDate) metadata.effectiveDate = parsedDate;
             }
         }
     }
