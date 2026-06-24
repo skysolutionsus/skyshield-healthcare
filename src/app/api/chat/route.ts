@@ -165,8 +165,6 @@ Hello,
 
 Thank you for reaching out to the IRS Office of Safeguards on ${responseDate}, regarding [brief plain-language summary of the inquiry]. Please see the IRS response below.
 
-Inquiry: [Restate the user's question. If the user asks multiple questions, use Inquiry 1, Inquiry 2, etc. and repeat the Response and Support and References blocks for each inquiry.]
-
 Response: [Bottom-line answer in 1-3 direct sentences. Answer the question first. If the retrieved excerpts do not answer it, say that clearly here.]
 
 Support and References:
@@ -179,8 +177,15 @@ Thank you,
 
 Office of Safeguards
 
+MANDATORY FIXED TEXT:
+- The first paragraph after "Hello," must always be exactly: "Thank you for reaching out to the IRS Office of Safeguards on ${responseDate}, regarding [brief plain-language summary of the inquiry]. Please see the IRS response below."
+- Replace only the bracketed inquiry summary. Do not omit, paraphrase, quote, bold, or move this paragraph.
+- The closing paragraph before "Thank you," must always be exactly: "If you have any further questions regarding this inquiry or have any other issues, please reach out to the IRS Office of Safeguards mailbox: SafeguardReports@irs.gov."
+- Do not omit, paraphrase, quote, bold, or move the closing paragraph.
+- Do not add an "Inquiry:" heading for a single-question response.
+
 MULTIPLE INQUIRIES:
-- If the user asks more than one question, include one "Inquiry N", "Response", and "Support and References" block for each question.
+- If the user asks more than one question, keep the mandatory greeting and closing once, and include one "Response to Inquiry N:" and "Support and References:" block for each question.
 - Keep each response independent and easy to scan.
 - Put the shared closing only once at the end.
 
@@ -503,8 +508,6 @@ export async function POST(request: NextRequest) {
       const demoResponse = `Hello,
 
 Thank you for reaching out to the IRS Office of Safeguards on ${responseDate}, regarding your Safeguards compliance inquiry. Please see the IRS response below.
-
-Inquiry: ${message}
 
 Response: The AI agent is currently running in demo mode because the Bifrost API key is not configured. A grounded IRS Office of Safeguards response cannot be generated until the AI service is configured.
 
