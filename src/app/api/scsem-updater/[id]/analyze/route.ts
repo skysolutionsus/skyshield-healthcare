@@ -28,6 +28,8 @@ import {
     buildControlSummary,
     buildNewControlEvidence,
     extractPub1075Sections,
+    isMaterialTextDelta,
+    isUsableBenchmarkDefaultValue,
     parseJsonResponse,
     validateChanges,
     type DownloadedBenchmark,
@@ -75,6 +77,7 @@ function controlsFromParsedSCSEM(parsed: ParsedSCSEM): SCSEMControlEvidence[] {
             description: control.description,
             testProcedures: control.testProcedures,
             expectedResults: control.expectedResults,
+            findingStatement: control.findingStatement,
             criticality: control.criticality,
             cisBenchmarkRef: control.cisBenchmarkRef,
             recommendationNum: control.recommendationNum,
@@ -154,12 +157,61 @@ function safeRecommendationId(value: string): string {
     return value.replace(/[^a-z0-9._-]+/gi, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
 }
 
+function compactField(value: string | null | undefined, maxLength: number): string {
+    return (value || "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, maxLength);
+}
+
+function pub1075ReviewPriority(control: SCSEMControlEvidence): number {
+    let score = 0;
+    if (control.nistId) score += 4;
+    if (!control.testProcedures || control.testProcedures.length < 80) score += 3;
+    if (!control.expectedResults || control.expectedResults.length < 40) score += 2;
+    if (!control.description || control.description.length < 80) score += 2;
+    if (!control.remediationProcedure || control.remediationProcedure.length < 40) score += 1;
+    return score;
+}
+
+function buildPub1075ControlEvidence(controls: SCSEMControlEvidence[], maxChars: number): string {
+    const sortedControls = [...controls]
+        .filter((control) => control.nistId || control.description || control.testProcedures)
+        .sort((a, b) => {
+            const priorityDiff = pub1075ReviewPriority(b) - pub1075ReviewPriority(a);
+            if (priorityDiff !== 0) return priorityDiff;
+            return a.testId.localeCompare(b.testId, undefined, { numeric: true });
+        });
+    const blocks: string[] = [];
+    let usedChars = 0;
+
+    for (const control of sortedControls) {
+        const block = [
+            `SCSEM Test ID: ${control.testId}`,
+            `Sheet: ${control.sourceSheet || "unknown"}`,
+            `NIST: ${control.nistId || "N/A"} | Control: ${control.nistControlName || "N/A"} | Criticality: ${control.criticality || "N/A"}`,
+            `Section title: ${compactField(control.sectionTitle, 220) || "N/A"}`,
+            `Description: ${compactField(control.description, 320) || "N/A"}`,
+            `Test procedure: ${compactField(control.testProcedures, 420) || "N/A"}`,
+            `Expected result: ${compactField(control.expectedResults, 260) || "N/A"}`,
+            control.remediationProcedure ? `Remediation: ${compactField(control.remediationProcedure, 260)}` : null,
+        ].filter(Boolean).join("\n");
+
+        if (usedChars + block.length > maxChars) break;
+        blocks.push(block);
+        usedChars += block.length + 8;
+    }
+
+    return blocks.join("\n\n---\n\n");
+}
+
 function chooseFallbackField(
     control: SCSEMControlEvidence,
     recommendation: CISBenchmarkRecommendation
 ): { field: string; currentValue: string; proposedValue: string } | null {
     const choices = [
         { field: "testProcedures", currentValue: control.testProcedures || "", proposedValue: recommendation.audit || "" },
+        { field: "expectedResults", currentValue: control.expectedResults || "", proposedValue: isUsableBenchmarkDefaultValue(recommendation.defaultValue) ? recommendation.defaultValue || "" : "" },
         { field: "remediationProcedure", currentValue: control.remediationProcedure || "", proposedValue: recommendation.remediation || "" },
         { field: "description", currentValue: control.description || "", proposedValue: recommendation.description || "" },
         { field: "rationale", currentValue: control.rationale || "", proposedValue: recommendation.rationale || "" },
@@ -167,7 +219,7 @@ function chooseFallbackField(
     ];
 
     return choices.find((choice) => choice.proposedValue.trim().length > 0 &&
-        choice.proposedValue.trim() !== choice.currentValue.trim()) || null;
+        isMaterialTextDelta(choice.currentValue, choice.proposedValue)) || null;
 }
 
 function buildFallbackPayload({
@@ -239,6 +291,113 @@ function buildFallbackPayload({
         summary: `Generated deterministic review items for ${technology}${fallbackReason ? ` because ${fallbackReason}` : ""}. Each item is marked needs_review and is grounded directly in the selected CIS/STIG workbook evidence with ${pub1075.version} as the compliance floor.`,
         changes,
     };
+}
+
+async function buildPub1075OnlyPayload({
+    technology,
+    fileName,
+    parsed,
+    controls,
+    pub1075,
+}: {
+    technology: string;
+    fileName: string;
+    parsed: ParsedSCSEM;
+    controls: SCSEMControlEvidence[];
+    pub1075: { version: string; sourcePath: string; excerpts: string };
+}) {
+    const controlEvidenceBudget = Math.max(18000, AI_PROMPT_CHAR_LIMIT - pub1075.excerpts.length - 24000);
+    const controlEvidence = buildPub1075ControlEvidence(controls, controlEvidenceBudget);
+    const prompt = `You are an IRS Safeguards SCSEM update analyst. This uploaded workbook has no direct CIS SecureSuite or STIG benchmark Excel source. Perform a Pub 1075-only review using only the uploaded SCSEM row text and the Publication 1075 excerpts below.
+
+Decision policy:
+- IRS Publication 1075 is the governing compliance floor.
+- Existing IRS SCSEM rows remain the base source of truth.
+- Propose an update only when the current row is materially incomplete, materially weaker, or materially inconsistent with the Pub 1075 excerpt for the same NIST control.
+- Do not propose formatting-only, grammar-only, casing-only, numbering-only, or equivalent-wording changes.
+- Do not rewrite a row merely because Pub 1075 uses different phrasing.
+- Do not invent product-specific benchmark requirements. There is no CIS/STIG product benchmark source for this workbook.
+- Prefer updateField changes to existing rows. Only propose addControl when Pub 1075 clearly requires a control family element and the uploaded workbook has no row that covers it.
+- Mark confidence "needs_review" unless the gap is direct and unambiguous.
+
+Uploaded SCSEM:
+- File name: ${fileName}
+- Inferred technology: ${technology}
+- Dashboard subject: ${parsed.metadata.subject || "unknown"}
+- SCSEM version: ${parsed.metadata.version || "unknown"}
+- Effective date: ${parsed.metadata.effectiveDate || "unknown"}
+- Parsed controls: ${controls.length}
+
+Publication 1075:
+- Version: ${pub1075.version}
+- Local source: ${pub1075.sourcePath}
+
+SCSEM ROWS FOR PUB 1075 REVIEW:
+${controlEvidence || "No SCSEM row text was available."}
+
+PUBLICATION 1075 EXCERPTS FOR REFERENCED NIST CONTROLS:
+${pub1075.excerpts || "No direct Pub 1075 excerpts were found for the referenced NIST controls."}
+
+Return ONLY valid JSON:
+{
+  "summary": "2-3 sentence evidence-based summary of the Pub 1075-only review.",
+  "changes": [
+    {
+      "action": "updateField",
+      "testId": "exact existing SCSEM Test ID",
+      "field": "testProcedures|expectedResults|remediationProcedure|description|rationale|impact|sectionTitle|findingStatement",
+      "currentValue": "brief current value summary",
+      "proposedValue": "complete replacement text for that field",
+      "reason": "specific reason citing the Pub 1075 control excerpt used",
+      "confidence": "high|medium|needs_review",
+      "sourceEvidence": {
+        "cisRecommendation": null,
+        "cisProfile": null,
+        "stigRecommendation": null,
+        "stigProfile": null,
+        "sourceWorkbenchId": null,
+        "sourceBenchmarkTitle": null,
+        "pub1075Version": "${pub1075.version}",
+        "pub1075Only": true
+      }
+    }
+  ]
+}
+
+Rules:
+- Include up to ${MAX_UPDATER_CHANGES} total changes.
+- Use only Test IDs listed in SCSEM ROWS FOR PUB 1075 REVIEW.
+- Do not include changes that only restate the same control in different words.
+- Do not claim Pub 1075 says something unless the excerpt is present above.
+- Do not include markdown fences.`;
+
+    const emptyPayload = {
+        summary: `No direct CIS or STIG benchmark source was found for ${technology}. Pub 1075-only review did not generate deterministic changes without AI reasoning; review the workbook manually if a technology-specific source is available.`,
+        changes: [],
+    };
+
+    if (controls.length > AI_CONTROL_LIMIT || prompt.length > AI_PROMPT_CHAR_LIMIT || !pub1075.excerpts) {
+        return emptyPayload;
+    }
+
+    const abortController = new AbortController();
+    const timeout = setTimeout(() => abortController.abort(), AI_TIMEOUT_MS);
+    try {
+        const responseText = await generateBifrostText({
+            model: getConfiguredBifrostModel("BIFROST_SCSEM_MODEL"),
+            maxTokens: 7000,
+            temperature: 0.1,
+            system: "You generate precise JSON SCSEM update recommendations grounded only in IRS Pub 1075 evidence.",
+            prompt,
+            signal: abortController.signal,
+        });
+        return parseJsonResponse(responseText);
+    } catch (error) {
+        console.warn("SCSEM updater Pub 1075-only analysis failed; returning no benchmark-source changes.", error);
+        return emptyPayload;
+    } finally {
+        clearTimeout(timeout);
+    }
 }
 
 export async function POST(
@@ -357,13 +516,22 @@ export async function POST(
         };
 
         if (resolvedSources.length === 0) {
+            const payload = await buildPub1075OnlyPayload({
+                technology: updaterSession.inferredTechnology,
+                fileName: updaterSession.originalFileName,
+                parsed,
+                controls,
+                pub1075,
+            });
+            const validChanges = addIdsToChanges(validateChanges(payload.changes || [], controls, MAX_UPDATER_CHANGES));
+
             updaterSession.status = "review_ready";
-            updaterSession.summary = `No matching CIS or STIG Benchmark Excel workbook/profile was found for ${updaterSession.inferredTechnology}. The uploaded SCSEM parsed successfully with ${controls.length} controls, but this IRS SCSEM appears to be generic or product-specific and has no direct CIS SecureSuite benchmark equivalent, so no benchmark-driven changes were generated.`;
-            updaterSession.changes = [];
+            updaterSession.summary = payload.summary || `No matching CIS or STIG Benchmark Excel workbook/profile was found for ${updaterSession.inferredTechnology}. Pub 1075-only review completed.`;
+            updaterSession.changes = validChanges;
             updaterSession.history.push({
                 at: new Date().toISOString(),
                 action: "analyze",
-                description: "Analysis completed without a matching CIS or STIG benchmark source.",
+                description: `Pub 1075-only analysis completed without a matching CIS or STIG benchmark source and generated ${validChanges.length} proposed change(s).`,
             });
             writeSCSEMUpdaterSession(updaterSession);
             await logAudit({
@@ -383,12 +551,14 @@ export async function POST(
                     },
                     output: {
                         summary: updaterSession.summary,
-                        changeCount: 0,
+                        changeCount: validChanges.length,
+                        changes: changePreview(validChanges),
                         candidateCounts: {
                             cisUpdates: 0,
                             cisNewControls: 0,
                             stigUpdates: 0,
                             stigNewControls: 0,
+                            pub1075OnlyChanges: validChanges.length,
                         },
                         auditSources: updaterSession.audit,
                     },

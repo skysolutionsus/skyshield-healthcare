@@ -38,6 +38,7 @@ export type SCSEMControlEvidence = {
     description: string | null;
     testProcedures: string | null;
     expectedResults: string | null;
+    findingStatement?: string | null;
     criticality: string | null;
     cisBenchmarkRef: string | null;
     recommendationNum: string | null;
@@ -148,6 +149,77 @@ export function buildNewControlEvidence(recommendation: CISBenchmarkRecommendati
     ].join("\n");
 }
 
+function normalizeMaterialText(value: string | null | undefined): string {
+    return (value || "")
+        .toLowerCase()
+        .replace(/\r\n/g, "\n")
+        .replace(/[^a-z0-9]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+function materialTokenSimilarity(left: string, right: string): number {
+    const leftTokens = new Set(left.split(/\s+/).filter((token) => token.length > 1));
+    const rightTokens = new Set(right.split(/\s+/).filter((token) => token.length > 1));
+    if (leftTokens.size === 0 && rightTokens.size === 0) return 1;
+    if (leftTokens.size === 0 || rightTokens.size === 0) return 0;
+
+    let intersection = 0;
+    for (const token of leftTokens) {
+        if (rightTokens.has(token)) intersection++;
+    }
+
+    return intersection / (leftTokens.size + rightTokens.size - intersection);
+}
+
+export function isMaterialTextDelta(
+    currentValue: string | null | undefined,
+    proposedValue: string | null | undefined
+): boolean {
+    const current = (currentValue || "").trim();
+    const proposed = (proposedValue || "").trim();
+    if (!proposed) return false;
+    if (!current) return proposed.length >= 12;
+
+    const normalizedCurrent = normalizeMaterialText(current);
+    const normalizedProposed = normalizeMaterialText(proposed);
+    if (!normalizedCurrent) return normalizedProposed.length >= 12;
+    if (!normalizedProposed || normalizedCurrent === normalizedProposed) return false;
+
+    const similarity = textSimilarity(normalizedCurrent, normalizedProposed);
+    const tokenSimilarity = materialTokenSimilarity(normalizedCurrent, normalizedProposed);
+    const lengthRatio = normalizedProposed.length / Math.max(normalizedCurrent.length, 1);
+    const containsExisting = normalizedProposed.includes(normalizedCurrent) || normalizedCurrent.includes(normalizedProposed);
+
+    if (tokenSimilarity >= 0.92 && lengthRatio >= 0.7 && lengthRatio <= 1.45) return false;
+    if (similarity >= 0.92 && lengthRatio >= 0.75 && lengthRatio <= 1.35) return false;
+    if (containsExisting && similarity >= 0.84 && lengthRatio >= 0.8 && lengthRatio <= 1.45) return false;
+
+    return (similarity < 0.84 && tokenSimilarity < 0.86) || lengthRatio < 0.7 || lengthRatio > 1.45;
+}
+
+function materialFieldScore(currentValue: string | null | undefined, proposedValue: string | null | undefined): number {
+    if (!isMaterialTextDelta(currentValue, proposedValue)) return 0;
+    return 1 - textSimilarity(currentValue, proposedValue);
+}
+
+export function isUsableBenchmarkDefaultValue(value: string | null | undefined): boolean {
+    const normalized = normalizeMaterialText(value);
+    if (!normalized) return false;
+
+    return !new Set([
+        "n a",
+        "na",
+        "none",
+        "not applicable",
+        "not configured",
+        "not installed",
+        "not set",
+        "varies",
+        "varies by environment",
+    ]).has(normalized);
+}
+
 export function buildComparisonCandidates(
     controls: SCSEMControlEvidence[],
     recommendations: CISBenchmarkRecommendation[],
@@ -174,11 +246,14 @@ export function buildComparisonCandidates(
             const recommendation = recommendationNum ? recById.get(recommendationNum) : null;
             if (!recommendation) return null;
 
-            const descriptionDiff = 1 - textSimilarity(control.description, recommendation.description);
-            const auditDiff = 1 - textSimilarity(control.testProcedures, recommendation.audit);
-            const remediationDiff = 1 - textSimilarity(control.remediationProcedure, recommendation.remediation);
-            const expectedDiff = 1 - textSimilarity(control.expectedResults, recommendation.defaultValue || recommendation.audit);
+            const descriptionDiff = materialFieldScore(control.description, recommendation.description);
+            const auditDiff = materialFieldScore(control.testProcedures, recommendation.audit);
+            const remediationDiff = materialFieldScore(control.remediationProcedure, recommendation.remediation);
+            const expectedDiff = isUsableBenchmarkDefaultValue(recommendation.defaultValue)
+                ? materialFieldScore(control.expectedResults, recommendation.defaultValue)
+                : 0;
             const score = Math.max(descriptionDiff, auditDiff, remediationDiff, expectedDiff);
+            if (score <= 0) return null;
 
             return { control, recommendation, score };
         })
@@ -310,6 +385,7 @@ function insertMissingCommasBetweenObjects(jsonText: string): string {
 
 export function validateChanges(rawChanges: any[], controls: SCSEMControlEvidence[], maxChanges = 8): any[] {
     const existingTestIds = new Set(controls.map((control) => control.testId));
+    const controlByTestId = new Map(controls.map((control) => [control.testId, control]));
 
     return rawChanges
         .filter((change) => change && typeof change === "object")
@@ -322,10 +398,13 @@ export function validateChanges(rawChanges: any[], controls: SCSEMControlEvidenc
                 return Boolean(change.newControl?.recommendationNum && change.newControl?.description);
             }
 
+            const control = controlByTestId.get(change.testId);
+            const currentValue = control ? String((control as any)[change.field] || "") : "";
+
             return existingTestIds.has(change.testId) &&
                 ALLOWED_UPDATE_FIELDS.has(change.field) &&
                 typeof change.proposedValue === "string" &&
-                change.proposedValue.trim().length > 0;
+                isMaterialTextDelta(currentValue, change.proposedValue);
         })
         .slice(0, maxChanges);
 }

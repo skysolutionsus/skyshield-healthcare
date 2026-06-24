@@ -510,8 +510,8 @@ export function SCSEMUpdater() {
                     </div>
 
                     {session.changes.length === 0 ? (
-                        <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/10 p-5 text-sm text-emerald-200">
-                            No proposed control updates were generated for this workbook.
+                        <div className="rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] p-5 text-sm text-[var(--sky-text-secondary)]">
+                            No proposed control updates are available for review. See the analysis summary above for source coverage and reasoning status.
                         </div>
                     ) : (
                         <div className="space-y-3">
