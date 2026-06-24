@@ -51,6 +51,7 @@ export interface SCSEMUpdaterHistoryEntry {
 }
 
 export interface SCSEMUpdaterAuditSource {
+    sourceKind?: "CIS" | "STIG";
     workbenchId: number;
     benchmarkTitle: string;
     benchmarkVersion: string;
@@ -63,6 +64,8 @@ export interface SCSEMUpdaterAuditSource {
     selectedProfile?: string | null;
     selectedProfileRecommendationCount?: number;
     sharedRecommendationCount?: number;
+    matchedSheets?: string[];
+    matchQuery?: string;
     sourceUrl?: string;
 }
 
@@ -93,6 +96,8 @@ export interface SCSEMUpdaterSession {
         pub1075SourcePath?: string;
         cis?: SCSEMUpdaterAuditSource | null;
         stig?: SCSEMUpdaterAuditSource | null;
+        cisSources?: SCSEMUpdaterAuditSource[];
+        stigSources?: SCSEMUpdaterAuditSource[];
     };
 }
 

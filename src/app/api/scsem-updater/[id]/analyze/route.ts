@@ -7,13 +7,14 @@ import {
     getCISToken,
 } from "@/lib/cis-api";
 import {
-    selectApplicableSTIGProfiles,
-    selectBestCISProfile,
-    selectLatestBenchmarkForTechnology,
-    selectLatestSTIGBenchmarkForTechnology,
     type CISBenchmarkRecommendation,
     type SelectedCISProfile,
 } from "@/lib/cis-benchmark-xlsx";
+import {
+    resolveSCSEMBenchmarkSources,
+    type ResolvedBenchmarkKind,
+    type ResolvedBenchmarkSource,
+} from "@/lib/scsem-benchmark-resolver";
 import {
     addIdsToChanges,
     readSCSEMUpdaterSessionForUser,
@@ -26,7 +27,6 @@ import {
     buildComparisonCandidates,
     buildControlSummary,
     buildNewControlEvidence,
-    downloadAndParseBenchmark,
     extractPub1075Sections,
     parseJsonResponse,
     validateChanges,
@@ -66,6 +66,7 @@ function controlsFromParsedSCSEM(parsed: ParsedSCSEM): SCSEMControlEvidence[] {
         .filter((sheet) => sheet.sheetType === "test_cases")
         .flatMap((sheet) => sheet.controls.map((control) => ({
             id: `${sheet.sheetName}:${control.rowIndex}`,
+            sourceSheet: sheet.sheetName,
             testId: control.testId,
             nistId: control.nistId,
             nistControlName: control.nistControlName,
@@ -85,9 +86,15 @@ function controlsFromParsedSCSEM(parsed: ParsedSCSEM): SCSEMControlEvidence[] {
 
 function auditSource(
     downloaded: DownloadedBenchmark,
-    selectedProfile: SelectedCISProfile | null | undefined
+    selectedProfile: SelectedCISProfile | null | undefined,
+    context?: {
+        sourceKind?: ResolvedBenchmarkKind;
+        matchedSheets?: string[];
+        matchQuery?: string;
+    }
 ): SCSEMUpdaterAuditSource {
     return {
+        sourceKind: context?.sourceKind,
         workbenchId: downloaded.snapshot.workbenchId,
         benchmarkTitle: downloaded.snapshot.benchmarkTitle,
         benchmarkVersion: downloaded.snapshot.benchmarkVersion,
@@ -100,23 +107,52 @@ function auditSource(
         selectedProfile: selectedProfile?.profile || null,
         selectedProfileRecommendationCount: selectedProfile?.totalRecommendationCount || 0,
         sharedRecommendationCount: selectedProfile?.sharedRecommendationCount || 0,
+        matchedSheets: context?.matchedSheets,
+        matchQuery: context?.matchQuery,
         sourceUrl: `https://workbench.cisecurity.org/api/vendor/v1/excel/${downloaded.snapshot.workbenchId}`,
     };
 }
 
-type FallbackUpdateCandidate = {
-    sourceLabel: "CIS" | "STIG";
-    profile: string;
+type AnalysisUpdateCandidate = {
+    sourceKind: ResolvedBenchmarkKind;
+    sourceLabel: string;
+    sourceProfile: string;
+    sourceWorkbenchId: number;
+    sourceBenchmarkTitle: string;
     control: SCSEMControlEvidence;
     recommendation: CISBenchmarkRecommendation;
     score: number;
 };
 
-type FallbackNewCandidate = {
-    sourceLabel: "CIS" | "STIG";
-    profile: string;
+type AnalysisNewCandidate = {
+    sourceKind: ResolvedBenchmarkKind;
+    sourceLabel: string;
+    sourceProfile: string;
+    sourceWorkbenchId: number;
+    sourceBenchmarkTitle: string;
     recommendation: CISBenchmarkRecommendation;
 };
+
+function sourceLabel(source: ResolvedBenchmarkSource): string {
+    return `${source.kind} WB ${source.downloaded.snapshot.workbenchId} ${source.downloaded.snapshot.benchmarkTitle} (${source.selectedProfile.profile})`;
+}
+
+function sourceEvidence(candidate: Pick<AnalysisUpdateCandidate | AnalysisNewCandidate,
+    "sourceKind" | "sourceProfile" | "sourceWorkbenchId" | "sourceBenchmarkTitle" | "recommendation">, pub1075Version: string) {
+    return {
+        cisRecommendation: candidate.sourceKind === "CIS" ? candidate.recommendation.recommendation : null,
+        cisProfile: candidate.sourceKind === "CIS" ? candidate.sourceProfile : null,
+        stigRecommendation: candidate.sourceKind === "STIG" ? candidate.recommendation.recommendation : null,
+        stigProfile: candidate.sourceKind === "STIG" ? candidate.sourceProfile : null,
+        sourceWorkbenchId: candidate.sourceWorkbenchId,
+        sourceBenchmarkTitle: candidate.sourceBenchmarkTitle,
+        pub1075Version,
+    };
+}
+
+function safeRecommendationId(value: string): string {
+    return value.replace(/[^a-z0-9._-]+/gi, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+}
 
 function chooseFallbackField(
     control: SCSEMControlEvidence,
@@ -136,50 +172,19 @@ function chooseFallbackField(
 
 function buildFallbackPayload({
     technology,
-    cisProfile,
-    stigProfile,
     pub1075,
     fallbackReason,
     updateCandidates,
     newControlCandidates,
-    stigUpdateCandidates,
-    stigNewControlCandidates,
 }: {
     technology: string;
-    cisProfile: string;
-    stigProfile: string;
     pub1075: { version: string };
     fallbackReason?: string;
-    updateCandidates: ReturnType<typeof buildComparisonCandidates>["updateCandidates"];
-    newControlCandidates: ReturnType<typeof buildComparisonCandidates>["newControlCandidates"];
-    stigUpdateCandidates: ReturnType<typeof buildComparisonCandidates>["updateCandidates"];
-    stigNewControlCandidates: ReturnType<typeof buildComparisonCandidates>["newControlCandidates"];
+    updateCandidates: AnalysisUpdateCandidate[];
+    newControlCandidates: AnalysisNewCandidate[];
 }) {
-    const fallbackUpdates: FallbackUpdateCandidate[] = [
-        ...updateCandidates.map((candidate) => ({
-            ...candidate,
-            sourceLabel: "CIS" as const,
-            profile: cisProfile,
-        })),
-        ...stigUpdateCandidates.map((candidate) => ({
-            ...candidate,
-            sourceLabel: "STIG" as const,
-            profile: stigProfile,
-        })),
-    ].sort((a, b) => b.score - a.score);
-
-    const fallbackNewControls: FallbackNewCandidate[] = [
-        ...newControlCandidates.map((recommendation) => ({
-            recommendation,
-            sourceLabel: "CIS" as const,
-            profile: cisProfile,
-        })),
-        ...stigNewControlCandidates.map((recommendation) => ({
-            recommendation,
-            sourceLabel: "STIG" as const,
-            profile: stigProfile,
-        })),
-    ];
+    const fallbackUpdates = [...updateCandidates].sort((a, b) => b.score - a.score);
+    const fallbackNewControls = [...newControlCandidates];
 
     const changes: any[] = [];
 
@@ -194,15 +199,9 @@ function buildFallbackPayload({
             field: selectedField.field,
             currentValue: selectedField.currentValue.slice(0, 1200),
             proposedValue: selectedField.proposedValue,
-            reason: `${candidate.sourceLabel} ${candidate.recommendation.recommendation} (${candidate.profile}) differs from the uploaded SCSEM row. ${pub1075.version} remains the compliance floor; this fallback proposal should be reviewed for the stricter CIS/STIG/Pub 1075 wording before approval.`,
+            reason: `${candidate.sourceKind} ${candidate.recommendation.recommendation} (${candidate.sourceProfile}, WB ${candidate.sourceWorkbenchId}) differs from the uploaded SCSEM row. ${pub1075.version} remains the compliance floor; this fallback proposal should be reviewed for the stricter CIS/STIG/Pub 1075 wording before approval.`,
             confidence: "needs_review",
-            sourceEvidence: {
-                cisRecommendation: candidate.sourceLabel === "CIS" ? candidate.recommendation.recommendation : null,
-                cisProfile,
-                stigRecommendation: candidate.sourceLabel === "STIG" ? candidate.recommendation.recommendation : null,
-                stigProfile,
-                pub1075Version: pub1075.version,
-            },
+            sourceEvidence: sourceEvidence(candidate, pub1075.version),
         });
     }
 
@@ -211,11 +210,11 @@ function buildFallbackPayload({
         const recommendation = candidate.recommendation;
         changes.push({
             action: "addControl",
-            testId: `NEW-${candidate.sourceLabel}-${recommendation.recommendation}`,
+            testId: `NEW-${candidate.sourceKind}-${candidate.sourceWorkbenchId}-${safeRecommendationId(recommendation.recommendation)}`,
             field: "newControl",
             currentValue: "Not present in current SCSEM",
-            proposedValue: `${candidate.sourceLabel} ${recommendation.recommendation}: ${recommendation.title}`,
-            reason: `${candidate.sourceLabel} ${recommendation.recommendation} appears in the selected benchmark profile but was not mapped in the uploaded SCSEM. ${pub1075.version} should be checked before approval.`,
+            proposedValue: `${candidate.sourceKind} ${recommendation.recommendation}: ${recommendation.title}`,
+            reason: `${candidate.sourceKind} ${recommendation.recommendation} appears in ${candidate.sourceBenchmarkTitle} (${candidate.sourceProfile}, WB ${candidate.sourceWorkbenchId}) but was not mapped in the uploaded SCSEM. ${pub1075.version} should be checked before approval.`,
             confidence: "needs_review",
             newControl: {
                 nistId: null,
@@ -232,13 +231,7 @@ function buildFallbackPayload({
                 impact: recommendation.impact,
                 remediationProcedure: recommendation.remediation,
             },
-            sourceEvidence: {
-                cisRecommendation: candidate.sourceLabel === "CIS" ? recommendation.recommendation : null,
-                cisProfile,
-                stigRecommendation: candidate.sourceLabel === "STIG" ? recommendation.recommendation : null,
-                stigProfile,
-                pub1075Version: pub1075.version,
-            },
+            sourceEvidence: sourceEvidence(candidate, pub1075.version),
         });
     }
 
@@ -286,95 +279,131 @@ export async function POST(
             fetchAllBenchmarkExcelFiles(cisToken),
         ]);
 
-        const selected = selectLatestBenchmarkForTechnology(
-            updaterSession.inferredTechnology,
-            allBenchmarks,
-            allExcelFiles
-        );
-        const selectedStig = selectLatestSTIGBenchmarkForTechnology(
-            updaterSession.inferredTechnology,
-            allBenchmarks,
-            allExcelFiles
-        );
-
         const downloadedBenchmarks = new Map<number, DownloadedBenchmark>();
-        let downloaded: DownloadedBenchmark | null = null;
-        let selectedProfile: SelectedCISProfile | null = null;
+        const resolvedSources = await resolveSCSEMBenchmarkSources({
+            token: cisToken,
+            technology: updaterSession.inferredTechnology,
+            parsed,
+            benchmarks: allBenchmarks,
+            excelFiles: allExcelFiles,
+            downloadedBenchmarks,
+        });
 
-        if (selected) {
-            downloaded = await downloadAndParseBenchmark(
-                cisToken,
-                selected.benchmark,
-                selected.excel,
-                downloadedBenchmarks
+        const updateCandidates: AnalysisUpdateCandidate[] = [];
+        const newControlCandidates: AnalysisNewCandidate[] = [];
+
+        for (const source of resolvedSources) {
+            const scopedControls = controls.filter((control) =>
+                source.matchedSheets.includes(control.sourceSheet || "")
             );
-            selectedProfile = selectBestCISProfile(
-                updaterSession.inferredTechnology,
-                controls,
-                downloaded.recommendations
-            );
-        }
+            if (scopedControls.length === 0) continue;
 
-        let stigDownloaded: DownloadedBenchmark | null = null;
-        let selectedStigProfile: SelectedCISProfile | null = null;
-        let stigUpdateCandidates: ReturnType<typeof buildComparisonCandidates>["updateCandidates"] = [];
-        let stigNewControlCandidates: ReturnType<typeof buildComparisonCandidates>["newControlCandidates"] = [];
-
-        if (selectedStig) {
-            stigDownloaded = await downloadAndParseBenchmark(
-                cisToken,
-                selectedStig.benchmark,
-                selectedStig.excel,
-                downloadedBenchmarks
-            );
-            selectedStigProfile = selectApplicableSTIGProfiles(
-                updaterSession.inferredTechnology,
-                controls,
-                stigDownloaded.recommendations
-            );
-
-            if (selectedStigProfile) {
-                const stigCandidates = buildComparisonCandidates(
-                    controls,
-                    selectedStigProfile.recommendations,
-                    UPDATER_CANDIDATE_LIMITS
-                );
-                stigUpdateCandidates = stigCandidates.updateCandidates;
-                stigNewControlCandidates = stigCandidates.newControlCandidates;
-            }
-        }
-
-        if (!selectedProfile && !selectedStigProfile) {
-            throw new Error(`No matching CIS or STIG Benchmark Excel workbook/profile was found for ${updaterSession.inferredTechnology}. Some IRS SCSEMs are generic or product-specific and do not have a direct CIS SecureSuite Excel equivalent.`);
-        }
-
-        const { updateCandidates, newControlCandidates } = selectedProfile
-            ? buildComparisonCandidates(
-                controls,
-                selectedProfile.recommendations,
+            const candidates = buildComparisonCandidates(
+                scopedControls,
+                source.selectedProfile.recommendations,
                 UPDATER_CANDIDATE_LIMITS
-            )
-            : { updateCandidates: [], newControlCandidates: [] };
+            );
+            const label = sourceLabel(source);
 
-        const pub1075 = extractPub1075Sections([
+            updateCandidates.push(...candidates.updateCandidates.map((candidate) => ({
+                ...candidate,
+                sourceKind: source.kind,
+                sourceLabel: label,
+                sourceProfile: source.selectedProfile.profile,
+                sourceWorkbenchId: source.downloaded.snapshot.workbenchId,
+                sourceBenchmarkTitle: source.downloaded.snapshot.benchmarkTitle,
+            })));
+            newControlCandidates.push(...candidates.newControlCandidates.map((recommendation) => ({
+                recommendation,
+                sourceKind: source.kind,
+                sourceLabel: label,
+                sourceProfile: source.selectedProfile.profile,
+                sourceWorkbenchId: source.downloaded.snapshot.workbenchId,
+                sourceBenchmarkTitle: source.downloaded.snapshot.benchmarkTitle,
+            })));
+        }
+
+        updateCandidates.sort((a, b) => b.score - a.score);
+
+        const candidateNistIds = [
             ...updateCandidates.map((candidate) => candidate.control.nistId),
-            ...stigUpdateCandidates.map((candidate) => candidate.control.nistId),
-        ]);
+        ];
+        const pub1075 = extractPub1075Sections(
+            candidateNistIds.length > 0
+                ? candidateNistIds
+                : controls.map((control) => control.nistId)
+        );
+        const cisSources = resolvedSources.filter((source) => source.kind === "CIS");
+        const stigSources = resolvedSources.filter((source) => source.kind === "STIG");
+        const cisAuditSources = cisSources.map((source) => auditSource(source.downloaded, source.selectedProfile, {
+            sourceKind: source.kind,
+            matchedSheets: source.matchedSheets,
+            matchQuery: source.matchQuery,
+        }));
+        const stigAuditSources = stigSources.map((source) => auditSource(source.downloaded, source.selectedProfile, {
+            sourceKind: source.kind,
+            matchedSheets: source.matchedSheets,
+            matchQuery: source.matchQuery,
+        }));
 
         updaterSession.audit = {
             ...updaterSession.audit,
             pub1075Version: pub1075.version,
             pub1075SourcePath: pub1075.sourcePath,
-            cis: downloaded ? auditSource(downloaded, selectedProfile) : null,
-            stig: stigDownloaded ? auditSource(stigDownloaded, selectedStigProfile) : null,
+            cis: cisAuditSources[0] || null,
+            stig: stigAuditSources[0] || null,
+            cisSources: cisAuditSources,
+            stigSources: stigAuditSources,
         };
 
-        if (
-            updateCandidates.length === 0 &&
-            newControlCandidates.length === 0 &&
-            stigUpdateCandidates.length === 0 &&
-            stigNewControlCandidates.length === 0
-        ) {
+        if (resolvedSources.length === 0) {
+            updaterSession.status = "review_ready";
+            updaterSession.summary = `No matching CIS or STIG Benchmark Excel workbook/profile was found for ${updaterSession.inferredTechnology}. The uploaded SCSEM parsed successfully with ${controls.length} controls, but this IRS SCSEM appears to be generic or product-specific and has no direct CIS SecureSuite benchmark equivalent, so no benchmark-driven changes were generated.`;
+            updaterSession.changes = [];
+            updaterSession.history.push({
+                at: new Date().toISOString(),
+                action: "analyze",
+                description: "Analysis completed without a matching CIS or STIG benchmark source.",
+            });
+            writeSCSEMUpdaterSession(updaterSession);
+            await logAudit({
+                organizationId: user.organizationId,
+                userId: user.id,
+                action: "SCSEM_UPDATER_ANALYZE",
+                resourceType: "scsem_updater_session",
+                resourceId: updaterSession.id,
+                metadata: {
+                    input: {
+                        fileName: updaterSession.originalFileName,
+                        inferredTechnology: updaterSession.inferredTechnology,
+                        parsedControls: controls.length,
+                        testCaseSheets: parsed.sheets
+                            .filter((sheet) => sheet.sheetType === "test_cases")
+                            .map((sheet) => sheet.sheetName),
+                    },
+                    output: {
+                        summary: updaterSession.summary,
+                        changeCount: 0,
+                        candidateCounts: {
+                            cisUpdates: 0,
+                            cisNewControls: 0,
+                            stigUpdates: 0,
+                            stigNewControls: 0,
+                        },
+                        auditSources: updaterSession.audit,
+                    },
+                },
+                ...auditRequestContext(request),
+            });
+            return NextResponse.json({ session: updaterSession });
+        }
+
+        const cisUpdateCandidates = updateCandidates.filter((candidate) => candidate.sourceKind === "CIS");
+        const stigUpdateCandidates = updateCandidates.filter((candidate) => candidate.sourceKind === "STIG");
+        const cisNewControlCandidates = newControlCandidates.filter((candidate) => candidate.sourceKind === "CIS");
+        const stigNewControlCandidates = newControlCandidates.filter((candidate) => candidate.sourceKind === "STIG");
+
+        if (updateCandidates.length === 0 && newControlCandidates.length === 0) {
             updaterSession.status = "review_ready";
             updaterSession.summary = "No CIS or STIG deltas were detected for the uploaded SCSEM workbook.";
             updaterSession.changes = [];
@@ -403,8 +432,8 @@ export async function POST(
                         summary: updaterSession.summary,
                         changeCount: 0,
                         candidateCounts: {
-                            cisUpdates: updateCandidates.length,
-                            cisNewControls: newControlCandidates.length,
+                            cisUpdates: cisUpdateCandidates.length,
+                            cisNewControls: cisNewControlCandidates.length,
                             stigUpdates: stigUpdateCandidates.length,
                             stigNewControls: stigNewControlCandidates.length,
                         },
@@ -416,31 +445,32 @@ export async function POST(
             return NextResponse.json({ session: updaterSession });
         }
 
-        const updateEvidence = updateCandidates
-            .map((candidate) => buildControlSummary(candidate.control, candidate.recommendation, "CIS"))
+        const cisUpdateEvidence = cisUpdateCandidates
+            .map((candidate) => buildControlSummary(candidate.control, candidate.recommendation, candidate.sourceLabel))
             .join("\n\n---\n\n");
-        const newControlEvidence = newControlCandidates
-            .map((recommendation) => buildNewControlEvidence(recommendation, "CIS"))
+        const cisNewControlEvidence = cisNewControlCandidates
+            .map((candidate) => buildNewControlEvidence(candidate.recommendation, candidate.sourceLabel))
             .join("\n\n---\n\n");
         const stigUpdateEvidence = stigUpdateCandidates
-            .map((candidate) => buildControlSummary(candidate.control, candidate.recommendation, "STIG"))
+            .map((candidate) => buildControlSummary(candidate.control, candidate.recommendation, candidate.sourceLabel))
             .join("\n\n---\n\n");
         const stigNewControlEvidence = stigNewControlCandidates
-            .map((recommendation) => buildNewControlEvidence(recommendation, "STIG"))
+            .map((candidate) => buildNewControlEvidence(candidate.recommendation, candidate.sourceLabel))
             .join("\n\n---\n\n");
-        const stigSourceSummary = stigDownloaded
-            ? selectedStigProfile
-                ? [
-                    `- Title: ${stigDownloaded.snapshot.benchmarkTitle}`,
-                    `- Version: ${stigDownloaded.snapshot.benchmarkVersion}`,
-                    `- Release date: ${stigDownloaded.snapshot.releaseDate.toISOString().slice(0, 10)}`,
-                    `- Selected profile: ${selectedStigProfile.profile}`,
-                    `- Excel snapshot path: ${stigDownloaded.snapshot.filePath}`,
-                    `- Excel SHA-256: ${stigDownloaded.snapshot.sha256}`,
-                    `- Matched existing recommendations: ${selectedStigProfile.sharedRecommendationCount}/${selectedStigProfile.totalRecommendationCount}`,
-                ].join("\n")
-                : `- STIG benchmark found (${stigDownloaded.snapshot.benchmarkTitle} v${stigDownloaded.snapshot.benchmarkVersion}), but no parseable matching profile was selected.`
-            : "- No matching CIS SecureSuite STIG Excel benchmark was found for this SCSEM technology.";
+        const benchmarkSourceSummary = (sources: ResolvedBenchmarkSource[], kind: ResolvedBenchmarkKind) => sources.length > 0
+            ? sources.map((source) => [
+                `- Title: ${source.downloaded.snapshot.benchmarkTitle}`,
+                `  WorkBench ID: ${source.downloaded.snapshot.workbenchId}`,
+                `  Version: ${source.downloaded.snapshot.benchmarkVersion}`,
+                `  Release date: ${source.downloaded.snapshot.releaseDate.toISOString().slice(0, 10)}`,
+                `  Selected profile: ${source.selectedProfile.profile}`,
+                `  Matched sheets: ${source.matchedSheets.join(", ")}`,
+                `  Match query: ${source.matchQuery}`,
+                `  Excel snapshot path: ${source.downloaded.snapshot.filePath}`,
+                `  Excel SHA-256: ${source.downloaded.snapshot.sha256}`,
+                `  Matched existing recommendations: ${source.sharedRecommendationCount}/${source.sheetRecommendationCount}`,
+            ].join("\n")).join("\n")
+            : `- No matching ${kind} Benchmark Excel workbook/profile was selected for this SCSEM technology.`;
 
         const prompt = `You are an IRS Safeguards SCSEM update analyst. Propose human-reviewable SCSEM workbook changes using only the evidence below.
 
@@ -464,31 +494,21 @@ Uploaded SCSEM:
 - Effective date: ${parsed.metadata.effectiveDate || "unknown"}
 - Parsed controls: ${controls.length}
 
-CIS Benchmark:
-${downloaded && selectedProfile
-                ? [
-                    `- Title: ${downloaded.snapshot.benchmarkTitle}`,
-                    `- Version: ${downloaded.snapshot.benchmarkVersion}`,
-                    `- Release date: ${downloaded.snapshot.releaseDate.toISOString().slice(0, 10)}`,
-                    `- Selected profile: ${selectedProfile.profile}`,
-                    `- Excel snapshot path: ${downloaded.snapshot.filePath}`,
-                    `- Excel SHA-256: ${downloaded.snapshot.sha256}`,
-                    `- Matched existing recommendations: ${selectedProfile.sharedRecommendationCount}/${selectedProfile.totalRecommendationCount}`,
-                ].join("\n")
-                : "- No matching CIS Benchmark Excel workbook/profile was selected for this SCSEM technology."}
+CIS Benchmark Sources:
+${benchmarkSourceSummary(cisSources, "CIS")}
 
-STIG Benchmark:
-${stigSourceSummary}
+STIG Benchmark Sources:
+${benchmarkSourceSummary(stigSources, "STIG")}
 
 Publication 1075:
 - Version: ${pub1075.version}
 - Local source: ${pub1075.sourcePath}
 
 CURRENT SCSEM ROWS MATCHED TO CIS CANDIDATES:
-${updateEvidence || "None"}
+${cisUpdateEvidence || "None"}
 
 POTENTIAL NEW CIS ROWS NOT PRESENT IN THE SCSEM:
-${newControlEvidence || "None"}
+${cisNewControlEvidence || "None"}
 
 CURRENT SCSEM ROWS MATCHED TO STIG CANDIDATES:
 ${stigUpdateEvidence || "None"}
@@ -513,9 +533,11 @@ Return ONLY valid JSON:
       "confidence": "high|medium|needs_review",
       "sourceEvidence": {
         "cisRecommendation": "CIS recommendation number if CIS evidence applies, otherwise null",
-        "cisProfile": "${selectedProfile?.profile || ""}",
+        "cisProfile": "selected CIS profile if CIS evidence applies, otherwise null",
         "stigRecommendation": "STIG recommendation number if STIG evidence applies, otherwise null",
-        "stigProfile": "${selectedStigProfile?.profile || ""}",
+        "stigProfile": "selected STIG profile if STIG evidence applies, otherwise null",
+        "sourceWorkbenchId": "WorkBench ID from the evidence source",
+        "sourceBenchmarkTitle": "benchmark title from the evidence source",
         "pub1075Version": "${pub1075.version}"
       }
     },
@@ -544,9 +566,11 @@ Return ONLY valid JSON:
       },
       "sourceEvidence": {
         "cisRecommendation": "CIS recommendation number if CIS evidence applies, otherwise null",
-        "cisProfile": "${selectedProfile?.profile || ""}",
+        "cisProfile": "selected CIS profile if CIS evidence applies, otherwise null",
         "stigRecommendation": "STIG recommendation number if STIG evidence applies, otherwise null",
-        "stigProfile": "${selectedStigProfile?.profile || ""}",
+        "stigProfile": "selected STIG profile if STIG evidence applies, otherwise null",
+        "sourceWorkbenchId": "WorkBench ID from the evidence source",
+        "sourceBenchmarkTitle": "benchmark title from the evidence source",
         "pub1075Version": "${pub1075.version}"
       }
     }
@@ -566,14 +590,10 @@ Rules:
         if (!shouldUseAI) {
             payload = buildFallbackPayload({
                 technology: updaterSession.inferredTechnology,
-                cisProfile: selectedProfile?.profile || "",
-                stigProfile: selectedStigProfile?.profile || "",
                 pub1075,
                 fallbackReason: `the uploaded workbook has ${controls.length} parsed controls, so the updater used deterministic benchmark diffs to keep the interactive request within deploy limits`,
                 updateCandidates,
                 newControlCandidates,
-                stigUpdateCandidates,
-                stigNewControlCandidates,
             });
         } else {
             const abortController = new AbortController();
@@ -593,16 +613,12 @@ Rules:
                 console.warn("SCSEM updater AI analysis failed; using deterministic fallback changes.", error);
                 payload = buildFallbackPayload({
                     technology: updaterSession.inferredTechnology,
-                    cisProfile: selectedProfile?.profile || "",
-                    stigProfile: selectedStigProfile?.profile || "",
                     pub1075,
                     fallbackReason: error instanceof Error && error.name === "AbortError"
                         ? "the AI analysis exceeded the interactive timeout"
                         : "the AI response could not be used safely",
                     updateCandidates,
                     newControlCandidates,
-                    stigUpdateCandidates,
-                    stigNewControlCandidates,
                 });
             } finally {
                 clearTimeout(timeout);
@@ -640,8 +656,8 @@ Rules:
                     changeCount: validChanges.length,
                     changes: changePreview(validChanges),
                     candidateCounts: {
-                        cisUpdates: updateCandidates.length,
-                        cisNewControls: newControlCandidates.length,
+                        cisUpdates: cisUpdateCandidates.length,
+                        cisNewControls: cisNewControlCandidates.length,
                         stigUpdates: stigUpdateCandidates.length,
                         stigNewControls: stigNewControlCandidates.length,
                     },

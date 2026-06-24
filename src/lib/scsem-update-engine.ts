@@ -29,6 +29,7 @@ export const ALLOWED_UPDATE_FIELDS = new Set([
 
 export type SCSEMControlEvidence = {
     id: string;
+    sourceSheet?: string;
     testId: string;
     nistId: string | null;
     nistControlName: string | null;
