@@ -7,10 +7,12 @@ import {
     getCISToken,
 } from "@/lib/cis-api";
 import {
+    recommendationEvidenceSummary,
     type CISBenchmarkRecommendation,
     type SelectedCISProfile,
 } from "@/lib/cis-benchmark-xlsx";
 import {
+    resolveAdjacentSCSEMBenchmarkSources,
     resolveSCSEMBenchmarkSources,
     type ResolvedBenchmarkKind,
     type ResolvedBenchmarkSource,
@@ -92,12 +94,16 @@ function auditSource(
     selectedProfile: SelectedCISProfile | null | undefined,
     context?: {
         sourceKind?: ResolvedBenchmarkKind;
+        sourceRelationship?: "direct" | "adjacent";
         matchedSheets?: string[];
         matchQuery?: string;
+        adjacentCategory?: string;
+        adjacentRationale?: string;
     }
 ): SCSEMUpdaterAuditSource {
     return {
         sourceKind: context?.sourceKind,
+        sourceRelationship: context?.sourceRelationship,
         workbenchId: downloaded.snapshot.workbenchId,
         benchmarkTitle: downloaded.snapshot.benchmarkTitle,
         benchmarkVersion: downloaded.snapshot.benchmarkVersion,
@@ -112,12 +118,15 @@ function auditSource(
         sharedRecommendationCount: selectedProfile?.sharedRecommendationCount || 0,
         matchedSheets: context?.matchedSheets,
         matchQuery: context?.matchQuery,
+        adjacentCategory: context?.adjacentCategory,
+        adjacentRationale: context?.adjacentRationale,
         sourceUrl: `https://workbench.cisecurity.org/api/vendor/v1/excel/${downloaded.snapshot.workbenchId}`,
     };
 }
 
 type AnalysisUpdateCandidate = {
     sourceKind: ResolvedBenchmarkKind;
+    sourceRelationship?: "direct" | "adjacent";
     sourceLabel: string;
     sourceProfile: string;
     sourceWorkbenchId: number;
@@ -129,6 +138,7 @@ type AnalysisUpdateCandidate = {
 
 type AnalysisNewCandidate = {
     sourceKind: ResolvedBenchmarkKind;
+    sourceRelationship?: "direct" | "adjacent";
     sourceLabel: string;
     sourceProfile: string;
     sourceWorkbenchId: number;
@@ -136,13 +146,28 @@ type AnalysisNewCandidate = {
     recommendation: CISBenchmarkRecommendation;
 };
 
+type AnalysisAdjacentCandidate = {
+    sourceKind: ResolvedBenchmarkKind;
+    sourceRelationship: "adjacent";
+    sourceLabel: string;
+    sourceProfile: string;
+    sourceWorkbenchId: number;
+    sourceBenchmarkTitle: string;
+    adjacentCategory: string;
+    adjacentRationale: string;
+    recommendation: CISBenchmarkRecommendation;
+    score: number;
+};
+
 function sourceLabel(source: ResolvedBenchmarkSource): string {
     return `${source.kind} WB ${source.downloaded.snapshot.workbenchId} ${source.downloaded.snapshot.benchmarkTitle} (${source.selectedProfile.profile})`;
 }
 
 function sourceEvidence(candidate: Pick<AnalysisUpdateCandidate | AnalysisNewCandidate,
-    "sourceKind" | "sourceProfile" | "sourceWorkbenchId" | "sourceBenchmarkTitle" | "recommendation">, pub1075Version: string) {
+    "sourceKind" | "sourceRelationship" | "sourceProfile" | "sourceWorkbenchId" | "sourceBenchmarkTitle" | "recommendation">, pub1075Version: string) {
     return {
+        evidenceTier: candidate.sourceRelationship === "adjacent" ? "adjacent" : "direct",
+        sourceRelationship: candidate.sourceRelationship || "direct",
         cisRecommendation: candidate.sourceKind === "CIS" ? candidate.recommendation.recommendation : null,
         cisProfile: candidate.sourceKind === "CIS" ? candidate.sourceProfile : null,
         stigRecommendation: candidate.sourceKind === "STIG" ? candidate.recommendation.recommendation : null,
@@ -203,6 +228,210 @@ function buildPub1075ControlEvidence(controls: SCSEMControlEvidence[], maxChars:
     }
 
     return blocks.join("\n\n---\n\n");
+}
+
+const ADJACENT_BASE_TERMS = [
+    "access",
+    "account",
+    "admin",
+    "administrator",
+    "audit",
+    "authentication",
+    "authorization",
+    "backup",
+    "certificate",
+    "configuration",
+    "credential",
+    "cryptographic",
+    "default",
+    "encrypt",
+    "encryption",
+    "logging",
+    "management",
+    "monitor",
+    "password",
+    "patch",
+    "privilege",
+    "remote",
+    "secure",
+    "session",
+    "tls",
+    "update",
+];
+
+function adjacentCategoryTerms(category: string): string[] {
+    const normalized = category.toLowerCase();
+    if (normalized.includes("network")) {
+        return [
+            "aaa",
+            "radius",
+            "tacacs",
+            "ssh",
+            "snmp",
+            "syslog",
+            "ntp",
+            "management",
+            "banner",
+            "firmware",
+            "configuration",
+            "access list",
+            "logging",
+        ];
+    }
+    if (normalized.includes("web")) {
+        return [
+            "tls",
+            "ssl",
+            "certificate",
+            "directory",
+            "headers",
+            "logging",
+            "error",
+            "authentication",
+            "modules",
+            "request",
+            "timeout",
+            "session",
+            "server tokens",
+        ];
+    }
+    if (normalized.includes("application")) {
+        return [
+            "authentication",
+            "session",
+            "database",
+            "audit",
+            "logging",
+            "encryption",
+            "service account",
+            "privilege",
+            "connection",
+            "password",
+            "tls",
+        ];
+    }
+    return [];
+}
+
+function adjacentRecommendationScore(recommendation: CISBenchmarkRecommendation, category: string): number {
+    const title = `${recommendation.title || ""} ${recommendation.section || ""}`.toLowerCase();
+    const body = [
+        recommendation.description,
+        recommendation.rationale,
+        recommendation.audit,
+        recommendation.remediation,
+        recommendation.defaultValue,
+    ].filter(Boolean).join(" ").toLowerCase();
+    const terms = [...ADJACENT_BASE_TERMS, ...adjacentCategoryTerms(category)];
+    let score = 0;
+
+    for (const term of terms) {
+        const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const pattern = new RegExp(`\\b${escaped.replace(/\\ /g, "\\s+")}\\b`, "i");
+        if (pattern.test(title)) score += 4;
+        if (pattern.test(body)) score += 1;
+    }
+
+    if (/deprecated|obsolete|sample|example|demo/i.test(title)) score -= 4;
+    if (/level\s*1/i.test(recommendation.profile)) score += 1;
+    if ((recommendation.audit || recommendation.remediation || recommendation.description) && recommendation.title) score += 1;
+    return score;
+}
+
+function buildAdjacentRecommendationCandidates(
+    adjacentSources: ResolvedBenchmarkSource[],
+    maxTotal = 28
+): AnalysisAdjacentCandidate[] {
+    const candidates: AnalysisAdjacentCandidate[] = [];
+    const seen = new Set<string>();
+
+    for (const source of adjacentSources) {
+        const sourceCandidates = source.selectedProfile.recommendations
+            .map((recommendation) => ({
+                recommendation,
+                score: adjacentRecommendationScore(recommendation, source.adjacentCategory || ""),
+            }))
+            .filter(({ recommendation, score }) => score > 0 && Boolean(recommendation.title))
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 8);
+
+        for (const { recommendation, score } of sourceCandidates) {
+            const dedupeKey = [
+                source.kind,
+                source.downloaded.snapshot.workbenchId,
+                recommendation.recommendation,
+                recommendation.title,
+            ].join(":").toLowerCase();
+            if (seen.has(dedupeKey)) continue;
+            seen.add(dedupeKey);
+            candidates.push({
+                sourceKind: source.kind,
+                sourceRelationship: "adjacent",
+                sourceLabel: sourceLabel(source),
+                sourceProfile: source.selectedProfile.profile,
+                sourceWorkbenchId: source.downloaded.snapshot.workbenchId,
+                sourceBenchmarkTitle: source.downloaded.snapshot.benchmarkTitle,
+                adjacentCategory: source.adjacentCategory || "Adjacent hardening patterns",
+                adjacentRationale: source.adjacentRationale || "Adjacent benchmark evidence selected for human review.",
+                recommendation,
+                score,
+            });
+        }
+    }
+
+    return candidates
+        .sort((a, b) => b.score - a.score)
+        .slice(0, maxTotal);
+}
+
+function buildAdjacentBenchmarkEvidence(candidates: AnalysisAdjacentCandidate[], maxChars: number): string {
+    const blocks: string[] = [];
+    let usedChars = 0;
+
+    for (const candidate of candidates) {
+        const block = [
+            `Evidence tier: adjacent benchmark pattern, not a direct SCSEM equivalent`,
+            `Adjacent category: ${candidate.adjacentCategory}`,
+            `Applicability guardrail: ${candidate.adjacentRationale}`,
+            recommendationEvidenceSummary(candidate.recommendation, candidate.sourceLabel),
+        ].join("\n");
+
+        if (usedChars + block.length > maxChars) break;
+        blocks.push(block);
+        usedChars += block.length + 8;
+    }
+
+    return blocks.join("\n\n---\n\n");
+}
+
+function adjacentSourceSummary(sources: ResolvedBenchmarkSource[]): string {
+    if (sources.length === 0) return "- No adjacent benchmark sources were selected.";
+
+    return sources.map((source) => [
+        `- Relationship: adjacent, not direct equivalent`,
+        `  Category: ${source.adjacentCategory || "Adjacent hardening patterns"}`,
+        `  Rationale: ${source.adjacentRationale || "Adjacent benchmark evidence selected for human review."}`,
+        `  Kind: ${source.kind}`,
+        `  Title: ${source.downloaded.snapshot.benchmarkTitle}`,
+        `  WorkBench ID: ${source.downloaded.snapshot.workbenchId}`,
+        `  Version: ${source.downloaded.snapshot.benchmarkVersion}`,
+        `  Release date: ${source.downloaded.snapshot.releaseDate.toISOString().slice(0, 10)}`,
+        `  Selected profile: ${source.selectedProfile.profile}`,
+        `  Query: ${source.matchQuery}`,
+    ].join("\n")).join("\n");
+}
+
+function markAdjacentChangesForReview(changes: any[], pub1075Version: string): any[] {
+    return changes.map((change) => ({
+        ...change,
+        confidence: "needs_review",
+        sourceEvidence: {
+            ...(change.sourceEvidence || {}),
+            evidenceTier: "adjacent",
+            sourceRelationship: "adjacent",
+            pub1075Version,
+        },
+    }));
 }
 
 function chooseFallbackField(
@@ -400,6 +629,171 @@ Rules:
     }
 }
 
+async function buildAdjacentSourcePayload({
+    technology,
+    fileName,
+    parsed,
+    controls,
+    pub1075,
+    adjacentSources,
+    adjacentCandidates,
+}: {
+    technology: string;
+    fileName: string;
+    parsed: ParsedSCSEM;
+    controls: SCSEMControlEvidence[];
+    pub1075: { version: string; sourcePath: string; excerpts: string };
+    adjacentSources: ResolvedBenchmarkSource[];
+    adjacentCandidates: AnalysisAdjacentCandidate[];
+}) {
+    const controlEvidence = buildPub1075ControlEvidence(controls, 18000);
+    const adjacentEvidence = buildAdjacentBenchmarkEvidence(adjacentCandidates, 24000);
+    const prompt = `You are an IRS Safeguards SCSEM update analyst. This uploaded workbook has no direct CIS SecureSuite or STIG benchmark Excel source. Perform an adjacent-source review using the uploaded SCSEM row text, IRS Publication 1075 excerpts, and explicitly labeled adjacent CIS/STIG benchmark patterns below.
+
+Decision policy:
+- IRS Publication 1075 is the governing compliance floor.
+- Existing IRS SCSEM rows remain the base source of truth.
+- Adjacent benchmarks are NOT direct equivalents. They are reasoning evidence only.
+- Use adjacent evidence only when it expresses a technology-neutral hardening pattern that reasonably applies to the uploaded SCSEM's control intent.
+- Propose an update only when the current SCSEM row appears materially incomplete, materially weaker, or materially inconsistent with Pub 1075 and the adjacent pattern helps explain a concrete reviewer-worthy improvement.
+- Do not copy vendor-specific commands, file paths, registry keys, product names, service names, configuration syntax, or exact platform settings into a generic SCSEM unless the uploaded SCSEM already names that same platform.
+- Do not propose formatting-only, grammar-only, casing-only, numbering-only, or equivalent-wording changes.
+- Prefer updateField changes to existing rows. Use addControl only when Pub 1075 clearly supports the control intent and no uploaded row covers that intent.
+- Every change from adjacent evidence must be marked confidence "needs_review".
+- Every change must include sourceEvidence.evidenceTier = "adjacent", sourceEvidence.sourceRelationship = "adjacent", and a short sourceEvidence.applicabilityRationale.
+
+Uploaded SCSEM:
+- File name: ${fileName}
+- Inferred technology: ${technology}
+- Dashboard subject: ${parsed.metadata.subject || "unknown"}
+- SCSEM version: ${parsed.metadata.version || "unknown"}
+- Effective date: ${parsed.metadata.effectiveDate || "unknown"}
+- Parsed controls: ${controls.length}
+
+Adjacent benchmark source summary:
+${adjacentSourceSummary(adjacentSources)}
+
+Publication 1075:
+- Version: ${pub1075.version}
+- Local source: ${pub1075.sourcePath}
+
+SCSEM ROWS FOR REVIEW:
+${controlEvidence || "No SCSEM row text was available."}
+
+ADJACENT BENCHMARK EVIDENCE:
+${adjacentEvidence || "No adjacent benchmark recommendations were selected."}
+
+PUBLICATION 1075 EXCERPTS FOR REFERENCED NIST CONTROLS:
+${pub1075.excerpts || "No direct Pub 1075 excerpts were found for the referenced NIST controls."}
+
+Return ONLY valid JSON:
+{
+  "summary": "2-3 sentence evidence-based summary of adjacent-source review coverage and limitations.",
+  "changes": [
+    {
+      "action": "updateField",
+      "testId": "exact existing SCSEM Test ID",
+      "field": "testProcedures|expectedResults|remediationProcedure|description|rationale|impact|sectionTitle|findingStatement",
+      "currentValue": "brief current value summary",
+      "proposedValue": "complete replacement text for that field",
+      "reason": "specific reason citing Pub 1075 and adjacent benchmark pattern; explicitly state this is adjacent-source evidence for reviewer approval",
+      "confidence": "needs_review",
+      "sourceEvidence": {
+        "evidenceTier": "adjacent",
+        "sourceRelationship": "adjacent",
+        "cisRecommendation": "CIS recommendation number if CIS adjacent evidence applies, otherwise null",
+        "cisProfile": "selected CIS profile if CIS adjacent evidence applies, otherwise null",
+        "stigRecommendation": "STIG recommendation number if STIG adjacent evidence applies, otherwise null",
+        "stigProfile": "selected STIG profile if STIG adjacent evidence applies, otherwise null",
+        "sourceWorkbenchId": "WorkBench ID from the adjacent evidence source",
+        "sourceBenchmarkTitle": "adjacent benchmark title",
+        "adjacentSourceCategory": "category from the adjacent source summary",
+        "applicabilityRationale": "why the adjacent pattern is relevant without claiming direct equivalence",
+        "pub1075Version": "${pub1075.version}"
+      }
+    },
+    {
+      "action": "addControl",
+      "testId": "NEW-ADJACENT-<recommendation>",
+      "field": "newControl",
+      "currentValue": "Not present in current SCSEM",
+      "proposedValue": "short summary of the new reviewer-only control",
+      "reason": "why this adjacent-source pattern should be reviewed against Pub 1075",
+      "confidence": "needs_review",
+      "newControl": {
+        "nistId": null,
+        "nistControlName": "best fit if obvious from Pub 1075, otherwise null",
+        "testMethod": "Automated|Manual|Interview|Examine|Test",
+        "sectionTitle": "SCSEM-ready generic title",
+        "description": "SCSEM-ready generic description without vendor-specific commands",
+        "testProcedures": "SCSEM-ready generic audit/test procedure without vendor-specific commands",
+        "expectedResults": "SCSEM-ready generic expected result",
+        "criticality": "Critical|Significant|Moderate|Limited|Informational",
+        "cisBenchmarkRef": "Adjacent CIS/STIG section number",
+        "recommendationNum": "Adjacent recommendation number",
+        "rationale": "SCSEM-ready rationale",
+        "impact": "SCSEM-ready impact",
+        "remediationProcedure": "SCSEM-ready remediation"
+      },
+      "sourceEvidence": {
+        "evidenceTier": "adjacent",
+        "sourceRelationship": "adjacent",
+        "sourceWorkbenchId": "WorkBench ID from the adjacent evidence source",
+        "sourceBenchmarkTitle": "adjacent benchmark title",
+        "adjacentSourceCategory": "category from the adjacent source summary",
+        "applicabilityRationale": "why the adjacent pattern is relevant without claiming direct equivalence",
+        "pub1075Version": "${pub1075.version}"
+      }
+    }
+  ]
+}
+
+Rules:
+- Include up to ${MAX_UPDATER_CHANGES} total changes.
+- For updateField, only use Test IDs listed in SCSEM ROWS FOR REVIEW.
+- Do not include a change unless a human reviewer could trace it to both Pub 1075/control intent and an adjacent hardening pattern.
+- Do not claim any adjacent benchmark is a direct equivalent for ${technology}.
+- Do not include markdown fences.`;
+
+    const emptyPayload = {
+        summary: `No direct CIS or STIG benchmark source was found for ${technology}. Adjacent benchmark sources were selected for reviewer-only reasoning, but no adjacent-source changes were generated without AI reasoning.`,
+        changes: [],
+    };
+
+    if (
+        controls.length > AI_CONTROL_LIMIT ||
+        prompt.length > AI_PROMPT_CHAR_LIMIT ||
+        !pub1075.excerpts ||
+        adjacentSources.length === 0 ||
+        adjacentCandidates.length === 0
+    ) {
+        return emptyPayload;
+    }
+
+    const abortController = new AbortController();
+    const timeout = setTimeout(() => abortController.abort(), AI_TIMEOUT_MS);
+    try {
+        const responseText = await generateBifrostText({
+            model: getConfiguredBifrostModel("BIFROST_SCSEM_MODEL"),
+            maxTokens: 9000,
+            temperature: 0.12,
+            system: "You generate precise JSON SCSEM update recommendations for human review. Adjacent benchmarks are never direct equivalents.",
+            prompt,
+            signal: abortController.signal,
+        });
+        const payload = parseJsonResponse(responseText);
+        return {
+            summary: payload.summary,
+            changes: markAdjacentChangesForReview(payload.changes || [], pub1075.version),
+        };
+    } catch (error) {
+        console.warn("SCSEM updater adjacent-source analysis failed; returning no adjacent-source changes.", error);
+        return emptyPayload;
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
 export async function POST(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
@@ -467,6 +861,7 @@ export async function POST(
             updateCandidates.push(...candidates.updateCandidates.map((candidate) => ({
                 ...candidate,
                 sourceKind: source.kind,
+                sourceRelationship: "direct" as const,
                 sourceLabel: label,
                 sourceProfile: source.selectedProfile.profile,
                 sourceWorkbenchId: source.downloaded.snapshot.workbenchId,
@@ -475,6 +870,7 @@ export async function POST(
             newControlCandidates.push(...candidates.newControlCandidates.map((recommendation) => ({
                 recommendation,
                 sourceKind: source.kind,
+                sourceRelationship: "direct" as const,
                 sourceLabel: label,
                 sourceProfile: source.selectedProfile.profile,
                 sourceWorkbenchId: source.downloaded.snapshot.workbenchId,
@@ -494,15 +890,36 @@ export async function POST(
         );
         const cisSources = resolvedSources.filter((source) => source.kind === "CIS");
         const stigSources = resolvedSources.filter((source) => source.kind === "STIG");
+        const adjacentSources = resolvedSources.length === 0
+            ? await resolveAdjacentSCSEMBenchmarkSources({
+                token: cisToken,
+                technology: updaterSession.inferredTechnology,
+                parsed,
+                benchmarks: allBenchmarks,
+                excelFiles: allExcelFiles,
+                downloadedBenchmarks,
+                excludeSources: resolvedSources,
+            })
+            : [];
         const cisAuditSources = cisSources.map((source) => auditSource(source.downloaded, source.selectedProfile, {
             sourceKind: source.kind,
+            sourceRelationship: source.sourceRelationship || "direct",
             matchedSheets: source.matchedSheets,
             matchQuery: source.matchQuery,
         }));
         const stigAuditSources = stigSources.map((source) => auditSource(source.downloaded, source.selectedProfile, {
             sourceKind: source.kind,
+            sourceRelationship: source.sourceRelationship || "direct",
             matchedSheets: source.matchedSheets,
             matchQuery: source.matchQuery,
+        }));
+        const adjacentAuditSources = adjacentSources.map((source) => auditSource(source.downloaded, source.selectedProfile, {
+            sourceKind: source.kind,
+            sourceRelationship: "adjacent",
+            matchedSheets: source.matchedSheets,
+            matchQuery: source.matchQuery,
+            adjacentCategory: source.adjacentCategory,
+            adjacentRationale: source.adjacentRationale,
         }));
 
         updaterSession.audit = {
@@ -513,25 +930,37 @@ export async function POST(
             stig: stigAuditSources[0] || null,
             cisSources: cisAuditSources,
             stigSources: stigAuditSources,
+            adjacentSources: adjacentAuditSources,
         };
 
         if (resolvedSources.length === 0) {
-            const payload = await buildPub1075OnlyPayload({
-                technology: updaterSession.inferredTechnology,
-                fileName: updaterSession.originalFileName,
-                parsed,
-                controls,
-                pub1075,
-            });
+            const adjacentCandidates = buildAdjacentRecommendationCandidates(adjacentSources);
+            const payload = adjacentCandidates.length > 0
+                ? await buildAdjacentSourcePayload({
+                    technology: updaterSession.inferredTechnology,
+                    fileName: updaterSession.originalFileName,
+                    parsed,
+                    controls,
+                    pub1075,
+                    adjacentSources,
+                    adjacentCandidates,
+                })
+                : await buildPub1075OnlyPayload({
+                    technology: updaterSession.inferredTechnology,
+                    fileName: updaterSession.originalFileName,
+                    parsed,
+                    controls,
+                    pub1075,
+                });
             const validChanges = addIdsToChanges(validateChanges(payload.changes || [], controls, MAX_UPDATER_CHANGES));
 
             updaterSession.status = "review_ready";
-            updaterSession.summary = payload.summary || `No matching CIS or STIG Benchmark Excel workbook/profile was found for ${updaterSession.inferredTechnology}. Pub 1075-only review completed.`;
+            updaterSession.summary = payload.summary || `No matching CIS or STIG Benchmark Excel workbook/profile was found for ${updaterSession.inferredTechnology}. Adjacent-source review completed.`;
             updaterSession.changes = validChanges;
             updaterSession.history.push({
                 at: new Date().toISOString(),
                 action: "analyze",
-                description: `Pub 1075-only analysis completed without a matching CIS or STIG benchmark source and generated ${validChanges.length} proposed change(s).`,
+                description: `Adjacent/Pub 1075 analysis completed without a direct CIS or STIG benchmark source and generated ${validChanges.length} proposed change(s).`,
             });
             writeSCSEMUpdaterSession(updaterSession);
             await logAudit({
@@ -558,6 +987,8 @@ export async function POST(
                             cisNewControls: 0,
                             stigUpdates: 0,
                             stigNewControls: 0,
+                            adjacentSources: adjacentSources.length,
+                            adjacentRecommendations: adjacentCandidates.length,
                             pub1075OnlyChanges: validChanges.length,
                         },
                         auditSources: updaterSession.audit,

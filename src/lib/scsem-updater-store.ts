@@ -52,6 +52,7 @@ export interface SCSEMUpdaterHistoryEntry {
 
 export interface SCSEMUpdaterAuditSource {
     sourceKind?: "CIS" | "STIG";
+    sourceRelationship?: "direct" | "adjacent";
     workbenchId: number;
     benchmarkTitle: string;
     benchmarkVersion: string;
@@ -66,6 +67,8 @@ export interface SCSEMUpdaterAuditSource {
     sharedRecommendationCount?: number;
     matchedSheets?: string[];
     matchQuery?: string;
+    adjacentCategory?: string;
+    adjacentRationale?: string;
     sourceUrl?: string;
 }
 
@@ -98,6 +101,7 @@ export interface SCSEMUpdaterSession {
         stig?: SCSEMUpdaterAuditSource | null;
         cisSources?: SCSEMUpdaterAuditSource[];
         stigSources?: SCSEMUpdaterAuditSource[];
+        adjacentSources?: SCSEMUpdaterAuditSource[];
     };
 }
 

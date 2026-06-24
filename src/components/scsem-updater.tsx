@@ -51,6 +51,7 @@ interface UpdaterChange {
 
 interface AuditSource {
     sourceKind?: "CIS" | "STIG";
+    sourceRelationship?: "direct" | "adjacent";
     workbenchId: number;
     benchmarkTitle: string;
     benchmarkVersion: string;
@@ -64,6 +65,8 @@ interface AuditSource {
     selectedProfileRecommendationCount?: number;
     matchedSheets?: string[];
     matchQuery?: string;
+    adjacentCategory?: string;
+    adjacentRationale?: string;
 }
 
 interface UpdaterSession {
@@ -96,6 +99,7 @@ interface UpdaterSession {
         stig?: AuditSource | null;
         cisSources?: AuditSource[];
         stigSources?: AuditSource[];
+        adjacentSources?: AuditSource[];
     };
 }
 
@@ -178,6 +182,10 @@ export function SCSEMUpdater() {
             : session.audit.stig
                 ? [session.audit.stig]
                 : [];
+    }, [session]);
+
+    const adjacentAuditSources = useMemo(() => {
+        return session?.audit.adjacentSources || [];
     }, [session]);
 
     async function uploadFile(file: File) {
@@ -436,7 +444,7 @@ export function SCSEMUpdater() {
                 </section>
             )}
 
-            {session && (cisAuditSources.length > 0 || stigAuditSources.length > 0 || session.audit.pub1075Version) && (
+            {session && (cisAuditSources.length > 0 || stigAuditSources.length > 0 || adjacentAuditSources.length > 0 || session.audit.pub1075Version) && (
                 <section className="mb-6 rounded-xl border border-[var(--sky-border)] bg-[var(--sky-surface)] p-5">
                     <div className="mb-4 flex items-center gap-2">
                         <ShieldCheck className="h-5 w-5 text-[var(--sky-light)]" />
@@ -461,6 +469,13 @@ export function SCSEMUpdater() {
                                 />
                             ))
                             : <AuditSourceCard title="STIG Benchmark" source={null} />}
+                        {adjacentAuditSources.map((source, index) => (
+                            <AuditSourceCard
+                                key={`adjacent-${source.workbenchId}-${index}`}
+                                title={adjacentAuditSources.length > 1 ? `Adjacent Source ${index + 1}` : "Adjacent Source"}
+                                source={source}
+                            />
+                        ))}
                         <article className="rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] p-4">
                             <p className="text-xs font-semibold uppercase text-[var(--sky-text-muted)]">Publication 1075</p>
                             <p className="mt-2 text-sm font-medium text-white">{session.audit.pub1075Version || "Unknown"}</p>
@@ -568,6 +583,11 @@ function AuditSourceCard({ title, source }: { title: string; source: AuditSource
         <article className="rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] p-4">
             <p className="text-xs font-semibold uppercase text-[var(--sky-text-muted)]">{title}</p>
             <p className="mt-2 text-sm font-medium text-white">{source.benchmarkTitle}</p>
+            {source.sourceRelationship === "adjacent" && (
+                <div className="mt-2 rounded border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-xs text-amber-200">
+                    Adjacent evidence only. Reviewer approval required.
+                </div>
+            )}
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-[var(--sky-text-secondary)]">
                 <span>v{source.benchmarkVersion}</span>
                 <span>WB {source.workbenchId}</span>
@@ -584,11 +604,94 @@ function AuditSourceCard({ title, source }: { title: string; source: AuditSource
                         Query: {source.matchQuery}
                     </span>
                 ) : null}
+                {source.adjacentCategory ? (
+                    <span className="col-span-2 truncate" title={source.adjacentCategory}>
+                        Category: {source.adjacentCategory}
+                    </span>
+                ) : null}
+                {source.adjacentRationale ? (
+                    <span className="col-span-2 line-clamp-2" title={source.adjacentRationale}>
+                        {source.adjacentRationale}
+                    </span>
+                ) : null}
                 <span className="col-span-2 truncate font-mono" title={source.sha256}>
                     SHA {source.sha256.slice(0, 16)}...
                 </span>
             </div>
         </article>
+    );
+}
+
+function sourceEvidenceText(evidence: Record<string, unknown> | null | undefined, key: string): string | null {
+    const value = evidence?.[key];
+    if (value === null || value === undefined || value === "") return null;
+    return String(value);
+}
+
+function evidenceTier(change: UpdaterChange): "direct" | "adjacent" | "pub1075" | null {
+    const tier = sourceEvidenceText(change.sourceEvidence, "evidenceTier");
+    const relationship = sourceEvidenceText(change.sourceEvidence, "sourceRelationship");
+    if (tier === "adjacent" || relationship === "adjacent") return "adjacent";
+    if (sourceEvidenceText(change.sourceEvidence, "pub1075Only") === "true") return "pub1075";
+    if (change.sourceEvidence) return "direct";
+    return null;
+}
+
+function EvidenceTierBadge({ change }: { change: UpdaterChange }) {
+    const tier = evidenceTier(change);
+    if (!tier) return null;
+
+    const styles = {
+        direct: "border-blue-500/25 bg-blue-500/10 text-blue-300",
+        adjacent: "border-amber-500/25 bg-amber-500/10 text-amber-300",
+        pub1075: "border-indigo-500/25 bg-indigo-500/10 text-indigo-300",
+    };
+    const labels = {
+        direct: "direct source",
+        adjacent: "adjacent source",
+        pub1075: "Pub 1075",
+    };
+
+    return (
+        <span className={`rounded border px-2 py-0.5 text-xs font-medium ${styles[tier]}`}>
+            {labels[tier]}
+        </span>
+    );
+}
+
+function SourceEvidencePanel({ change }: { change: UpdaterChange }) {
+    if (!change.sourceEvidence) return null;
+
+    const evidence = change.sourceEvidence;
+    const rows = [
+        ["Tier", evidenceTier(change) || sourceEvidenceText(evidence, "evidenceTier")],
+        ["Benchmark", sourceEvidenceText(evidence, "sourceBenchmarkTitle")],
+        ["Workbench", sourceEvidenceText(evidence, "sourceWorkbenchId")],
+        ["CIS", sourceEvidenceText(evidence, "cisRecommendation")],
+        ["CIS Profile", sourceEvidenceText(evidence, "cisProfile")],
+        ["STIG", sourceEvidenceText(evidence, "stigRecommendation")],
+        ["STIG Profile", sourceEvidenceText(evidence, "stigProfile")],
+        ["Adjacent Category", sourceEvidenceText(evidence, "adjacentSourceCategory")],
+        ["Applicability", sourceEvidenceText(evidence, "applicabilityRationale")],
+        ["Pub 1075", sourceEvidenceText(evidence, "pub1075Version")],
+    ].filter(([, value]) => Boolean(value));
+
+    if (rows.length === 0) return null;
+
+    return (
+        <div className="mt-4 rounded-lg border border-[var(--sky-border)] bg-[var(--sky-navy)] p-3">
+            <p className="mb-2 text-[10px] font-bold uppercase text-[var(--sky-text-muted)]">
+                Source Evidence
+            </p>
+            <div className="grid grid-cols-1 gap-2 text-xs text-[var(--sky-text-secondary)] sm:grid-cols-2">
+                {rows.map(([label, value]) => (
+                    <div key={label || ""} className="min-w-0">
+                        <span className="font-semibold text-[var(--sky-text-primary)]">{label}: </span>
+                        <span className="break-words">{value}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
     );
 }
 
@@ -642,6 +745,7 @@ function ChangeReview({
                                 {change.confidence.replace("_", " ")}
                             </span>
                         )}
+                        <EvidenceTierBadge change={change} />
                     </div>
                     <p className="mt-1 truncate text-xs text-[var(--sky-text-secondary)]">{change.reason}</p>
                 </div>
@@ -689,6 +793,8 @@ function ChangeReview({
                             )}
                         </div>
                     </div>
+
+                    <SourceEvidencePanel change={change} />
 
                     <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
                         <button

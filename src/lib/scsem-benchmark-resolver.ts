@@ -17,12 +17,15 @@ export type ResolvedBenchmarkKind = "CIS" | "STIG";
 
 export interface ResolvedBenchmarkSource {
     kind: ResolvedBenchmarkKind;
+    sourceRelationship?: "direct" | "adjacent";
     matchQuery: string;
     matchedSheets: string[];
     selectedProfile: SelectedCISProfile;
     downloaded: DownloadedBenchmark;
     sheetRecommendationCount: number;
     sharedRecommendationCount: number;
+    adjacentCategory?: string;
+    adjacentRationale?: string;
 }
 
 export interface ResolveSCSEMBenchmarkSourcesInput {
@@ -41,6 +44,12 @@ type CandidateSelection = {
     sheetRecommendationCount: number;
     sharedRecommendationCount: number;
     score: number;
+};
+
+type AdjacentBenchmarkPlan = {
+    category: string;
+    rationale: string;
+    queries: string[];
 };
 
 function normalizeText(value: string | null | undefined): string {
@@ -186,6 +195,62 @@ function unsafeBroadQuery(query: string): boolean {
         normalized === "generic os";
 }
 
+function adjacentPlansForTechnology(technology: string, parsed: ParsedSCSEM): AdjacentBenchmarkPlan[] {
+    const haystack = normalizeText([
+        technology,
+        parsed.metadata.subject,
+        ...parsed.sheets.map((sheet) => sheet.sheetName),
+    ].filter(Boolean).join(" "));
+
+    const plans: AdjacentBenchmarkPlan[] = [];
+
+    if (
+        haystack.includes("storage area network") ||
+        haystack.includes("network attached storage") ||
+        /\bsan\b/.test(haystack) ||
+        /\bnas\b/.test(haystack)
+    ) {
+        plans.push({
+            category: "Network management-plane hardening patterns",
+            rationale: "No storage-array CIS/STIG workbook was found. Network device benchmarks are adjacent evidence for AAA, management access, logging, time sync, encryption, configuration backup, and administrative-plane controls that commonly apply to SAN/NAS management interfaces.",
+            queries: [
+                "Cisco NX-OS",
+                "Cisco IOS XE 17.x",
+                "HPE Aruba Networking CX Switch",
+                "ExtremeNetworks-SLX-OS-20.X.X",
+            ],
+        });
+    }
+
+    if (haystack.includes("generic web server") || haystack.includes("web server") || haystack.includes("webserver")) {
+        plans.push({
+            category: "Web platform hardening patterns",
+            rationale: "No single generic web-server CIS/STIG workbook exists. Apache HTTP Server, NGINX, IIS, and Tomcat benchmarks are adjacent evidence for TLS, request handling, authentication, directory exposure, logging, error handling, and management hardening patterns.",
+            queries: [
+                "Apache HTTP Server 2.4",
+                "NGINX",
+                "Microsoft IIS 10",
+                "Apache Tomcat 10.1",
+            ],
+        });
+    }
+
+    if (haystack.includes("gentax")) {
+        plans.push({
+            category: "Enterprise application platform hardening patterns",
+            rationale: "No GenTax-specific CIS/STIG workbook was found. Web/application server and database benchmarks are adjacent evidence for authentication, session handling, audit logging, encryption, service accounts, and data-tier privilege patterns that may apply to an enterprise tax application SCSEM.",
+            queries: [
+                "Apache Tomcat 10.1",
+                "Microsoft IIS 10",
+                "Oracle Database 19c",
+                "Microsoft SQL Server 2022 Database",
+            ],
+        });
+    }
+
+    return plans;
+}
+
 function rawQuery(value: string | null | undefined): string | null {
     const normalized = normalizeText(value)
         .replace(/\bscsem\b/g, " ")
@@ -309,6 +374,62 @@ async function evaluateQuery({
     };
 }
 
+async function evaluateAdjacentQuery({
+    kind,
+    query,
+    category,
+    rationale,
+    parsed,
+    token,
+    benchmarks,
+    excelFiles,
+    downloadedBenchmarks,
+}: {
+    kind: ResolvedBenchmarkKind;
+    query: string;
+    category: string;
+    rationale: string;
+    parsed: ParsedSCSEM;
+    token: string;
+    benchmarks: CISBenchmark[];
+    excelFiles: CISExcelFile[];
+    downloadedBenchmarks: Map<number, DownloadedBenchmark>;
+}): Promise<ResolvedBenchmarkSource | null> {
+    const selected = kind === "CIS"
+        ? selectLatestBenchmarkForTechnology(query, benchmarks, excelFiles)
+        : selectLatestSTIGBenchmarkForTechnology(query, benchmarks, excelFiles);
+    if (!selected) return null;
+
+    const downloaded = await downloadAndParseBenchmark(
+        token,
+        selected.benchmark,
+        selected.excel,
+        downloadedBenchmarks
+    );
+    const allControls = parsed.sheets
+        .filter((candidate) => candidate.sheetType === "test_cases")
+        .flatMap((sheet) => sheet.controls);
+    const selectedProfile = kind === "CIS"
+        ? selectBestCISProfile(query, allControls, downloaded.recommendations)
+        : selectApplicableSTIGProfiles(query, allControls, downloaded.recommendations);
+    if (!selectedProfile) return null;
+
+    return {
+        kind,
+        sourceRelationship: "adjacent",
+        matchQuery: query,
+        matchedSheets: parsed.sheets
+            .filter((candidate) => candidate.sheetType === "test_cases")
+            .map((sheet) => sheet.sheetName),
+        selectedProfile,
+        downloaded,
+        sheetRecommendationCount: recommendationCount(allControls),
+        sharedRecommendationCount: selectedProfile.sharedRecommendationCount,
+        adjacentCategory: category,
+        adjacentRationale: rationale,
+    };
+}
+
 async function resolveKindForSheet({
     kind,
     queries,
@@ -345,6 +466,7 @@ async function resolveKindForSheet({
 
     return {
         kind,
+        sourceRelationship: "direct",
         matchQuery: selected.query,
         matchedSheets: [sheetName],
         selectedProfile: selected.selectedProfile,
@@ -403,4 +525,71 @@ export async function resolveSCSEMBenchmarkSources({
         if (kindDiff !== 0) return kindDiff;
         return a.downloaded.snapshot.benchmarkTitle.localeCompare(b.downloaded.snapshot.benchmarkTitle);
     });
+}
+
+export async function resolveAdjacentSCSEMBenchmarkSources({
+    token,
+    technology,
+    parsed,
+    benchmarks,
+    excelFiles,
+    downloadedBenchmarks,
+    excludeSources = [],
+}: ResolveSCSEMBenchmarkSourcesInput & {
+    excludeSources?: ResolvedBenchmarkSource[];
+}): Promise<ResolvedBenchmarkSource[]> {
+    const plans = adjacentPlansForTechnology(technology, parsed);
+    if (plans.length === 0) return [];
+
+    const excluded = new Set(excludeSources.map((source) =>
+        sourceKey(source.kind, source.downloaded, source.selectedProfile.profile)
+    ));
+    const byKey = new Map<string, ResolvedBenchmarkSource>();
+
+    for (const plan of plans) {
+        const sourceSets = await Promise.all(plan.queries.map(async (query) => {
+            const [cisSource, stigSource] = await Promise.all([
+                evaluateAdjacentQuery({
+                    kind: "CIS",
+                    query,
+                    category: plan.category,
+                    rationale: plan.rationale,
+                    parsed,
+                    token,
+                    benchmarks,
+                    excelFiles,
+                    downloadedBenchmarks,
+                }),
+                evaluateAdjacentQuery({
+                    kind: "STIG",
+                    query,
+                    category: plan.category,
+                    rationale: plan.rationale,
+                    parsed,
+                    token,
+                    benchmarks,
+                    excelFiles,
+                    downloadedBenchmarks,
+                }),
+            ]);
+
+            return [cisSource, stigSource].filter(Boolean) as ResolvedBenchmarkSource[];
+        }));
+
+        for (const source of sourceSets.flat()) {
+            const key = sourceKey(source.kind, source.downloaded, source.selectedProfile.profile);
+            if (excluded.has(key) || byKey.has(key)) continue;
+            byKey.set(key, source);
+        }
+    }
+
+    return [...byKey.values()]
+        .sort((a, b) => {
+            const categoryDiff = (a.adjacentCategory || "").localeCompare(b.adjacentCategory || "");
+            if (categoryDiff !== 0) return categoryDiff;
+            const kindDiff = a.kind.localeCompare(b.kind);
+            if (kindDiff !== 0) return kindDiff;
+            return a.downloaded.snapshot.benchmarkTitle.localeCompare(b.downloaded.snapshot.benchmarkTitle);
+        })
+        .slice(0, 6);
 }
