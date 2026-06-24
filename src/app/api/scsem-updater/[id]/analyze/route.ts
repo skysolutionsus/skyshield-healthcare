@@ -480,7 +480,7 @@ function buildFallbackPayload({
             field: selectedField.field,
             currentValue: selectedField.currentValue.slice(0, 1200),
             proposedValue: selectedField.proposedValue,
-            reason: `${candidate.sourceKind} ${candidate.recommendation.recommendation} (${candidate.sourceProfile}, WB ${candidate.sourceWorkbenchId}) differs from the uploaded SCSEM row. ${pub1075.version} remains the compliance floor; this fallback proposal should be reviewed for the stricter CIS/STIG/Pub 1075 wording before approval.`,
+            reason: `${candidate.sourceKind} ${candidate.recommendation.recommendation} (${candidate.sourceProfile}, WB ${candidate.sourceWorkbenchId}) materially differs from the uploaded SCSEM row. The updater selected ${selectedField.field} because the benchmark evidence provides a more specific or stricter control statement while ${pub1075.version} remains the compliance floor.`,
             confidence: "needs_review",
             sourceEvidence: sourceEvidence(candidate, pub1075.version),
         });
@@ -495,7 +495,7 @@ function buildFallbackPayload({
             field: "newControl",
             currentValue: "Not present in current SCSEM",
             proposedValue: `${candidate.sourceKind} ${recommendation.recommendation}: ${recommendation.title}`,
-            reason: `${candidate.sourceKind} ${recommendation.recommendation} appears in ${candidate.sourceBenchmarkTitle} (${candidate.sourceProfile}, WB ${candidate.sourceWorkbenchId}) but was not mapped in the uploaded SCSEM. ${pub1075.version} should be checked before approval.`,
+            reason: `${candidate.sourceKind} ${recommendation.recommendation} appears in ${candidate.sourceBenchmarkTitle} (${candidate.sourceProfile}, WB ${candidate.sourceWorkbenchId}) but was not mapped in the uploaded SCSEM. The updater is proposing it as a reviewer-gated candidate because the benchmark evidence indicates a control objective not currently present, with ${pub1075.version} as the compliance floor.`,
             confidence: "needs_review",
             newControl: {
                 nistId: null,
@@ -718,7 +718,7 @@ Return ONLY valid JSON:
       "field": "newControl",
       "currentValue": "Not present in current SCSEM",
       "proposedValue": "short summary of the new reviewer-only control",
-      "reason": "why this adjacent-source pattern should be reviewed against Pub 1075",
+      "reason": "why this adjacent-source pattern is proposed against Pub 1075 and current SCSEM evidence",
       "confidence": "needs_review",
       "newControl": {
         "nistId": null,
@@ -1148,7 +1148,7 @@ Return ONLY valid JSON:
       "field": "newControl",
       "currentValue": "Not present in current SCSEM",
       "proposedValue": "short summary of the new control",
-      "reason": "why a new control should be reviewed",
+      "reason": "why this new control is proposed from the benchmark evidence",
       "confidence": "high|medium|needs_review",
       "newControl": {
         "nistId": null,

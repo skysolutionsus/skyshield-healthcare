@@ -718,6 +718,8 @@ function ChangeReview({
 }) {
     const isNewControl = change.action === "addControl" || change.field === "newControl";
     const statusBusy = busy?.endsWith(`:${change.id}`) || false;
+    const fieldLabel = FIELD_LABELS[change.field] || change.field;
+    const actionSummary = isNewControl ? "Add new control" : `Update ${fieldLabel}`;
 
     return (
         <article className="overflow-hidden rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)]">
@@ -735,7 +737,7 @@ function ChangeReview({
                             : "border-purple-500/25 bg-purple-500/10 text-purple-300"
                             }`}>
                             {isNewControl && <PlusCircle className="h-3 w-3" />}
-                            {isNewControl ? "New Control" : FIELD_LABELS[change.field] || change.field}
+                            {isNewControl ? "New Control" : fieldLabel}
                         </span>
                         <span className={`rounded border px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[change.status]}`}>
                             {change.status.toLowerCase()}
@@ -747,49 +749,48 @@ function ChangeReview({
                         )}
                         <EvidenceTierBadge change={change} />
                     </div>
-                    <p className="mt-1 truncate text-xs text-[var(--sky-text-secondary)]">{change.reason}</p>
+                    <p className="mt-2 text-sm font-semibold text-white">{actionSummary}</p>
+                    <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--sky-text-secondary)]">{change.reason}</p>
                 </div>
                 {expanded ? <ChevronUp className="h-4 w-4 shrink-0 text-[var(--sky-text-muted)]" /> : <ChevronDown className="h-4 w-4 shrink-0 text-[var(--sky-text-muted)]" />}
             </button>
 
             {expanded && (
                 <div className="border-t border-[var(--sky-border)] p-4">
+                    <div className="mb-4 rounded-lg border border-[var(--sky-border)] bg-[var(--sky-navy)] p-3">
+                        <span className="mb-2 block text-[10px] font-bold uppercase text-[var(--sky-text-muted)]">
+                            Why This Is Proposed
+                        </span>
+                        <Textarea
+                            value={change.reason}
+                            onChange={(event) => onLocalChange({ reason: event.target.value })}
+                            className="min-h-[120px]"
+                        />
+                    </div>
+
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                         <div className="rounded-lg border border-red-500/25 bg-red-950/30 p-3">
                             <span className="mb-2 block text-[10px] font-bold uppercase text-red-200">
-                                Current {isNewControl ? "SCSEM" : FIELD_LABELS[change.field] || change.field}
+                                {isNewControl ? "Current SCSEM Coverage" : `Current ${fieldLabel} In Uploaded SCSEM`}
                             </span>
                             <p className="whitespace-pre-wrap text-sm leading-6 text-[var(--sky-text-primary)]">{change.currentValue}</p>
                         </div>
                         <div className="rounded-lg border border-emerald-500/25 bg-emerald-950/30 p-3">
                             <span className="mb-2 block text-[10px] font-bold uppercase text-emerald-200">
-                                Proposed
+                                {isNewControl ? "Proposed New Control" : `Proposed ${fieldLabel} Replacement`}
                             </span>
                             {isNewControl ? (
                                 <NewControlEditor
                                     change={change}
                                     onSummaryChange={(value) => onLocalChange({ proposedValue: value })}
-                                    onReasonChange={(value) => onLocalChange({ reason: value })}
                                     onFieldChange={onLocalNewControl}
                                 />
                             ) : (
-                                <div className="space-y-3">
-                                    <Textarea
-                                        value={change.proposedValue}
-                                        onChange={(event) => onLocalChange({ proposedValue: event.target.value })}
-                                        className="min-h-[180px]"
-                                    />
-                                    <div>
-                                        <span className="mb-1 block text-[10px] font-bold uppercase text-[var(--sky-text-primary)]">
-                                            Explanation
-                                        </span>
-                                        <Textarea
-                                            value={change.reason}
-                                            onChange={(event) => onLocalChange({ reason: event.target.value })}
-                                            className="min-h-[90px]"
-                                        />
-                                    </div>
-                                </div>
+                                <Textarea
+                                    value={change.proposedValue}
+                                    onChange={(event) => onLocalChange({ proposedValue: event.target.value })}
+                                    className="min-h-[220px]"
+                                />
                             )}
                         </div>
                     </div>
@@ -831,12 +832,10 @@ function ChangeReview({
 function NewControlEditor({
     change,
     onSummaryChange,
-    onReasonChange,
     onFieldChange,
 }: {
     change: UpdaterChange;
     onSummaryChange: (value: string) => void;
-    onReasonChange: (value: string) => void;
     onFieldChange: (field: keyof NonNullable<UpdaterChange["newControl"]>, value: string) => void;
 }) {
     const control = change.newControl || {};
@@ -899,16 +898,6 @@ function NewControlEditor({
                 </div>
             ))}
 
-            <div>
-                <span className="mb-1 block text-[10px] font-bold uppercase text-[var(--sky-text-primary)]">
-                    Explanation
-                </span>
-                <Textarea
-                    value={change.reason}
-                    onChange={(event) => onReasonChange(event.target.value)}
-                    className="min-h-[90px]"
-                />
-            </div>
         </div>
     );
 }
