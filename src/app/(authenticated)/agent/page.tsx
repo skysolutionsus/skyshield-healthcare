@@ -68,7 +68,7 @@ function renderMarkdown(content: string) {
 
   function inlineFormat(text: string): React.ReactNode[] {
     const parts: React.ReactNode[] = [];
-    const regex = /(\*\*(.+?)\*\*|`(.+?)`|\[(Section\s[\d.]+(?:\.\d+)*(?:,\s*Page\s+\d+)?|Exhibit\s+\d+)\])/g;
+    const regex = /(\*\*(.+?)\*\*|`(.+?)`|\[((?:Section|Exhibit)\s[^\]]+)\])/g;
     let lastIndex = 0;
     let match;
 
