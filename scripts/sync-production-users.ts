@@ -14,6 +14,8 @@ const paulJohnsonPasswordHash =
   "$2b$12$psblO4H1rjfWhbnlS.5SW..aXtmraECyWsHS.AGhj7MLVPDko.8d6";
 const anshulSankaraneniPasswordHash =
   "$2b$12$ery.ldSwyIWN7QK0uPN7juOq0UNhknaC6.tOrkq6pyS0my89a/VcC";
+const wesFarahPasswordHash =
+  "$2b$12$g/6RBu3gXbB72MUWbagx0OV8hxf1U09rWkBDtbWZHB.8pnFNb9FRK";
 
 function nameFromEmail(email: string) {
   const localPart = email.split("@")[0] || email;
@@ -84,6 +86,12 @@ async function main() {
       name: "Anshul Sankaraneni",
       role: "ADMIN" as const,
       passwordHash: anshulSankaraneniPasswordHash,
+    },
+    {
+      email: "wfarah@skysolutions.com",
+      name: "Wes Farah",
+      role: "COMPUTER_SECURITY_REVIEW" as const,
+      passwordHash: wesFarahPasswordHash,
     },
   ];
 
