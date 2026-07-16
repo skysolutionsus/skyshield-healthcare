@@ -1,7 +1,8 @@
 import * as fs from "fs";
 import * as path from "path";
 import { createHash, randomUUID } from "crypto";
-import { parseSCSEMFile } from "@/lib/xlsx-parser";
+import { parseSCSEMFile, type ParsedSCSEM } from "@/lib/xlsx-parser";
+import type { OfficialSCSEMReference } from "@/lib/scsem-official-reference";
 import {
     resolveRuntimeFilePath,
     runtimeDataDir,
@@ -37,6 +38,7 @@ export interface SCSEMUpdaterChange {
     proposedValue: string;
     reason: string;
     confidence?: string;
+    targetSheet?: string;
     sourceEvidence?: Record<string, unknown> | null;
     newControl?: SCSEMUpdaterNewControl;
 }
@@ -80,6 +82,11 @@ export interface SCSEMUpdaterSession {
     createdByUserId?: string;
     uploadedAt: string;
     inferredTechnology: string;
+    technologyInference?: {
+        source: "content" | "subject" | "filename" | "fallback";
+        confidence: "high" | "medium" | "low";
+        signals: string[];
+    };
     status: SCSEMUpdaterStatus;
     summary?: string;
     error?: string;
@@ -97,6 +104,30 @@ export interface SCSEMUpdaterSession {
         uploadedSizeBytes: number;
         pub1075Version?: string;
         pub1075SourcePath?: string;
+        nistVersion?: string;
+        nistSourcePath?: string;
+        nistSourceUrl?: string;
+        complianceCoverage?: {
+            requested: number;
+            pub1075: number;
+            nistFallback: number;
+            uncovered: number;
+        };
+        benchmarkLookupError?: string;
+        benchmarkResolution?: Array<{
+            kind: "CIS" | "STIG";
+            query: string;
+            sheetName: string;
+            catalogCandidateCount: number;
+            attempts: Array<{
+                workbenchId: number;
+                benchmarkTitle: string;
+                benchmarkVersion: string;
+                outcome: string;
+                reason: string;
+            }>;
+        }>;
+        officialReference?: OfficialSCSEMReference | null;
         cis?: SCSEMUpdaterAuditSource | null;
         stig?: SCSEMUpdaterAuditSource | null;
         cisSources?: SCSEMUpdaterAuditSource[];
@@ -167,12 +198,144 @@ function cleanTechnologyName(value: string): string {
     return cleaned;
 }
 
-export function inferSCSEMTechnology(originalFileName: string, subject?: string | null): string {
+export function inferSCSEMTechnologyDetails(
+    originalFileName: string,
+    subject?: string | null,
+    parsed?: Pick<ParsedSCSEM, "sheets">
+): {
+    technology: string;
+    source: "content" | "subject" | "filename" | "fallback";
+    confidence: "high" | "medium" | "low";
+    signals: string[];
+} {
     const fromFileName = cleanTechnologyName(originalFileName);
-    if (fromFileName) return fromFileName;
-
     const fromSubject = subject ? cleanTechnologyName(subject) : "";
-    return fromSubject || "Unknown Technology";
+    const sheetNames = parsed?.sheets.map((sheet) => sheet.sheetName) || [];
+    const controlSignals = (parsed?.sheets || [])
+        .filter((sheet) => sheet.sheetType === "test_cases")
+        .flatMap((sheet) => sheet.controls.slice(0, 12))
+        .flatMap((control) => [
+            control.testId,
+            control.sectionTitle,
+            control.description,
+            control.testProcedures,
+            control.expectedResults,
+            control.remediationProcedure,
+        ])
+        .filter(Boolean)
+        .map(String);
+    const evidenceParts = [fromSubject, ...sheetNames, ...controlSignals].filter(Boolean);
+    const evidence = evidenceParts.join("\n").toLowerCase();
+    const cloudProviderSheets = sheetNames.filter((sheetName) =>
+        /\b(?:aws|amazon|azure|google|office\s*365|microsoft\s*365)\b/i.test(sheetName)
+    );
+
+    // The IRS Cloud SCSEM is one workbook with separate AWS, Azure, Google,
+    // and Microsoft 365 tabs. Do not collapse the entire workbook to whichever
+    // provider happens to appear first; the resolver handles each provider tab.
+    if (cloudProviderSheets.length >= 2) {
+        return {
+            technology: fromSubject || "Cloud Computing",
+            source: "content",
+            confidence: "high",
+            signals: cloudProviderSheets.slice(0, 5),
+        };
+    }
+
+    const contentRules: Array<{
+        technology: string;
+        patterns: RegExp[];
+    }> = [
+        {
+            technology: "Amazon Linux 2023",
+            patterns: [
+                /\bamazon linux 2023\b/i,
+                /\bamazon linux 23\b/i,
+                /\bal2023\b/i,
+                /\bamzl23[-_\s]/i,
+            ],
+        },
+        {
+            technology: "Amazon Elastic Kubernetes Service (EKS)",
+            patterns: [/\bamazon elastic kubernetes service\b/i, /\bamazon eks\b/i],
+        },
+        {
+            technology: "AWS End User Compute Services",
+            patterns: [/\baws end user compute\b/i, /\bamazon workspaces\b/i, /\bappstream 2(?:\.0)?\b/i],
+        },
+        {
+            technology: "AWS Database Services",
+            patterns: [/\baws database services\b/i, /\bamazon (?:rds|dynamodb|redshift|documentdb|neptune)\b/i],
+        },
+        {
+            technology: "AWS Storage Services",
+            patterns: [/\baws storage services\b/i, /\bamazon (?:s3|efs|fsx|glacier)\b/i],
+        },
+        {
+            technology: "AWS Compute Services",
+            patterns: [/\baws compute services\b/i, /\bamazon (?:ec2|lambda|lightsail|elastic beanstalk)\b/i],
+        },
+        {
+            technology: "Amazon Web Services Foundations",
+            patterns: [/\bamazon web services foundations\b/i, /\baws foundations\b/i],
+        },
+        {
+            technology: "Red Hat Enterprise Linux",
+            patterns: [/\bred hat enterprise linux\b/i, /\brhel\s*(?:7|8|9|10)?\b/i, /\brhl(?:gen|7|8|9|10)-/i],
+        },
+        {
+            technology: "VMware ESXi",
+            patterns: [/\bvmware\s+(?:vsphere\s+)?esxi\b/i, /\besxi\s*(?:6\.7|7\.0|8\.0|9\.0)?\b/i],
+        },
+    ];
+
+    for (const rule of contentRules) {
+        const matched = rule.patterns.find((pattern) => pattern.test(evidence));
+        if (!matched) continue;
+
+        const matchingSignals = evidenceParts
+            .filter((part) => rule.patterns.some((pattern) => pattern.test(part)))
+            .slice(0, 5);
+        return {
+            technology: rule.technology,
+            source: "content",
+            confidence: "high",
+            signals: matchingSignals.length > 0 ? matchingSignals : [matched.source],
+        };
+    }
+
+    if (fromSubject && !/^(unknown|generic|cloud|application|operating system)$/i.test(fromSubject)) {
+        return {
+            technology: fromSubject,
+            source: "subject",
+            confidence: "medium",
+            signals: [subject || fromSubject],
+        };
+    }
+
+    if (fromFileName) {
+        return {
+            technology: fromFileName,
+            source: "filename",
+            confidence: "medium",
+            signals: [originalFileName],
+        };
+    }
+
+    return {
+        technology: fromSubject || "Unknown Technology",
+        source: "fallback",
+        confidence: "low",
+        signals: fromSubject ? [subject || fromSubject] : [],
+    };
+}
+
+export function inferSCSEMTechnology(
+    originalFileName: string,
+    subject?: string | null,
+    parsed?: Pick<ParsedSCSEM, "sheets">
+): string {
+    return inferSCSEMTechnologyDetails(originalFileName, subject, parsed).technology;
 }
 
 export function resolveUpdaterPath(storedPath: string): string {
@@ -193,6 +356,11 @@ export function createSCSEMUpdaterSession(
     fs.writeFileSync(absoluteFilePath, workbookBuffer);
 
     const parsed = parseSCSEMFile(absoluteFilePath);
+    const technologyInference = inferSCSEMTechnologyDetails(
+        originalFileName,
+        parsed.metadata.subject,
+        parsed
+    );
     const session: SCSEMUpdaterSession = {
         id,
         originalFileName,
@@ -200,7 +368,12 @@ export function createSCSEMUpdaterSession(
         organizationId: owner.organizationId,
         createdByUserId: owner.userId,
         uploadedAt: new Date().toISOString(),
-        inferredTechnology: inferSCSEMTechnology(originalFileName, parsed.metadata.subject),
+        inferredTechnology: technologyInference.technology,
+        technologyInference: {
+            source: technologyInference.source,
+            confidence: technologyInference.confidence,
+            signals: technologyInference.signals,
+        },
         status: "uploaded",
         scsem: {
             subject: parsed.metadata.subject,
@@ -257,6 +430,7 @@ export function addIdsToChanges(changes: any[]): SCSEMUpdaterChange[] {
         proposedValue: String(change.proposedValue || ""),
         reason: String(change.reason || ""),
         confidence: change.confidence,
+        targetSheet: change.targetSheet || change.sourceEvidence?.sourceSheet || undefined,
         sourceEvidence: change.sourceEvidence || null,
         ...(change.newControl ? { newControl: change.newControl } : {}),
     }));

@@ -7,8 +7,8 @@ The app is built around a human-review workflow. AI and deterministic matching c
 ## Core Capabilities
 
 - AI Compliance Agent: Ask questions about Publication 1075 and related guidance with retrieved source context, citations, and audit metadata.
-- SCSEM Updater: Upload an IRS Safeguards SCSEM workbook, match it to current CIS SecureSuite and STIG benchmark workbooks, compare controls, review proposed updates, and export an updated XLSX.
-- Workbook Fidelity: SCSEM exports start from the original uploaded workbook so formatting, colors, filters, sheet structure, and workbook styling are preserved as closely as possible.
+- SCSEM Updater: Upload an IRS Safeguards SCSEM workbook, identify it from internal content, apply Pub 1075-first/NIST-fallback compliance review, supplement with CIS/STIG evidence, and export an updated XLSX.
+- Workbook Fidelity: Exports preserve the uploaded workbook, or rebase an older upload on the latest bundled official IRS SCSEM when a newer version/platform tab is available, while carrying matching assessment results forward.
 - Audit Log Drilldowns: Audit entries are clickable and show structured details such as input, output, retrieval context, action metadata, and raw JSON.
 - Incident Tracking: Capture, triage, and document incidents including PII/FTI detection events from the agent.
 - Knowledge Base: Ingest Publication 1075, IRS interim guidance, and other supporting documents for hybrid search and retrieval.
@@ -60,11 +60,11 @@ Cross-cutting security controls sit across the API and service layers: mandatory
 ```mermaid
 flowchart LR
   Upload["Upload IRS SCSEM workbook"] --> Parse["Parse workbook\ninfer technology and controls"]
-  Parse --> Match["Match latest CIS and STIG\nbenchmark workbooks"]
-  Match --> Snapshot["Store source snapshots\nrelease metadata + SHA-256"]
-  Snapshot --> Compare["Compare current SCSEM rows\nand missing recommendations"]
-  Compare --> Pub["Pull Pub 1075 excerpts\nfor referenced controls"]
-  Pub --> Propose["Generate proposed changes\nAI or deterministic fallback"]
+  Parse --> Official["Select latest official IRS SCSEM\nwhen version/platform tabs are newer"]
+  Official --> Compliance["Review IRS Pub 1075 first\nNIST 800-53 only as fallback"]
+  Compliance --> Match["Match version-specific CIS/STIG\nprofiles from workbook content"]
+  Match --> Compare["Compare current SCSEM rows\nand missing recommendations"]
+  Compare --> Propose["Generate proposed changes\nAI or deterministic fallback"]
   Propose --> Review["Human review\napprove, reject, edit, undo"]
   Review --> Export["Export updated XLSX\napproved changes only"]
   Export --> Audit["Audit trail\nupload through export"]
@@ -73,7 +73,7 @@ flowchart LR
 Primary API calls for the demo flow:
 
 - `POST /api/scsem-updater/upload` stores the original workbook, validates it, parses metadata, creates an updater session, and logs the upload.
-- `POST /api/scsem-updater/[id]/analyze` selects CIS/STIG benchmark evidence, extracts Pub 1075 context, produces proposed updates, and logs source metadata.
+- `POST /api/scsem-updater/[id]/analyze` selects an official IRS structural baseline when newer, runs Pub 1075-first/NIST-fallback compliance analysis independently of CIS availability, adds CIS/STIG hardening evidence, and logs source metadata and match diagnostics.
 - `PATCH /api/scsem-updater/[id]/changes` records reviewer edits, approvals, rejections, and batch decisions.
 - `POST /api/scsem-updater/[id]/undo` restores the most recent approve/reject action.
 - `GET /api/scsem-updater/[id]/export` applies approved changes to the original workbook and returns the updated XLSX.
@@ -102,18 +102,16 @@ This page replaces the old static SCSEM browser as the primary SCSEM workflow.
 1. A reviewer uploads or drags in an IRS workbook named like `Safeguards-SCSEM (Technology).xlsx`.
 2. The server stores the original workbook under runtime storage and creates an updater session.
 3. The workbook is parsed to identify sheets, test-case rows, headers, control fields, NIST IDs, CIS references, recommendation numbers, and existing release/change-log sheets.
-4. The app infers the target technology from the workbook name and workbook metadata. Examples include Windows 11, Windows Server, RHEL, Oracle Database, Cisco, and other SCSEM technology families.
-5. The CIS SecureSuite API is used to list available benchmarks and Excel files.
-6. The app selects the latest matching CIS Benchmark workbook and the latest matching CIS STIG Benchmark workbook when available.
-7. Downloaded benchmark workbooks are stored as audit snapshots with title, version, release date, filename, workbench ID, local path, download time, and SHA-256 hash.
-8. Benchmark recommendations are parsed and profile-matched against the SCSEM.
-9. The comparison engine builds update candidates for existing controls and new-control candidates for recommendations missing from the SCSEM.
-10. Publication 1075 excerpts are pulled from `data/pub1075/p1075-full-text.md` using the relevant NIST control families.
-11. CIS, STIG, and Publication 1075 evidence is compared. When sources conflict, the proposed update should favor the stricter and more secure control language, subject to reviewer validation.
-12. For smaller sessions, Bifrost can produce structured, explainable recommendations. For large workbooks, missing AI configuration, AI timeouts, or malformed AI JSON, the app falls back to deterministic recommendations.
-13. The UI shows each proposed change with source evidence, target field, current value, proposed value, rationale, and approval controls.
-14. Reviewers can approve, reject, edit proposed text, edit rationale, edit new-control content, batch review, undo the last review action, or export at any time.
-15. Export applies approved changes only and returns an updated `.xlsx`.
+4. The app infers the target technology from dashboard content, test-case tab names, control IDs/text, subject metadata, and finally the filename. A multi-provider Cloud workbook stays multi-provider instead of being collapsed to the first AWS/Azure/Google signal.
+5. For RHEL, VMware ESXi, Cloud/AWS Foundations, and Amazon Linux 2023, the app compares the upload to the bundled current official IRS workbook and automatically selects the official workbook as the export/analysis base when its SCSEM version, effective date, provider coverage, or platform-generation tabs are newer.
+6. Publication 1075 is analyzed as the governing compliance source. The local NIST SP 800-53 Rev. 5 OSCAL snapshot is used only for referenced controls that have no Pub 1075 section. This analysis continues even when CIS credentials, catalog calls, downloads, or matches fail.
+7. CIS access calls `POST /license`, `GET /benchmarks`, and `GET /excel`, followed by `GET /excel/{workbenchId}` for candidates. Titles are not sent to a CIS search endpoint; catalog matching is local.
+8. The matcher ranks product generation separately from benchmark document revision, tries multiple candidates, validates profiles and control overlap, and prevents cross-major matches such as RHEL 8 to RHEL 9 or ESXi 7 to ESXi 8.
+9. Downloaded benchmark workbooks are stored as audit snapshots with title, version, release date, filename, workbench ID, local path, download time, and SHA-256 hash.
+10. The comparison engine builds reviewer-gated updates. Compliance proposals take precedence for the same sheet/control/field; CIS and STIG remain supplemental hardening evidence.
+11. Large workbooks use bounded compliance batches distributed across version/provider tabs. Missing AI configuration, timeouts, or malformed JSON retain only safe deterministic empty-field gaps plus deterministic benchmark comparisons.
+12. The UI shows source precedence, content-identification signals, exact target sheet, official baseline decision, benchmark query/overlap diagnostics, and the current/proposed values.
+13. Reviewers approve, reject, edit, batch review, undo, and export.
 
 #### SCSEM Update Fields
 
@@ -132,19 +130,20 @@ New controls can also be appended when a CIS or STIG recommendation appears appl
 
 #### Workbook Export Behavior
 
-Export uses the uploaded workbook as the base file.
+Export normally uses the uploaded workbook as the base file. When analysis selected a newer official IRS SCSEM, export uses that official workbook as the structural base.
 
 - Existing approved cell updates are written into the matching test-case row and column.
-- Approved new controls are appended to the appropriate sheet with copied row formatting where possible.
+- Approved updates and new controls are routed to the exact matched version/provider sheet, with copied row formatting for appended rows.
+- When an official baseline is selected, assessment values (actual result, status, findings, notes/evidence, issue codes, remediation/CAP text, and risk rating) are carried forward for matching Test IDs.
 - Existing workbook styles, filters, colors, widths, sheet names, and workbook structure are preserved by editing the original XLSX package rather than regenerating a workbook from scratch.
-- If no changes have been approved, export returns the original workbook bytes.
+- If no changes have been approved and no official structural upgrade was selected, export returns the original workbook bytes.
 - If the workbook includes `Change Log` or `New Release Changes` sheets, export appends release/update entries for approved changes.
 
 This is designed to keep the output visually and structurally equivalent to the input workbook, with only approved reviewer changes applied.
 
 #### Matching Notes
 
-Not every IRS SCSEM has a one-to-one CIS Benchmark Excel workbook. The matcher uses normalized title scoring, version/date comparison, aliases, accepted benchmark status, and Excel availability. If a standard CIS benchmark is not found but a STIG benchmark is found, the updater can proceed with STIG-only evidence. If neither source has a confident match, the UI reports that no matching workbook/profile was found instead of inventing a source.
+Not every IRS SCSEM has a one-to-one CIS workbook. The IRS Cloud SCSEM, for example, contains an `AWS Foundations` tab, while Amazon Linux 2023 is a separate SCSEM. Matching therefore uses workbook content and per-sheet product/version identities, not filename equality. The UI reports the local query, attempted candidates, and rejection reason. A miss never suppresses Pub 1075/NIST compliance review.
 
 ### Audit Log
 
@@ -521,12 +520,14 @@ SEED_INVITED_USER_PASSWORD=rotate-this-invite-password-too
 | `npm run rag:ingest:interim-guidance` | Import bundled IRS interim guidance |
 | `npm run rag:ingest:pub1075` | Import local Publication 1075 text |
 | `npm run rag:sync:pub1075` | Download official Publication 1075 and import/embed it |
+| `npm run rag:sync:nist80053` | Refresh the normalized NIST SP 800-53 Rev. 5 OSCAL fallback snapshot |
 | `npm run db:studio` | Open Prisma Studio |
 
 ## Project Structure
 
 ```text
 data/
+  nist/                          Normalized NIST SP 800-53 OSCAL fallback controls
   pub1075/                       Publication 1075 source files
   scsem-index.json               Bundled SCSEM metadata
   scsems/                        Bundled IRS SCSEM workbooks
@@ -579,14 +580,13 @@ In docker-compose, keep the `skyshield_runtime_data:/var/lib/skyshield` volume.
 
 ### `No matching CIS Benchmark Excel workbook was found`
 
-This means the uploaded SCSEM technology did not confidently match an available CIS Benchmark Excel file. The app also tries STIG benchmark matching. If neither source matches, the reviewer should confirm:
+This means no catalog candidate passed local content, product-generation, profile, and control-overlap validation. The UI shows the attempted sheet/query and rejection reason. Pub 1075/NIST analysis still runs. Confirm:
 
-- The SCSEM filename includes the actual technology.
 - The CIS license has access to that benchmark family.
 - The benchmark has an Excel download available.
 - The technology is covered by CIS or STIG at all.
 
-Some IRS SCSEMs may not have a direct CIS Excel equivalent.
+Renaming the file or tabs is normally unnecessary because titles are not sent as a CIS search call. Some IRS SCSEMs have no direct CIS equivalent; AWS Foundations is also nested in the IRS Cloud SCSEM rather than published as an “AWS SCSEM.”
 
 ### `Unexpected token '<', "<!DOCTYPE "... is not valid JSON`
 
@@ -599,6 +599,8 @@ Large workbooks can exceed practical structured-output limits. The updater catch
 ```env
 SCSEM_UPDATER_AI_CONTROL_LIMIT=500
 SCSEM_UPDATER_AI_PROMPT_CHAR_LIMIT=90000
+SCSEM_UPDATER_COMPLIANCE_MAX_BATCHES=6
+SCSEM_UPDATER_COMPLIANCE_BATCH_CONCURRENCY=4
 SCSEM_UPDATER_AI_TIMEOUT_MS=25000
 ```
 

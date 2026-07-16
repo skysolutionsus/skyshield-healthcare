@@ -81,6 +81,55 @@ function cellStr(val: any): string | null {
 }
 
 /**
+ * Some older IRS workbooks have a worksheet !ref that stretches to XFD or
+ * row 1,048,576 even though the cells at those coordinates are blank. Passing
+ * that inflated range to SheetJS makes it walk millions of empty cells and can
+ * cause an otherwise valid SCSEM upload to time out before matching begins.
+ *
+ * Derive the range from cells that actually contain a value or formula. This
+ * leaves the workbook untouched; it only bounds the read performed by the
+ * parser.
+ */
+function meaningfulWorksheetRange(ws: XLSX.WorkSheet): XLSX.Range | undefined {
+    let maxRow = -1;
+    let maxCol = -1;
+
+    for (const address of Object.keys(ws)) {
+        if (address.startsWith('!')) continue;
+
+        const cell = ws[address] as XLSX.CellObject | undefined;
+        if (!cell) continue;
+        const hasValue = cell.v !== undefined && cell.v !== null && cell.v !== '';
+        const hasFormula = typeof cell.f === 'string' && cell.f.length > 0;
+        if (!hasValue && !hasFormula) continue;
+
+        const decoded = XLSX.utils.decode_cell(address);
+        maxRow = Math.max(maxRow, decoded.r);
+        maxCol = Math.max(maxCol, decoded.c);
+    }
+
+    if (maxRow < 0 || maxCol < 0) return undefined;
+    return {
+        // Keep A1 as the origin so parsed rowIndex/column positions retain
+        // their original workbook coordinates.
+        s: { r: 0, c: 0 },
+        e: { r: maxRow, c: maxCol },
+    };
+}
+
+function worksheetRows(ws: XLSX.WorkSheet): any[][] {
+    const range = meaningfulWorksheetRange(ws);
+    if (!range) return [];
+
+    return XLSX.utils.sheet_to_json(ws, {
+        header: 1,
+        blankrows: false,
+        defval: '',
+        range,
+    }) as any[][];
+}
+
+/**
  * Convert Excel serial date to JS Date
  */
 function excelDateToJS(serial: number): Date {
@@ -166,8 +215,8 @@ function matchColumnHeader(header: string): keyof ParsedControl | null {
 /**
  * Parse a "Test Cases" sheet into structured control records using dynamic header detection
  */
-function parseTestCaseSheet(ws: XLSX.WorkSheet): ParsedControl[] {
-    const data = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '' }) as any[][];
+function parseTestCaseSheet(ws: XLSX.WorkSheet, existingRows?: any[][]): ParsedControl[] {
+    const data = existingRows || worksheetRows(ws);
     const controls: ParsedControl[] = [];
 
     // Find the header row (look for "Test ID" somewhere in first 5 rows)
@@ -249,8 +298,8 @@ function parseTestCaseSheet(ws: XLSX.WorkSheet): ParsedControl[] {
 /**
  * Parse a "Change Log" sheet into structured entries
  */
-function parseChangeLogSheet(ws: XLSX.WorkSheet): ParsedChangeLog[] {
-    const data = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '' }) as any[][];
+function parseChangeLogSheet(ws: XLSX.WorkSheet, existingRows?: any[][]): ParsedChangeLog[] {
+    const data = existingRows || worksheetRows(ws);
     const entries: ParsedChangeLog[] = [];
 
     // Find header row — scan each row fully before deciding
@@ -317,8 +366,8 @@ function parseChangeLogSheet(ws: XLSX.WorkSheet): ParsedChangeLog[] {
 /**
  * Extract dashboard metadata from the Dashboard sheet
  */
-function parseDashboardMetadata(ws: XLSX.WorkSheet): ParsedSCSEM['metadata'] {
-    const data = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '' }) as any[][];
+function parseDashboardMetadata(ws: XLSX.WorkSheet, existingRows?: any[][]): ParsedSCSEM['metadata'] {
+    const data = existingRows || worksheetRows(ws);
     const metadata: ParsedSCSEM['metadata'] = { subject: null, version: null, effectiveDate: null };
 
     const extractMetadataDate = (value: string): string | null => {
@@ -375,7 +424,7 @@ export function parseSCSEMFile(filePath: string): ParsedSCSEM {
         let sheetType = classifySheet(sheetName);
 
         // Always capture raw data for every sheet so nothing is lost
-        const allRows = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '' }) as any[][];
+        const allRows = worksheetRows(ws);
 
         const parsed: ParsedSheet = {
             sheetName,
@@ -388,12 +437,12 @@ export function parseSCSEMFile(filePath: string): ParsedSCSEM {
 
         // Parse structured data where applicable
         if (sheetType === 'dashboard') {
-            metadata = parseDashboardMetadata(ws);
+            metadata = parseDashboardMetadata(ws, allRows);
         } else if (sheetType === 'test_cases') {
-            parsed.controls = parseTestCaseSheet(ws);
+            parsed.controls = parseTestCaseSheet(ws, allRows);
             totalControls += parsed.controls.length;
         } else if (sheetType === 'changelog') {
-            parsed.changeLogEntries = parseChangeLogSheet(ws);
+            parsed.changeLogEntries = parseChangeLogSheet(ws, allRows);
         } else if (sheetType === 'other') {
             // Auto-detect: probe content for test case headers
             // Many SCSEM files have technology-specific sheets (e.g. "Tomcat9", "IIS10", "Docker")
@@ -401,7 +450,7 @@ export function parseSCSEMFile(filePath: string): ParsedSCSEM {
                 const firstCell = cellStr(allRows[r]?.[0]);
                 if (firstCell && firstCell.toLowerCase().includes('test id')) {
                     parsed.sheetType = 'test_cases';
-                    parsed.controls = parseTestCaseSheet(ws);
+                    parsed.controls = parseTestCaseSheet(ws, allRows);
                     totalControls += parsed.controls.length;
                     break;
                 }

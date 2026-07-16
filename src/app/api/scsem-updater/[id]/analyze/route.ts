@@ -13,7 +13,8 @@ import {
 } from "@/lib/cis-benchmark-xlsx";
 import {
     resolveAdjacentSCSEMBenchmarkSources,
-    resolveSCSEMBenchmarkSources,
+    resolveSCSEMBenchmarkSourcesDetailed,
+    type BenchmarkQueryResolutionDiagnostic,
     type ResolvedBenchmarkKind,
     type ResolvedBenchmarkSource,
 } from "@/lib/scsem-benchmark-resolver";
@@ -26,10 +27,13 @@ import {
 } from "@/lib/scsem-updater-store";
 import { parseSCSEMFile, type ParsedSCSEM } from "@/lib/xlsx-parser";
 import {
+    evaluateOfficialSCSEMReference,
+    resolveOfficialReferencePath,
+} from "@/lib/scsem-official-reference";
+import {
     buildComparisonCandidates,
     buildControlSummary,
     buildNewControlEvidence,
-    extractPub1075Sections,
     isMaterialTextDelta,
     isUsableBenchmarkDefaultValue,
     parseJsonResponse,
@@ -37,6 +41,11 @@ import {
     type DownloadedBenchmark,
     type SCSEMControlEvidence,
 } from "@/lib/scsem-update-engine";
+import {
+    extractComplianceEvidence,
+    normalizeNistControlId,
+    type ComplianceEvidence,
+} from "@/lib/compliance-evidence";
 import { generateBifrostText, getConfiguredBifrostModel } from "@/lib/ai/bifrost";
 
 export const runtime = "nodejs";
@@ -49,12 +58,34 @@ const MAX_UPDATER_CHANGES = 25;
 const AI_CONTROL_LIMIT = Number(process.env.SCSEM_UPDATER_AI_CONTROL_LIMIT || 500);
 const AI_PROMPT_CHAR_LIMIT = Number(process.env.SCSEM_UPDATER_AI_PROMPT_CHAR_LIMIT || 90000);
 const AI_TIMEOUT_MS = Number(process.env.SCSEM_UPDATER_AI_TIMEOUT_MS || 25000);
+const COMPLIANCE_BATCH_CONTROL_LIMIT = Math.max(
+    12,
+    Math.min(Number(process.env.SCSEM_UPDATER_COMPLIANCE_BATCH_SIZE || 72), 120)
+);
+const COMPLIANCE_BATCH_CHAR_LIMIT = Math.max(
+    12000,
+    Math.min(Number(process.env.SCSEM_UPDATER_COMPLIANCE_BATCH_CHAR_LIMIT || 36000), 42000)
+);
+const COMPLIANCE_BATCH_CONCURRENCY = Math.max(
+    1,
+    Math.min(Number(process.env.SCSEM_UPDATER_COMPLIANCE_BATCH_CONCURRENCY || 4), 4)
+);
+const MAX_COMPLIANCE_BATCHES = Math.max(
+    1,
+    Math.min(Number(process.env.SCSEM_UPDATER_COMPLIANCE_MAX_BATCHES || 6), 12)
+);
+const COMPLIANCE_BATCH_UNIQUE_CONTROL_LIMIT = Math.max(
+    4,
+    Math.min(Number(process.env.SCSEM_UPDATER_COMPLIANCE_BATCH_UNIQUE_CONTROLS || 11), 12)
+);
+const MAX_COMPLIANCE_CHANGES_PER_BATCH = 6;
 
 function changePreview(changes: any[]) {
     return changes.slice(0, 25).map((change) => ({
         id: change.id,
         action: change.action,
         testId: change.testId,
+        targetSheet: change.targetSheet,
         field: change.field,
         status: change.status,
         confidence: change.confidence,
@@ -143,6 +174,7 @@ type AnalysisNewCandidate = {
     sourceProfile: string;
     sourceWorkbenchId: number;
     sourceBenchmarkTitle: string;
+    targetSheet?: string;
     recommendation: CISBenchmarkRecommendation;
 };
 
@@ -163,8 +195,12 @@ function sourceLabel(source: ResolvedBenchmarkSource): string {
     return `${source.kind} WB ${source.downloaded.snapshot.workbenchId} ${source.downloaded.snapshot.benchmarkTitle} (${source.selectedProfile.profile})`;
 }
 
-function sourceEvidence(candidate: Pick<AnalysisUpdateCandidate | AnalysisNewCandidate,
-    "sourceKind" | "sourceRelationship" | "sourceProfile" | "sourceWorkbenchId" | "sourceBenchmarkTitle" | "recommendation">, pub1075Version: string) {
+function sourceEvidence(
+    candidate: Pick<AnalysisUpdateCandidate | AnalysisNewCandidate,
+        "sourceKind" | "sourceRelationship" | "sourceProfile" | "sourceWorkbenchId" | "sourceBenchmarkTitle" | "recommendation">,
+    pub1075Version: string,
+    nistVersion?: string
+) {
     return {
         evidenceTier: candidate.sourceRelationship === "adjacent" ? "adjacent" : "direct",
         sourceRelationship: candidate.sourceRelationship || "direct",
@@ -175,6 +211,7 @@ function sourceEvidence(candidate: Pick<AnalysisUpdateCandidate | AnalysisNewCan
         sourceWorkbenchId: candidate.sourceWorkbenchId,
         sourceBenchmarkTitle: candidate.sourceBenchmarkTitle,
         pub1075Version,
+        nistVersion: nistVersion || null,
     };
 }
 
@@ -220,6 +257,31 @@ function buildPub1075ControlEvidence(controls: SCSEMControlEvidence[], maxChars:
             `Test procedure: ${compactField(control.testProcedures, 420) || "N/A"}`,
             `Expected result: ${compactField(control.expectedResults, 260) || "N/A"}`,
             control.remediationProcedure ? `Remediation: ${compactField(control.remediationProcedure, 260)}` : null,
+        ].filter(Boolean).join("\n");
+
+        if (usedChars + block.length > maxChars) break;
+        blocks.push(block);
+        usedChars += block.length + 8;
+    }
+
+    return blocks.join("\n\n---\n\n");
+}
+
+function buildComplianceControlEvidence(controls: SCSEMControlEvidence[], maxChars: number): string {
+    const blocks: string[] = [];
+    let usedChars = 0;
+
+    for (const control of controls) {
+        const block = [
+            `SCSEM Test ID: ${control.testId} | Sheet: ${control.sourceSheet || "unknown"}`,
+            `NIST: ${control.nistId || "N/A"} | Control: ${compactField(control.nistControlName, 100) || "N/A"} | Criticality: ${control.criticality || "N/A"}`,
+            `Title: ${compactField(control.sectionTitle, 100) || "N/A"}`,
+            `Description: ${compactField(control.description, 140) || "N/A"}`,
+            `Test procedure: ${compactField(control.testProcedures, 190) || "N/A"}`,
+            `Expected result: ${compactField(control.expectedResults, 120) || "N/A"}`,
+            control.remediationProcedure
+                ? `Remediation: ${compactField(control.remediationProcedure, 90)}`
+                : null,
         ].filter(Boolean).join("\n");
 
         if (usedChars + block.length > maxChars) break;
@@ -459,7 +521,7 @@ function buildFallbackPayload({
     newControlCandidates,
 }: {
     technology: string;
-    pub1075: { version: string };
+    pub1075: { version: string; nist?: { version: string } };
     fallbackReason?: string;
     updateCandidates: AnalysisUpdateCandidate[];
     newControlCandidates: AnalysisNewCandidate[];
@@ -477,12 +539,13 @@ function buildFallbackPayload({
         changes.push({
             action: "updateField",
             testId: candidate.control.testId,
+            targetSheet: candidate.control.sourceSheet,
             field: selectedField.field,
             currentValue: selectedField.currentValue.slice(0, 1200),
             proposedValue: selectedField.proposedValue,
-            reason: `${candidate.sourceKind} ${candidate.recommendation.recommendation} (${candidate.sourceProfile}, WB ${candidate.sourceWorkbenchId}) materially differs from the uploaded SCSEM row. The updater selected ${selectedField.field} because the benchmark evidence provides a more specific or stricter control statement while ${pub1075.version} remains the compliance floor.`,
+            reason: `${candidate.sourceKind} ${candidate.recommendation.recommendation} (${candidate.sourceProfile}, WB ${candidate.sourceWorkbenchId}) materially differs from the uploaded SCSEM row. The updater selected ${selectedField.field} because the benchmark provides supplemental hardening evidence after applying ${pub1075.version} first and NIST ${pub1075.nist?.version || "SP 800-53"} only where Pub 1075 has no control section.`,
             confidence: "needs_review",
-            sourceEvidence: sourceEvidence(candidate, pub1075.version),
+            sourceEvidence: sourceEvidence(candidate, pub1075.version, pub1075.nist?.version),
         });
     }
 
@@ -492,10 +555,11 @@ function buildFallbackPayload({
         changes.push({
             action: "addControl",
             testId: `NEW-${candidate.sourceKind}-${candidate.sourceWorkbenchId}-${safeRecommendationId(recommendation.recommendation)}`,
+            targetSheet: candidate.targetSheet,
             field: "newControl",
             currentValue: "Not present in current SCSEM",
             proposedValue: `${candidate.sourceKind} ${recommendation.recommendation}: ${recommendation.title}`,
-            reason: `${candidate.sourceKind} ${recommendation.recommendation} appears in ${candidate.sourceBenchmarkTitle} (${candidate.sourceProfile}, WB ${candidate.sourceWorkbenchId}) but was not mapped in the uploaded SCSEM. The updater is proposing it as a reviewer-gated candidate because the benchmark evidence indicates a control objective not currently present, with ${pub1075.version} as the compliance floor.`,
+            reason: `${candidate.sourceKind} ${recommendation.recommendation} appears in ${candidate.sourceBenchmarkTitle} (${candidate.sourceProfile}, WB ${candidate.sourceWorkbenchId}) but was not mapped in the uploaded SCSEM. It is a reviewer-gated supplemental hardening candidate after applying ${pub1075.version} first and NIST ${pub1075.nist?.version || "SP 800-53"} only as fallback.`,
             confidence: "needs_review",
             newControl: {
                 nistId: null,
@@ -512,41 +576,314 @@ function buildFallbackPayload({
                 impact: recommendation.impact,
                 remediationProcedure: recommendation.remediation,
             },
-            sourceEvidence: sourceEvidence(candidate, pub1075.version),
+            sourceEvidence: sourceEvidence(candidate, pub1075.version, pub1075.nist?.version),
         });
     }
 
     return {
-        summary: `Generated deterministic review items for ${technology}${fallbackReason ? ` because ${fallbackReason}` : ""}. Each item is marked needs_review and is grounded directly in the selected CIS/STIG workbook evidence with ${pub1075.version} as the compliance floor.`,
+        summary: `Generated deterministic supplemental hardening items for ${technology}${fallbackReason ? ` because ${fallbackReason}` : ""}. Each item is marked needs_review and follows the ${pub1075.version}-first, NIST-fallback source hierarchy.`,
         changes,
     };
 }
 
-async function buildPub1075OnlyPayload({
+function partitionComplianceControls(controls: SCSEMControlEvidence[]): SCSEMControlEvidence[][] {
+    const eligibleBySheet = new Map<string, SCSEMControlEvidence[]>();
+    for (const control of controls.filter((candidate) => Boolean(normalizeNistControlId(candidate.nistId)))) {
+        const sheetName = control.sourceSheet || "unknown";
+        eligibleBySheet.set(sheetName, [...(eligibleBySheet.get(sheetName) || []), control]);
+    }
+    for (const sheetControls of eligibleBySheet.values()) {
+        sheetControls.sort((left, right) => {
+            const priority = pub1075ReviewPriority(right) - pub1075ReviewPriority(left);
+            return priority || left.testId.localeCompare(right.testId, undefined, { numeric: true });
+        });
+    }
+
+    // Round-robin sheets so a large general-controls tab cannot crowd out the
+    // product/version-specific tabs before the bounded interactive limit.
+    const eligible: SCSEMControlEvidence[] = [];
+    const sheetEntries = [...eligibleBySheet.entries()];
+    const indexes = new Map(sheetEntries.map(([sheetName]) => [sheetName, 0]));
+    let remaining = sheetEntries.reduce((total, [, sheetControls]) => total + sheetControls.length, 0);
+    while (remaining > 0) {
+        for (const [sheetName, sheetControls] of sheetEntries) {
+            const index = indexes.get(sheetName) || 0;
+            const control = sheetControls[index];
+            if (!control) continue;
+            eligible.push(control);
+            indexes.set(sheetName, index + 1);
+            remaining--;
+        }
+    }
+    const batches: SCSEMControlEvidence[][] = [];
+    let current: SCSEMControlEvidence[] = [];
+    let currentChars = 0;
+    let currentControlFamilies = new Set<string>();
+
+    for (const control of eligible) {
+        const normalizedId = normalizeNistControlId(control.nistId) || "";
+        const baseControlId = normalizedId.replace(/\(\d+\)$/, "");
+        const wouldAddControlFamily = !currentControlFamilies.has(baseControlId);
+        const estimatedChars = buildComplianceControlEvidence([control], Number.MAX_SAFE_INTEGER).length + 8;
+        if (
+            current.length > 0 &&
+            (current.length >= COMPLIANCE_BATCH_CONTROL_LIMIT ||
+                currentChars + estimatedChars > COMPLIANCE_BATCH_CHAR_LIMIT ||
+                (wouldAddControlFamily &&
+                    currentControlFamilies.size >= COMPLIANCE_BATCH_UNIQUE_CONTROL_LIMIT))
+        ) {
+            batches.push(current);
+            current = [];
+            currentChars = 0;
+            currentControlFamilies = new Set<string>();
+        }
+        current.push(control);
+        currentChars += estimatedChars;
+        currentControlFamilies.add(baseControlId);
+    }
+
+    if (current.length > 0) batches.push(current);
+    return batches.slice(0, MAX_COMPLIANCE_BATCHES);
+}
+
+async function mapWithConcurrency<T, R>(
+    items: T[],
+    concurrency: number,
+    worker: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+    const results = new Array<R>(items.length);
+    let nextIndex = 0;
+
+    async function runWorker() {
+        while (nextIndex < items.length) {
+            const index = nextIndex++;
+            results[index] = await worker(items[index], index);
+        }
+    }
+
+    await Promise.all(
+        Array.from({ length: Math.min(concurrency, items.length) }, () => runWorker())
+    );
+    return results;
+}
+
+function annotateComplianceChanges(
+    changes: any[],
+    controls: SCSEMControlEvidence[],
+    evidence: ComplianceEvidence
+): any[] {
+    const pubIds = new Set(evidence.pub1075.controlIds);
+    const nistIds = new Set(evidence.nist.controlIds);
+
+    return changes.map((change) => {
+        const matches = controls.filter((control) => control.testId === change.testId);
+        const control = matches[0];
+        const controlId = normalizeNistControlId(control?.nistId);
+        const usesPub1075 = Boolean(controlId && pubIds.has(controlId));
+        const usesNistFallback = Boolean(controlId && !usesPub1075 && nistIds.has(controlId));
+
+        return {
+            ...change,
+            targetSheet: change.targetSheet || (matches.length === 1 ? control?.sourceSheet : undefined),
+            sourceEvidence: {
+                ...(change.sourceEvidence || {}),
+                evidenceTier: "compliance",
+                complianceSource: usesPub1075
+                    ? "IRS Publication 1075"
+                    : usesNistFallback
+                        ? "NIST SP 800-53 fallback"
+                        : "Compliance evidence",
+                pub1075Version: evidence.pub1075.version,
+                nistVersion: evidence.nist.version,
+                pub1075ControlId: usesPub1075 ? controlId : null,
+                nistFallbackControlId: usesNistFallback ? controlId : null,
+                pub1075Only: usesPub1075,
+                nistFallback: usesNistFallback,
+            },
+        };
+    });
+}
+
+function deterministicComplianceGapChanges(
+    controls: SCSEMControlEvidence[],
+    evidence: ComplianceEvidence,
+    maxChanges = 2
+): any[] {
+    const pubIds = new Set(evidence.pub1075.controlIds);
+    const nistIds = new Set(evidence.nist.controlIds);
+    const pubBlocks = evidence.pub1075.excerpts.split(/\n\n---\n\n/).filter(Boolean);
+    const nistBlocks = evidence.nist.excerpts.split(/\n\n---\n\n/).filter(Boolean);
+    const changes: any[] = [];
+
+    for (const control of [...controls].sort((left, right) =>
+        pub1075ReviewPriority(right) - pub1075ReviewPriority(left)
+    )) {
+        if (changes.length >= maxChanges) break;
+        const controlId = normalizeNistControlId(control.nistId);
+        if (!controlId) continue;
+        const baseId = controlId.replace(/\(\d+\)$/, "");
+        const usesPub1075 = pubIds.has(controlId);
+        const usesNistFallback = !usesPub1075 && nistIds.has(controlId);
+        const blocks = usesPub1075 ? pubBlocks : usesNistFallback ? nistBlocks : [];
+        const block = blocks.find((candidate) => {
+            const header = candidate.split("\n").slice(0, 2).join(" ");
+            return header.includes(controlId) || header.includes(baseId);
+        });
+        if (!block) continue;
+
+        const requirement = compactField(
+            block.replace(/^Requested controls:[^\n]*\n/i, ""),
+            1200
+        );
+        if (requirement.length < 40) continue;
+        const sourceLabel = usesPub1075 ? "IRS Publication 1075" : "NIST SP 800-53 fallback";
+        const gap = !control.description || control.description.trim().length < 12
+            ? {
+                field: "description",
+                currentValue: control.description || "",
+                proposedValue: requirement,
+            }
+            : !control.testProcedures || control.testProcedures.trim().length < 12
+                ? {
+                    field: "testProcedures",
+                    currentValue: control.testProcedures || "",
+                    proposedValue: `Examine applicable policies, configurations, and implementation evidence to verify this requirement: ${requirement}`,
+                }
+                : !control.expectedResults || control.expectedResults.trim().length < 12
+                    ? {
+                        field: "expectedResults",
+                        currentValue: control.expectedResults || "",
+                        proposedValue: `Evidence demonstrates that the following requirement is implemented: ${requirement}`,
+                    }
+                    : null;
+        if (!gap) continue;
+
+        changes.push({
+            action: "updateField",
+            testId: control.testId,
+            targetSheet: control.sourceSheet,
+            ...gap,
+            reason: `${gap.field} is empty or non-substantive. This reviewer-gated fallback uses the mapped ${sourceLabel} requirement verbatim or as an explicitly labeled verification objective because AI reasoning was unavailable.`,
+            confidence: "needs_review",
+            sourceEvidence: {
+                evidenceTier: "compliance",
+                complianceSource: sourceLabel,
+                sourceSheet: control.sourceSheet,
+                pub1075Version: evidence.pub1075.version,
+                nistVersion: evidence.nist.version,
+                pub1075ControlId: usesPub1075 ? controlId : null,
+                nistFallbackControlId: usesNistFallback ? controlId : null,
+                deterministicFallback: true,
+            },
+        });
+    }
+    return changes;
+}
+
+function dedupeProposedChanges(changes: any[]): any[] {
+    const seen = new Set<string>();
+    return changes.filter((change) => {
+        const key = [
+            change.action || "updateField",
+            change.targetSheet || "",
+            change.testId || "",
+            change.field || "",
+        ].join("|");
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
+function addUnambiguousTargetSheets(
+    changes: any[],
+    controls: SCSEMControlEvidence[]
+): any[] {
+    const sheetsByTestId = new Map<string, Set<string>>();
+    const knownSheets = new Set<string>();
+    for (const control of controls) {
+        if (!control.sourceSheet) continue;
+        knownSheets.add(control.sourceSheet);
+        if (!sheetsByTestId.has(control.testId)) sheetsByTestId.set(control.testId, new Set());
+        sheetsByTestId.get(control.testId)?.add(control.sourceSheet);
+    }
+
+    return changes.map((change) => {
+        if (change.action === "addControl") {
+            return change.targetSheet && knownSheets.has(change.targetSheet)
+                ? change
+                : { ...change, targetSheet: undefined };
+        }
+        const sheets = [...(sheetsByTestId.get(change.testId) || [])];
+        if (change.targetSheet && sheets.includes(change.targetSheet)) return change;
+        return {
+            ...change,
+            targetSheet: sheets.length === 1 ? sheets[0] : undefined,
+        };
+    });
+}
+
+async function buildCompliancePayload({
     technology,
     fileName,
     parsed,
     controls,
-    pub1075,
+    pub1075: complianceOverview,
 }: {
     technology: string;
     fileName: string;
     parsed: ParsedSCSEM;
     controls: SCSEMControlEvidence[];
-    pub1075: { version: string; sourcePath: string; excerpts: string };
+    pub1075: ComplianceEvidence;
 }) {
-    const controlEvidenceBudget = Math.max(18000, AI_PROMPT_CHAR_LIMIT - pub1075.excerpts.length - 24000);
-    const controlEvidence = buildPub1075ControlEvidence(controls, controlEvidenceBudget);
-    const prompt = `You are an IRS Safeguards SCSEM update analyst. This uploaded workbook has no direct CIS SecureSuite or STIG benchmark Excel source. Perform a Pub 1075-only review using only the uploaded SCSEM row text and the Publication 1075 excerpts below.
+    const batches = partitionComplianceControls(controls);
+    if (batches.length === 0) {
+        return {
+            summary: `Compliance review found no normalized NIST control identifiers in the ${technology} SCSEM rows, so Pub 1075 and NIST evidence could not be mapped safely.`,
+            changes: [],
+            batchCount: 0,
+            completedBatchCount: 0,
+        };
+    }
+
+    const batchResults = await mapWithConcurrency(
+        batches,
+        COMPLIANCE_BATCH_CONCURRENCY,
+        async (batch, batchIndex) => {
+            const promptBudget = Math.max(24000, AI_PROMPT_CHAR_LIMIT - 12000);
+            const controlEvidenceBudget = Math.min(
+                COMPLIANCE_BATCH_CHAR_LIMIT,
+                Math.max(9000, Math.floor(promptBudget * 0.46))
+            );
+            const controlEvidence = buildComplianceControlEvidence(batch, controlEvidenceBudget);
+            const complianceEvidence = extractComplianceEvidence(
+                batch.map((control) => control.nistId),
+                {
+                    maxTotalChars: Math.min(
+                        40000,
+                        Math.max(10000, promptBudget - controlEvidence.length)
+                    ),
+                }
+            );
+            if (!complianceEvidence.excerpts) {
+                return {
+                    summary: `Batch ${batchIndex + 1} had no mappable Pub 1075 or NIST SP 800-53 evidence.`,
+                    changes: [],
+                    analyzed: false,
+                };
+            }
+
+            const prompt = `You are an IRS Safeguards SCSEM update analyst. Perform the primary compliance review using only the uploaded SCSEM rows and the authoritative evidence below.
 
 Decision policy:
-- IRS Publication 1075 is the governing compliance floor.
+- IRS Publication 1075 is the first and governing source. When a Pub 1075 excerpt exists for a control, use it and do not let NIST or a benchmark weaken, replace, or override it.
+- NIST SP 800-53 is fallback evidence only for controls where this evidence package explicitly says no Pub 1075 section was found.
 - Existing IRS SCSEM rows remain the base source of truth.
-- Propose an update only when the current row is materially incomplete, materially weaker, or materially inconsistent with the Pub 1075 excerpt for the same NIST control.
+- Propose an update only when the current row is materially incomplete, materially weaker, or materially inconsistent with the applicable compliance excerpt for the same control.
 - Do not propose formatting-only, grammar-only, casing-only, numbering-only, or equivalent-wording changes.
-- Do not rewrite a row merely because Pub 1075 uses different phrasing.
-- Do not invent product-specific benchmark requirements. There is no CIS/STIG product benchmark source for this workbook.
-- Prefer updateField changes to existing rows. Only propose addControl when Pub 1075 clearly requires a control family element and the uploaded workbook has no row that covers it.
+- Do not rewrite a row merely because the authority uses different phrasing.
+- Do not invent product-specific benchmark requirements. CIS and STIG are assessed separately as supplemental hardening evidence.
+- Propose updateField changes only. Missing-control analysis requires workbook-wide applicability evidence and is outside this bounded row batch.
 - Mark confidence "needs_review" unless the gap is direct and unambiguous.
 
 Uploaded SCSEM:
@@ -556,28 +893,34 @@ Uploaded SCSEM:
 - SCSEM version: ${parsed.metadata.version || "unknown"}
 - Effective date: ${parsed.metadata.effectiveDate || "unknown"}
 - Parsed controls: ${controls.length}
+- Compliance batch: ${batchIndex + 1} of ${batches.length} (${batch.length} rows)
 
-Publication 1075:
-- Version: ${pub1075.version}
-- Local source: ${pub1075.sourcePath}
+Compliance sources:
+- IRS Publication 1075 version: ${complianceEvidence.pub1075.version}
+- IRS Publication 1075 local source: ${complianceEvidence.pub1075.sourcePath}
+- NIST SP 800-53 fallback version: ${complianceEvidence.nist.version}
+- NIST fallback local source: ${complianceEvidence.nist.sourcePath}
+- Pub 1075-covered IDs: ${complianceEvidence.pub1075.controlIds.join(", ") || "None"}
+- NIST-fallback IDs: ${complianceEvidence.nist.controlIds.join(", ") || "None"}
 
-SCSEM ROWS FOR PUB 1075 REVIEW:
+SCSEM ROWS FOR COMPLIANCE REVIEW:
 ${controlEvidence || "No SCSEM row text was available."}
 
-PUBLICATION 1075 EXCERPTS FOR REFERENCED NIST CONTROLS:
-${pub1075.excerpts || "No direct Pub 1075 excerpts were found for the referenced NIST controls."}
+COMPLIANCE EVIDENCE — PUB 1075 FIRST, NIST FALLBACK ONLY:
+${complianceEvidence.excerpts}
 
 Return ONLY valid JSON:
 {
-  "summary": "2-3 sentence evidence-based summary of the Pub 1075-only review.",
+  "summary": "1-2 sentence evidence-based summary of this bounded compliance batch.",
   "changes": [
     {
       "action": "updateField",
       "testId": "exact existing SCSEM Test ID",
+      "targetSheet": "exact Sheet named with this SCSEM row",
       "field": "testProcedures|expectedResults|remediationProcedure|description|rationale|impact|sectionTitle|findingStatement",
       "currentValue": "brief current value summary",
       "proposedValue": "complete replacement text for that field",
-      "reason": "specific reason citing the Pub 1075 control excerpt used",
+      "reason": "specific reason citing the Pub 1075 requirement, or the NIST fallback control only when no Pub 1075 section was supplied",
       "confidence": "high|medium|needs_review",
       "sourceEvidence": {
         "cisRecommendation": null,
@@ -586,47 +929,81 @@ Return ONLY valid JSON:
         "stigProfile": null,
         "sourceWorkbenchId": null,
         "sourceBenchmarkTitle": null,
-        "pub1075Version": "${pub1075.version}",
-        "pub1075Only": true
+        "pub1075Version": "${complianceEvidence.pub1075.version}",
+        "nistVersion": "${complianceEvidence.nist.version}",
+        "complianceSource": "IRS Publication 1075|NIST SP 800-53 fallback"
       }
     }
   ]
 }
 
 Rules:
-- Include up to ${MAX_UPDATER_CHANGES} total changes.
-- Use only Test IDs listed in SCSEM ROWS FOR PUB 1075 REVIEW.
+- Include up to ${MAX_COMPLIANCE_CHANGES_PER_BATCH} changes for this batch.
+- Use only Test IDs listed in SCSEM ROWS FOR COMPLIANCE REVIEW.
 - Do not include changes that only restate the same control in different words.
-- Do not claim Pub 1075 says something unless the excerpt is present above.
+- Do not claim Pub 1075 or NIST says something unless that exact source excerpt is present above.
+- Never use NIST fallback evidence for an ID listed under Pub 1075-covered IDs.
 - Do not include markdown fences.`;
 
-    const emptyPayload = {
-        summary: `No direct CIS or STIG benchmark source was found for ${technology}. Pub 1075-only review did not generate deterministic changes without AI reasoning; review the workbook manually if a technology-specific source is available.`,
-        changes: [],
+            if (prompt.length > AI_PROMPT_CHAR_LIMIT) {
+                return {
+                    summary: `Batch ${batchIndex + 1} exceeded the configured prompt limit after bounded evidence extraction.`,
+                    changes: deterministicComplianceGapChanges(batch, complianceEvidence),
+                    analyzed: false,
+                };
+            }
+
+            const abortController = new AbortController();
+            const timeout = setTimeout(() => abortController.abort(), AI_TIMEOUT_MS);
+            try {
+                const responseText = await generateBifrostText({
+                    model: getConfiguredBifrostModel("BIFROST_SCSEM_MODEL"),
+                    maxTokens: 4500,
+                    temperature: 0.1,
+                    system: "You generate precise JSON SCSEM recommendations using IRS Pub 1075 first and NIST SP 800-53 only as fallback evidence.",
+                    prompt,
+                    signal: abortController.signal,
+                });
+                const payload = parseJsonResponse(responseText);
+                return {
+                    summary: String(payload.summary || ""),
+                    changes: annotateComplianceChanges(
+                        (payload.changes || []).slice(0, MAX_COMPLIANCE_CHANGES_PER_BATCH),
+                        batch,
+                        complianceEvidence
+                    ),
+                    analyzed: true,
+                };
+            } catch (error) {
+                console.warn(`SCSEM updater compliance batch ${batchIndex + 1} failed.`, error);
+                return {
+                    summary: `Batch ${batchIndex + 1} could not produce safe AI recommendations; only deterministic empty-field compliance gaps were retained for review.`,
+                    changes: deterministicComplianceGapChanges(batch, complianceEvidence),
+                    analyzed: false,
+                };
+            } finally {
+                clearTimeout(timeout);
+            }
+        }
+    );
+
+    const completedBatchCount = batchResults.filter((result) => result.analyzed).length;
+    const reviewedRowCount = batches.reduce((total, batch) => total + batch.length, 0);
+    const changes = dedupeProposedChanges(batchResults.flatMap((result) => result.changes));
+    const coverage = [
+        `${batches.length} bounded batch(es)`,
+        `${reviewedRowCount} highest-priority row(s) distributed across version/provider tabs`,
+        `${completedBatchCount} completed with AI reasoning`,
+        `${complianceOverview.pub1075.controlIds.length} control ID(s) mapped to Pub 1075`,
+        `${complianceOverview.nist.controlIds.length} control ID(s) mapped to NIST fallback`,
+    ].join(", ");
+
+    return {
+        summary: `Primary compliance review for ${technology}: ${coverage}. Generated ${changes.length} reviewer-gated proposal(s) before supplemental CIS/STIG hardening review.`,
+        changes,
+        batchCount: batches.length,
+        completedBatchCount,
     };
-
-    if (controls.length > AI_CONTROL_LIMIT || prompt.length > AI_PROMPT_CHAR_LIMIT || !pub1075.excerpts) {
-        return emptyPayload;
-    }
-
-    const abortController = new AbortController();
-    const timeout = setTimeout(() => abortController.abort(), AI_TIMEOUT_MS);
-    try {
-        const responseText = await generateBifrostText({
-            model: getConfiguredBifrostModel("BIFROST_SCSEM_MODEL"),
-            maxTokens: 7000,
-            temperature: 0.1,
-            system: "You generate precise JSON SCSEM update recommendations grounded only in IRS Pub 1075 evidence.",
-            prompt,
-            signal: abortController.signal,
-        });
-        return parseJsonResponse(responseText);
-    } catch (error) {
-        console.warn("SCSEM updater Pub 1075-only analysis failed; returning no benchmark-source changes.", error);
-        return emptyPayload;
-    } finally {
-        clearTimeout(timeout);
-    }
 }
 
 async function buildAdjacentSourcePayload({
@@ -642,7 +1019,7 @@ async function buildAdjacentSourcePayload({
     fileName: string;
     parsed: ParsedSCSEM;
     controls: SCSEMControlEvidence[];
-    pub1075: { version: string; sourcePath: string; excerpts: string };
+    pub1075: ComplianceEvidence;
     adjacentSources: ResolvedBenchmarkSource[];
     adjacentCandidates: AnalysisAdjacentCandidate[];
 }) {
@@ -651,7 +1028,8 @@ async function buildAdjacentSourcePayload({
     const prompt = `You are an IRS Safeguards SCSEM update analyst. This uploaded workbook has no direct CIS SecureSuite or STIG benchmark Excel source. Perform an adjacent-source review using the uploaded SCSEM row text, IRS Publication 1075 excerpts, and explicitly labeled adjacent CIS/STIG benchmark patterns below.
 
 Decision policy:
-- IRS Publication 1075 is the governing compliance floor.
+- IRS Publication 1075 is the first and governing compliance source.
+- NIST SP 800-53 is fallback compliance evidence only where no Pub 1075 section was found.
 - Existing IRS SCSEM rows remain the base source of truth.
 - Adjacent benchmarks are NOT direct equivalents. They are reasoning evidence only.
 - Use adjacent evidence only when it expresses a technology-neutral hardening pattern that reasonably applies to the uploaded SCSEM's control intent.
@@ -673,9 +1051,11 @@ Uploaded SCSEM:
 Adjacent benchmark source summary:
 ${adjacentSourceSummary(adjacentSources)}
 
-Publication 1075:
-- Version: ${pub1075.version}
-- Local source: ${pub1075.sourcePath}
+Compliance sources:
+- IRS Publication 1075 version: ${pub1075.pub1075.version}
+- IRS Publication 1075 local source: ${pub1075.pub1075.sourcePath}
+- NIST SP 800-53 fallback version: ${pub1075.nist.version}
+- NIST fallback local source: ${pub1075.nist.sourcePath}
 
 SCSEM ROWS FOR REVIEW:
 ${controlEvidence || "No SCSEM row text was available."}
@@ -683,8 +1063,8 @@ ${controlEvidence || "No SCSEM row text was available."}
 ADJACENT BENCHMARK EVIDENCE:
 ${adjacentEvidence || "No adjacent benchmark recommendations were selected."}
 
-PUBLICATION 1075 EXCERPTS FOR REFERENCED NIST CONTROLS:
-${pub1075.excerpts || "No direct Pub 1075 excerpts were found for the referenced NIST controls."}
+COMPLIANCE EVIDENCE — PUB 1075 FIRST, NIST FALLBACK ONLY:
+${pub1075.excerpts || "No Pub 1075 or NIST fallback excerpts were found for the referenced controls."}
 
 Return ONLY valid JSON:
 {
@@ -693,6 +1073,7 @@ Return ONLY valid JSON:
     {
       "action": "updateField",
       "testId": "exact existing SCSEM Test ID",
+      "targetSheet": "exact Sheet named with this SCSEM row",
       "field": "testProcedures|expectedResults|remediationProcedure|description|rationale|impact|sectionTitle|findingStatement",
       "currentValue": "brief current value summary",
       "proposedValue": "complete replacement text for that field",
@@ -709,12 +1090,14 @@ Return ONLY valid JSON:
         "sourceBenchmarkTitle": "adjacent benchmark title",
         "adjacentSourceCategory": "category from the adjacent source summary",
         "applicabilityRationale": "why the adjacent pattern is relevant without claiming direct equivalence",
-        "pub1075Version": "${pub1075.version}"
+        "pub1075Version": "${pub1075.pub1075.version}",
+        "nistVersion": "${pub1075.nist.version}"
       }
     },
     {
       "action": "addControl",
       "testId": "NEW-ADJACENT-<recommendation>",
+      "targetSheet": "best matching existing test-case sheet",
       "field": "newControl",
       "currentValue": "Not present in current SCSEM",
       "proposedValue": "short summary of the new reviewer-only control",
@@ -742,7 +1125,8 @@ Return ONLY valid JSON:
         "sourceBenchmarkTitle": "adjacent benchmark title",
         "adjacentSourceCategory": "category from the adjacent source summary",
         "applicabilityRationale": "why the adjacent pattern is relevant without claiming direct equivalence",
-        "pub1075Version": "${pub1075.version}"
+        "pub1075Version": "${pub1075.pub1075.version}",
+        "nistVersion": "${pub1075.nist.version}"
       }
     }
   ]
@@ -784,7 +1168,7 @@ Rules:
         const payload = parseJsonResponse(responseText);
         return {
             summary: payload.summary,
-            changes: markAdjacentChangesForReview(payload.changes || [], pub1075.version),
+            changes: markAdjacentChangesForReview(payload.changes || [], pub1075.pub1075.version),
         };
     } catch (error) {
         console.warn("SCSEM updater adjacent-source analysis failed; returning no adjacent-source changes.", error);
@@ -814,33 +1198,73 @@ export async function POST(
         writeSCSEMUpdaterSession(updaterSession);
 
         const originalPath = resolveUpdaterPath(updaterSession.originalFilePath);
-        const parsed = parseSCSEMFile(originalPath);
+        const uploadedParsed = parseSCSEMFile(originalPath);
+        const officialReference = evaluateOfficialSCSEMReference(
+            uploadedParsed,
+            updaterSession.inferredTechnology,
+            updaterSession.audit.uploadedSha256
+        );
+        const parsed = officialReference?.selectedAsBase
+            ? parseSCSEMFile(resolveOfficialReferencePath(officialReference))
+            : uploadedParsed;
         const controls = controlsFromParsedSCSEM(parsed);
         if (controls.length === 0) {
             throw new Error("No SCSEM test case controls were found in the uploaded workbook.");
         }
 
+        // Start the governing compliance review before attempting any benchmark lookup.
+        // This promise resolves independently, so CIS credentials, catalog availability,
+        // or title/profile matching can never suppress Pub 1075/NIST analysis.
+        const compliance = extractComplianceEvidence(
+            controls.map((control) => control.nistId),
+            {
+                // This pass records workbook-wide source coverage without putting
+                // full control text into one prompt. Each bounded batch below
+                // re-extracts substantive excerpts for AI review.
+                maxPubCharsPerControl: 180,
+                maxNistCharsPerControl: 180,
+                maxTotalChars: Math.max(28000, controls.length * 240),
+            }
+        );
+        const compliancePayloadPromise = buildCompliancePayload({
+            technology: updaterSession.inferredTechnology,
+            fileName: updaterSession.originalFileName,
+            parsed,
+            controls,
+            pub1075: compliance,
+        });
+
         let cisToken = "";
+        let benchmarkLookupError: string | undefined;
+        let allBenchmarks: Awaited<ReturnType<typeof fetchAllBenchmarks>> = [];
+        let allExcelFiles: Awaited<ReturnType<typeof fetchAllBenchmarkExcelFiles>> = [];
+        const downloadedBenchmarks = new Map<number, DownloadedBenchmark>();
+        let resolvedSources: ResolvedBenchmarkSource[] = [];
+        let benchmarkResolutionDiagnostics: BenchmarkQueryResolutionDiagnostic[] = [];
+
         try {
             cisToken = await getCISToken();
+            [allBenchmarks, allExcelFiles] = await Promise.all([
+                fetchAllBenchmarks(cisToken),
+                fetchAllBenchmarkExcelFiles(cisToken),
+            ]);
+            const benchmarkResolution = await resolveSCSEMBenchmarkSourcesDetailed({
+                token: cisToken,
+                technology: updaterSession.inferredTechnology,
+                parsed,
+                benchmarks: allBenchmarks,
+                excelFiles: allExcelFiles,
+                downloadedBenchmarks,
+            });
+            resolvedSources = benchmarkResolution.sources;
+            benchmarkResolutionDiagnostics = benchmarkResolution.diagnostics;
         } catch (error: any) {
-            throw new Error(`CIS authentication failed: ${error.message || "unknown error"}`);
+            benchmarkLookupError = error?.message || "Unknown CIS benchmark lookup error";
+            console.warn(
+                "SCSEM updater benchmark lookup failed; continuing with compliance-first analysis.",
+                error
+            );
         }
-
-        const [allBenchmarks, allExcelFiles] = await Promise.all([
-            fetchAllBenchmarks(cisToken),
-            fetchAllBenchmarkExcelFiles(cisToken),
-        ]);
-
-        const downloadedBenchmarks = new Map<number, DownloadedBenchmark>();
-        const resolvedSources = await resolveSCSEMBenchmarkSources({
-            token: cisToken,
-            technology: updaterSession.inferredTechnology,
-            parsed,
-            benchmarks: allBenchmarks,
-            excelFiles: allExcelFiles,
-            downloadedBenchmarks,
-        });
 
         const updateCandidates: AnalysisUpdateCandidate[] = [];
         const newControlCandidates: AnalysisNewCandidate[] = [];
@@ -875,32 +1299,42 @@ export async function POST(
                 sourceProfile: source.selectedProfile.profile,
                 sourceWorkbenchId: source.downloaded.snapshot.workbenchId,
                 sourceBenchmarkTitle: source.downloaded.snapshot.benchmarkTitle,
+                targetSheet: source.matchedSheets[0],
             })));
         }
 
         updateCandidates.sort((a, b) => b.score - a.score);
 
-        const candidateNistIds = [
-            ...updateCandidates.map((candidate) => candidate.control.nistId),
-        ];
-        const pub1075 = extractPub1075Sections(
+        const candidateNistIds = updateCandidates
+            .map((candidate) => candidate.control.nistId)
+            .filter(Boolean);
+        const pub1075 = extractComplianceEvidence(
             candidateNistIds.length > 0
                 ? candidateNistIds
                 : controls.map((control) => control.nistId)
         );
         const cisSources = resolvedSources.filter((source) => source.kind === "CIS");
         const stigSources = resolvedSources.filter((source) => source.kind === "STIG");
-        const adjacentSources = resolvedSources.length === 0
-            ? await resolveAdjacentSCSEMBenchmarkSources({
-                token: cisToken,
-                technology: updaterSession.inferredTechnology,
-                parsed,
-                benchmarks: allBenchmarks,
-                excelFiles: allExcelFiles,
-                downloadedBenchmarks,
-                excludeSources: resolvedSources,
-            })
-            : [];
+        let adjacentSources: ResolvedBenchmarkSource[] = [];
+        if (resolvedSources.length === 0 && cisToken && !benchmarkLookupError) {
+            try {
+                adjacentSources = await resolveAdjacentSCSEMBenchmarkSources({
+                    token: cisToken,
+                    technology: updaterSession.inferredTechnology,
+                    parsed,
+                    benchmarks: allBenchmarks,
+                    excelFiles: allExcelFiles,
+                    downloadedBenchmarks,
+                    excludeSources: resolvedSources,
+                });
+            } catch (error: any) {
+                benchmarkLookupError = error?.message || "Adjacent CIS/STIG benchmark lookup failed";
+                console.warn(
+                    "SCSEM updater adjacent benchmark lookup failed; compliance results remain available.",
+                    error
+                );
+            }
+        }
         const cisAuditSources = cisSources.map((source) => auditSource(source.downloaded, source.selectedProfile, {
             sourceKind: source.kind,
             sourceRelationship: source.sourceRelationship || "direct",
@@ -924,8 +1358,32 @@ export async function POST(
 
         updaterSession.audit = {
             ...updaterSession.audit,
-            pub1075Version: pub1075.version,
-            pub1075SourcePath: pub1075.sourcePath,
+            pub1075Version: compliance.pub1075.version,
+            pub1075SourcePath: compliance.pub1075.sourcePath,
+            nistVersion: compliance.nist.version,
+            nistSourcePath: compliance.nist.sourcePath,
+            nistSourceUrl: compliance.nist.sourceUrl,
+            complianceCoverage: {
+                requested: compliance.requestedControlIds.length,
+                pub1075: compliance.pub1075.controlIds.length,
+                nistFallback: compliance.nist.controlIds.length,
+                uncovered: compliance.uncoveredControlIds.length,
+            },
+            benchmarkLookupError,
+            benchmarkResolution: benchmarkResolutionDiagnostics.slice(0, 30).map((diagnostic) => ({
+                kind: diagnostic.kind,
+                query: diagnostic.query,
+                sheetName: diagnostic.sheetName,
+                catalogCandidateCount: diagnostic.catalogCandidates.length,
+                attempts: diagnostic.candidateAttempts.slice(0, 5).map((attempt) => ({
+                    workbenchId: attempt.workbenchId,
+                    benchmarkTitle: attempt.benchmarkTitle,
+                    benchmarkVersion: attempt.benchmarkVersion,
+                    outcome: attempt.outcome,
+                    reason: attempt.reason,
+                })),
+            })),
+            officialReference,
             cis: cisAuditSources[0] || null,
             stig: stigAuditSources[0] || null,
             cisSources: cisAuditSources,
@@ -935,7 +1393,8 @@ export async function POST(
 
         if (resolvedSources.length === 0) {
             const adjacentCandidates = buildAdjacentRecommendationCandidates(adjacentSources);
-            const payload = adjacentCandidates.length > 0
+            const compliancePayload = await compliancePayloadPromise;
+            const adjacentPayload = adjacentCandidates.length > 0
                 ? await buildAdjacentSourcePayload({
                     technology: updaterSession.inferredTechnology,
                     fileName: updaterSession.originalFileName,
@@ -945,22 +1404,28 @@ export async function POST(
                     adjacentSources,
                     adjacentCandidates,
                 })
-                : await buildPub1075OnlyPayload({
-                    technology: updaterSession.inferredTechnology,
-                    fileName: updaterSession.originalFileName,
-                    parsed,
-                    controls,
-                    pub1075,
-                });
-            const validChanges = addIdsToChanges(validateChanges(payload.changes || [], controls, MAX_UPDATER_CHANGES));
+                : { summary: "", changes: [] };
+            const rawChanges = dedupeProposedChanges(addUnambiguousTargetSheets([
+                ...(compliancePayload.changes || []),
+                ...(adjacentPayload.changes || []),
+            ], controls));
+            const validChanges = addIdsToChanges(
+                validateChanges(rawChanges, controls, MAX_UPDATER_CHANGES)
+            );
 
             updaterSession.status = "review_ready";
-            updaterSession.summary = payload.summary || `No matching CIS or STIG Benchmark Excel workbook/profile was found for ${updaterSession.inferredTechnology}. Adjacent-source review completed.`;
+            updaterSession.summary = [
+                compliancePayload.summary,
+                adjacentPayload.summary,
+                benchmarkLookupError
+                    ? `CIS/STIG lookup was unavailable (${benchmarkLookupError}); compliance results were still produced.`
+                    : `No direct CIS or STIG workbook/profile matched ${updaterSession.inferredTechnology}; compliance review still completed.`,
+            ].filter(Boolean).join(" ");
             updaterSession.changes = validChanges;
             updaterSession.history.push({
                 at: new Date().toISOString(),
                 action: "analyze",
-                description: `Adjacent/Pub 1075 analysis completed without a direct CIS or STIG benchmark source and generated ${validChanges.length} proposed change(s).`,
+                description: `Pub 1075-first/NIST-fallback compliance analysis completed without a direct CIS or STIG source and generated ${validChanges.length} proposed change(s) across ${compliancePayload.batchCount} bounded batch(es).`,
             });
             writeSCSEMUpdaterSession(updaterSession);
             await logAudit({
@@ -989,8 +1454,11 @@ export async function POST(
                             stigNewControls: 0,
                             adjacentSources: adjacentSources.length,
                             adjacentRecommendations: adjacentCandidates.length,
-                            pub1075OnlyChanges: validChanges.length,
+                            complianceBatches: compliancePayload.batchCount,
+                            completedComplianceBatches: compliancePayload.completedBatchCount,
+                            complianceChanges: compliancePayload.changes.length,
                         },
+                        benchmarkLookupError: benchmarkLookupError || null,
                         auditSources: updaterSession.audit,
                     },
                 },
@@ -1005,13 +1473,22 @@ export async function POST(
         const stigNewControlCandidates = newControlCandidates.filter((candidate) => candidate.sourceKind === "STIG");
 
         if (updateCandidates.length === 0 && newControlCandidates.length === 0) {
+            const compliancePayload = await compliancePayloadPromise;
+            const validChanges = addIdsToChanges(validateChanges(
+                dedupeProposedChanges(addUnambiguousTargetSheets(
+                    compliancePayload.changes || [],
+                    controls
+                )),
+                controls,
+                MAX_UPDATER_CHANGES
+            ));
             updaterSession.status = "review_ready";
-            updaterSession.summary = "No CIS or STIG deltas were detected for the uploaded SCSEM workbook.";
-            updaterSession.changes = [];
+            updaterSession.summary = `${compliancePayload.summary} No supplemental CIS or STIG deltas were detected.`;
+            updaterSession.changes = validChanges;
             updaterSession.history.push({
                 at: new Date().toISOString(),
                 action: "analyze",
-                description: "Analysis completed with no proposed changes.",
+                description: `Compliance analysis completed across ${compliancePayload.batchCount} bounded batch(es); no supplemental CIS/STIG deltas were detected. Generated ${validChanges.length} proposed change(s).`,
             });
             writeSCSEMUpdaterSession(updaterSession);
             await logAudit({
@@ -1031,12 +1508,16 @@ export async function POST(
                     },
                     output: {
                         summary: updaterSession.summary,
-                        changeCount: 0,
+                        changeCount: validChanges.length,
+                        changes: changePreview(validChanges),
                         candidateCounts: {
                             cisUpdates: cisUpdateCandidates.length,
                             cisNewControls: cisNewControlCandidates.length,
                             stigUpdates: stigUpdateCandidates.length,
                             stigNewControls: stigNewControlCandidates.length,
+                            complianceBatches: compliancePayload.batchCount,
+                            completedComplianceBatches: compliancePayload.completedBatchCount,
+                            complianceChanges: compliancePayload.changes.length,
                         },
                         auditSources: updaterSession.audit,
                     },
@@ -1047,16 +1528,16 @@ export async function POST(
         }
 
         const cisUpdateEvidence = cisUpdateCandidates
-            .map((candidate) => buildControlSummary(candidate.control, candidate.recommendation, candidate.sourceLabel))
+            .map((candidate) => `Target sheet: ${candidate.control.sourceSheet || "unknown"}\n${buildControlSummary(candidate.control, candidate.recommendation, candidate.sourceLabel)}`)
             .join("\n\n---\n\n");
         const cisNewControlEvidence = cisNewControlCandidates
-            .map((candidate) => buildNewControlEvidence(candidate.recommendation, candidate.sourceLabel))
+            .map((candidate) => `Target sheet: ${candidate.targetSheet || "unknown"}\n${buildNewControlEvidence(candidate.recommendation, candidate.sourceLabel)}`)
             .join("\n\n---\n\n");
         const stigUpdateEvidence = stigUpdateCandidates
-            .map((candidate) => buildControlSummary(candidate.control, candidate.recommendation, candidate.sourceLabel))
+            .map((candidate) => `Target sheet: ${candidate.control.sourceSheet || "unknown"}\n${buildControlSummary(candidate.control, candidate.recommendation, candidate.sourceLabel)}`)
             .join("\n\n---\n\n");
         const stigNewControlEvidence = stigNewControlCandidates
-            .map((candidate) => buildNewControlEvidence(candidate.recommendation, candidate.sourceLabel))
+            .map((candidate) => `Target sheet: ${candidate.targetSheet || "unknown"}\n${buildNewControlEvidence(candidate.recommendation, candidate.sourceLabel)}`)
             .join("\n\n---\n\n");
         const benchmarkSourceSummary = (sources: ResolvedBenchmarkSource[], kind: ResolvedBenchmarkKind) => sources.length > 0
             ? sources.map((source) => [
@@ -1076,11 +1557,12 @@ export async function POST(
         const prompt = `You are an IRS Safeguards SCSEM update analyst. Propose human-reviewable SCSEM workbook changes using only the evidence below.
 
 Decision policy:
-- IRS Publication 1075 is the governing compliance floor.
-- CIS Benchmark Excel rows are security-hardening evidence.
-- STIG benchmark rows are security-hardening evidence and must be checked alongside CIS.
-- If Pub 1075 is stricter than CIS or STIG, propose Pub 1075-aligned text.
-- If CIS or STIG is stricter and does not conflict with Pub 1075, propose the stricter CIS/STIG-aligned text.
+- IRS Publication 1075 is the first and governing compliance source.
+- NIST SP 800-53 is fallback compliance evidence only for controls where no Pub 1075 section was found.
+- CIS Benchmark Excel rows and STIG rows are supplemental security-hardening evidence.
+- Pub 1075 always wins over NIST, CIS, or STIG for a covered control.
+- If a NIST fallback requirement is stricter than CIS or STIG and Pub 1075 has no section for that control, propose NIST-aligned text.
+- If CIS or STIG is stricter and does not conflict with the applicable Pub 1075 requirement or NIST fallback, propose the stricter CIS/STIG-aligned text.
 - If CIS and STIG differ, propose the stricter secure setting when clear; otherwise mark confidence "needs_review".
 - If strictness is ambiguous, include the item only when it is clearly useful for human review and mark confidence "needs_review".
 - Existing IRS SCSEM rows remain the base source of truth.
@@ -1101,9 +1583,11 @@ ${benchmarkSourceSummary(cisSources, "CIS")}
 STIG Benchmark Sources:
 ${benchmarkSourceSummary(stigSources, "STIG")}
 
-Publication 1075:
-- Version: ${pub1075.version}
-- Local source: ${pub1075.sourcePath}
+Compliance sources:
+- IRS Publication 1075 version: ${pub1075.pub1075.version}
+- IRS Publication 1075 local source: ${pub1075.pub1075.sourcePath}
+- NIST SP 800-53 fallback version: ${pub1075.nist.version}
+- NIST fallback local source: ${pub1075.nist.sourcePath}
 
 CURRENT SCSEM ROWS MATCHED TO CIS CANDIDATES:
 ${cisUpdateEvidence || "None"}
@@ -1117,8 +1601,8 @@ ${stigUpdateEvidence || "None"}
 POTENTIAL NEW STIG ROWS NOT PRESENT IN THE SCSEM:
 ${stigNewControlEvidence || "None"}
 
-PUBLICATION 1075 EXCERPTS FOR REFERENCED NIST CONTROLS:
-${pub1075.excerpts || "No direct Pub 1075 excerpts were found for the candidate NIST controls."}
+COMPLIANCE EVIDENCE — PUB 1075 FIRST, NIST FALLBACK ONLY:
+${pub1075.excerpts || "No Pub 1075 or NIST fallback excerpts were found for the candidate controls."}
 
 Return ONLY valid JSON:
 {
@@ -1127,10 +1611,11 @@ Return ONLY valid JSON:
     {
       "action": "updateField",
       "testId": "exact existing SCSEM Test ID",
+      "targetSheet": "exact Target sheet named with this candidate",
       "field": "testProcedures|expectedResults|remediationProcedure|description|rationale|impact|sectionTitle|findingStatement",
       "currentValue": "brief current value summary",
       "proposedValue": "complete replacement text for that field",
-      "reason": "specific reason citing CIS recommendation number, STIG evidence, and Pub 1075 section when available",
+      "reason": "specific reason citing Pub 1075 first, NIST only when it is the supplied fallback, and any supplemental CIS/STIG evidence used",
       "confidence": "high|medium|needs_review",
       "sourceEvidence": {
         "cisRecommendation": "CIS recommendation number if CIS evidence applies, otherwise null",
@@ -1139,12 +1624,14 @@ Return ONLY valid JSON:
         "stigProfile": "selected STIG profile if STIG evidence applies, otherwise null",
         "sourceWorkbenchId": "WorkBench ID from the evidence source",
         "sourceBenchmarkTitle": "benchmark title from the evidence source",
-        "pub1075Version": "${pub1075.version}"
+        "pub1075Version": "${pub1075.pub1075.version}",
+        "nistVersion": "${pub1075.nist.version}"
       }
     },
     {
       "action": "addControl",
       "testId": "NEW-CIS-or-STIG-<recommendation>",
+      "targetSheet": "exact Target sheet named with this candidate",
       "field": "newControl",
       "currentValue": "Not present in current SCSEM",
       "proposedValue": "short summary of the new control",
@@ -1172,7 +1659,8 @@ Return ONLY valid JSON:
         "stigProfile": "selected STIG profile if STIG evidence applies, otherwise null",
         "sourceWorkbenchId": "WorkBench ID from the evidence source",
         "sourceBenchmarkTitle": "benchmark title from the evidence source",
-        "pub1075Version": "${pub1075.version}"
+        "pub1075Version": "${pub1075.pub1075.version}",
+        "nistVersion": "${pub1075.nist.version}"
       }
     }
   ]
@@ -1182,7 +1670,8 @@ Rules:
 - Include up to ${MAX_UPDATER_CHANGES} total changes. Prioritize every cell-level delta that clearly needs human review, but do not create low-value wording churn.
 - For updateField, only use Test IDs from CURRENT SCSEM ROWS MATCHED TO CIS CANDIDATES or CURRENT SCSEM ROWS MATCHED TO STIG CANDIDATES.
 - For addControl, only use recommendation numbers from POTENTIAL NEW CIS ROWS or POTENTIAL NEW STIG ROWS.
-- Do not claim Pub 1075 says something unless the excerpt is present above.
+- Do not claim Pub 1075 or NIST says something unless the corresponding excerpt is present above.
+- Never use NIST fallback evidence for a control covered by a supplied Pub 1075 excerpt.
 - Do not include markdown fences.`;
 
         let payload: any;
@@ -1205,7 +1694,7 @@ Rules:
                     model: getConfiguredBifrostModel("BIFROST_SCSEM_MODEL"),
                     maxTokens: 9000,
                     temperature: 0.15,
-                    system: "You generate precise JSON SCSEM update recommendations grounded in CIS, STIG, and IRS Pub 1075 evidence.",
+                    system: "You generate precise JSON SCSEM recommendations using IRS Pub 1075 first, NIST SP 800-53 only as fallback, and CIS/STIG as supplemental hardening evidence.",
                     prompt,
                     signal: abortController.signal,
                 });
@@ -1225,15 +1714,27 @@ Rules:
                 clearTimeout(timeout);
             }
         }
-        const validChanges = addIdsToChanges(validateChanges(payload.changes || [], controls, MAX_UPDATER_CHANGES));
+        const compliancePayload = await compliancePayloadPromise;
+        const combinedChanges = dedupeProposedChanges(addUnambiguousTargetSheets([
+            ...(compliancePayload.changes || []),
+            ...(payload.changes || []),
+        ],
+            controls
+        ));
+        const validChanges = addIdsToChanges(
+            validateChanges(combinedChanges, controls, MAX_UPDATER_CHANGES)
+        );
 
         updaterSession.status = "review_ready";
-        updaterSession.summary = payload.summary || `CIS/STIG review generated for ${updaterSession.inferredTechnology}.`;
+        updaterSession.summary = [
+            compliancePayload.summary,
+            payload.summary || `Supplemental CIS/STIG review generated for ${updaterSession.inferredTechnology}.`,
+        ].filter(Boolean).join(" ");
         updaterSession.changes = validChanges;
         updaterSession.history.push({
             at: new Date().toISOString(),
             action: "analyze",
-            description: `Analysis generated ${validChanges.length} proposed change(s).`,
+            description: `Pub 1075-first/NIST-fallback analysis completed across ${compliancePayload.batchCount} bounded compliance batch(es), followed by supplemental CIS/STIG review, and generated ${validChanges.length} proposed change(s).`,
         });
         writeSCSEMUpdaterSession(updaterSession);
 
@@ -1261,6 +1762,9 @@ Rules:
                         cisNewControls: cisNewControlCandidates.length,
                         stigUpdates: stigUpdateCandidates.length,
                         stigNewControls: stigNewControlCandidates.length,
+                        complianceBatches: compliancePayload.batchCount,
+                        completedComplianceBatches: compliancePayload.completedBatchCount,
+                        complianceChanges: compliancePayload.changes.length,
                     },
                     auditSources: updaterSession.audit,
                 },

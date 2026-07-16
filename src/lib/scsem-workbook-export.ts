@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import * as fs from "fs";
 import * as path from "path";
+import JSZip from "jszip";
 import type { ParsedControl, ParsedSCSEM, ParsedSheet } from "@/lib/xlsx-parser";
 import type { SCSEMUpdaterChange, SCSEMUpdaterSession } from "@/lib/scsem-updater-store";
 import { ALLOWED_UPDATE_FIELDS } from "@/lib/scsem-update-engine";
@@ -114,6 +115,30 @@ const LOG_HEADER_PATTERNS: Array<[LogField, RegExp[]]> = [
 async function loadXlsxPopulate(): Promise<any> {
     const mod = await import("xlsx-populate");
     return (mod as any).default || mod;
+}
+
+async function restoreReferencedCalculationChain(
+    originalBuffer: Buffer,
+    outputBuffer: Buffer
+): Promise<Buffer> {
+    const outputZip = await JSZip.loadAsync(outputBuffer);
+    if (outputZip.file("xl/calcChain.xml")) return outputBuffer;
+
+    const workbookRelationships = await outputZip
+        .file("xl/_rels/workbook.xml.rels")
+        ?.async("string");
+    if (!workbookRelationships?.includes("relationships/calcChain")) return outputBuffer;
+
+    const originalZip = await JSZip.loadAsync(originalBuffer);
+    const originalCalculationChain = originalZip.file("xl/calcChain.xml");
+    if (!originalCalculationChain) return outputBuffer;
+
+    outputZip.file("xl/calcChain.xml", await originalCalculationChain.async("uint8array"));
+    const repaired = await outputZip.generateAsync({
+        type: "nodebuffer",
+        compression: "DEFLATE",
+    });
+    return Buffer.isBuffer(repaired) ? repaired : Buffer.from(repaired);
 }
 
 function workbookExtension(fileName: string): ".xlsx" | ".xlsm" {
@@ -534,6 +559,18 @@ function approvedFieldMap(session: SCSEMUpdaterSession): Map<string, Set<ExportF
     return fieldsByTestId;
 }
 
+function mergeFieldMaps(
+    target: Map<string, Set<ExportField>>,
+    source: Map<string, Set<ExportField>>
+): Map<string, Set<ExportField>> {
+    for (const [testId, fields] of source) {
+        const merged = target.get(testId) || new Set<ExportField>();
+        for (const field of fields) merged.add(field);
+        target.set(testId, merged);
+    }
+    return target;
+}
+
 function patchTestCaseSheetPreserving(
     sheet: XlsxPopulateSheet,
     readWorksheet: XLSX.WorkSheet,
@@ -778,8 +815,9 @@ async function buildTemplateWorkbookFromOriginalPreserving(
 
     const output = await workbook.outputAsync({ type: "nodebuffer" });
     const outputBuffer = Buffer.isBuffer(output) ? output : Buffer.from(output);
-    assertVbaPreserved(originalBuffer, outputBuffer);
-    return outputBuffer;
+    const repairedOutput = await restoreReferencedCalculationChain(originalBuffer, outputBuffer);
+    assertVbaPreserved(originalBuffer, repairedOutput);
+    return repairedOutput;
 }
 
 function addSkyShieldChangeLog(workbook: XLSX.WorkBook, changeLogs: ChangeLogEntry[]) {
@@ -923,7 +961,8 @@ async function buildWorkbookFromOriginalPreserving(
     sourcePath: string,
     sheets: ExportSheet[],
     changeLogs: ChangeLogEntry[],
-    session: SCSEMUpdaterSession
+    session: SCSEMUpdaterSession,
+    additionalFieldsByTestId: Map<string, Set<ExportField>> = new Map()
 ): Promise<Buffer | null> {
     if (!fs.existsSync(sourcePath)) return null;
 
@@ -935,7 +974,7 @@ async function buildWorkbookFromOriginalPreserving(
         cellStyles: true,
         sheetStubs: true,
     });
-    const fieldsByTestId = approvedFieldMap(session);
+    const fieldsByTestId = mergeFieldMaps(approvedFieldMap(session), additionalFieldsByTestId);
 
     for (const sheet of sheets) {
         if (sheet.sheetType !== "test_cases" || sheet.controls.length === 0) continue;
@@ -953,8 +992,9 @@ async function buildWorkbookFromOriginalPreserving(
 
     const output = await workbook.outputAsync({ type: "nodebuffer" });
     const outputBuffer = Buffer.isBuffer(output) ? output : Buffer.from(output);
-    assertVbaPreserved(originalBuffer, outputBuffer);
-    return outputBuffer;
+    const repairedOutput = await restoreReferencedCalculationChain(originalBuffer, outputBuffer);
+    assertVbaPreserved(originalBuffer, repairedOutput);
+    return repairedOutput;
 }
 
 function cloneParsedSheets(parsed: ParsedSCSEM): ExportSheet[] {
@@ -963,6 +1003,70 @@ function cloneParsedSheets(parsed: ParsedSCSEM): ExportSheet[] {
         controls: sheet.controls.map((control) => ({ ...control })),
         changeLogEntries: [...sheet.changeLogEntries],
     }));
+}
+
+const ASSESSMENT_FIELDS: ExportField[] = [
+    "actualResults",
+    "status",
+    "findingStatement",
+    "notesEvidence",
+    "issueCode",
+    "issueCodeDescription",
+    "remediationStatement",
+    "capRequestStatement",
+    "riskRating",
+];
+
+function carryForwardAssessmentValues(
+    targetSheets: ExportSheet[],
+    uploaded: ParsedSCSEM | undefined
+): {
+    fieldsByTestId: Map<string, Set<ExportField>>;
+    valueCount: number;
+    controlCount: number;
+} {
+    const fieldsByTestId = new Map<string, Set<ExportField>>();
+    if (!uploaded) return { fieldsByTestId, valueCount: 0, controlCount: 0 };
+
+    const sourceByTestId = new Map<string, Array<{ sheetName: string; control: ParsedControl }>>();
+    for (const sheet of uploaded.sheets.filter((candidate) => candidate.sheetType === "test_cases")) {
+        for (const control of sheet.controls) {
+            sourceByTestId.set(control.testId, [
+                ...(sourceByTestId.get(control.testId) || []),
+                { sheetName: sheet.sheetName, control },
+            ]);
+        }
+    }
+
+    let valueCount = 0;
+    let controlCount = 0;
+    for (const sheet of targetSheets.filter((candidate) => candidate.sheetType === "test_cases")) {
+        for (const target of sheet.controls) {
+            const sourceCandidates = sourceByTestId.get(target.testId) || [];
+            const source = sourceCandidates.find((candidate) =>
+                normalizedSheetKey(candidate.sheetName) === normalizedSheetKey(sheet.sheetName)
+            )?.control || (sourceCandidates.length === 1 ? sourceCandidates[0].control : null);
+            if (!source) continue;
+
+            const carriedFields = new Set<ExportField>();
+            for (const field of ASSESSMENT_FIELDS) {
+                const sourceValue = source[field];
+                const hasValue = sourceValue !== null && sourceValue !== undefined &&
+                    String(sourceValue).trim().length > 0;
+                if (!hasValue || String(target[field] || "") === String(sourceValue)) continue;
+                (target as unknown as Record<string, unknown>)[field] = sourceValue;
+                carriedFields.add(field);
+                valueCount++;
+            }
+            if (carriedFields.size === 0) continue;
+
+            target.updateHighlight = true;
+            fieldsByTestId.set(target.testId, carriedFields);
+            controlCount++;
+        }
+    }
+
+    return { fieldsByTestId, valueCount, controlCount };
 }
 
 function generateNextTestId(existingTestIds: string[], fallbackPrefix: string): string {
@@ -1002,10 +1106,72 @@ function appendEvidenceNote(existing: string | null, change: SCSEMUpdaterChange)
     const source = [
         change.sourceEvidence?.cisRecommendation ? `CIS ${change.sourceEvidence.cisRecommendation}` : null,
         change.sourceEvidence?.stigRecommendation ? `STIG ${change.sourceEvidence.stigRecommendation}` : null,
-        change.sourceEvidence?.pub1075Version ? String(change.sourceEvidence.pub1075Version) : null,
+        change.sourceEvidence?.pub1075Version ? `IRS Pub 1075 ${String(change.sourceEvidence.pub1075Version)}` : null,
+        change.sourceEvidence?.nistVersion ? `NIST SP 800-53 ${String(change.sourceEvidence.nistVersion)}` : null,
     ].filter(Boolean).join("; ");
     const note = `SkyShield SCSEM Updater: ${change.reason}${source ? ` (${source})` : ""}`;
     return existing ? `${existing}\n${note}` : note;
+}
+
+function normalizedSheetKey(value: string): string {
+    return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function evidenceString(change: SCSEMUpdaterChange, key: string): string | null {
+    const value = change.sourceEvidence?.[key];
+    return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function evidenceStrings(change: SCSEMUpdaterChange, key: string): string[] {
+    const value = change.sourceEvidence?.[key];
+    return Array.isArray(value)
+        ? value.filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
+        : [];
+}
+
+function targetSheetForNewControl(
+    sheets: ExportSheet[],
+    change: SCSEMUpdaterChange
+): ExportSheet | undefined {
+    const testSheets = sheets.filter((sheet) => sheet.sheetType === "test_cases");
+    const requestedNames = [
+        change.targetSheet,
+        evidenceString(change, "sourceSheet"),
+        ...evidenceStrings(change, "matchedSheets"),
+    ].filter((value): value is string => Boolean(value));
+
+    for (const requested of requestedNames) {
+        const key = normalizedSheetKey(requested);
+        const exact = testSheets.find((sheet) => normalizedSheetKey(sheet.sheetName) === key);
+        if (exact) return exact;
+    }
+
+    // When the analyzer only has benchmark evidence, use product/version tokens
+    // to select the corresponding version-specific SCSEM tab (for example,
+    // RHEL 9, ESXi 8.0, AWS Foundations, or Amazon Linux 2023).
+    const benchmarkText = [
+        evidenceString(change, "sourceBenchmarkTitle"),
+        evidenceString(change, "benchmarkTitle"),
+        change.newControl?.sectionTitle,
+    ].filter(Boolean).join(" ");
+    const benchmarkTokens = new Set(normalizedSheetKey(benchmarkText)
+        .split(" ")
+        .filter((token) => token.length > 1 || /^\d+$/.test(token)));
+    if (benchmarkTokens.size > 0) {
+        const ranked = testSheets
+            .map((sheet) => {
+                const sheetTokens = normalizedSheetKey(sheet.sheetName).split(" ").filter(Boolean);
+                const score = sheetTokens.reduce(
+                    (total, token) => total + (benchmarkTokens.has(token) ? (/^\d+$/.test(token) ? 5 : 2) : 0),
+                    0
+                );
+                return { sheet, score };
+            })
+            .sort((left, right) => right.score - left.score);
+        if ((ranked[0]?.score || 0) > 0) return ranked[0].sheet;
+    }
+
+    return testSheets.find((sheet) => sheet.controls.length > 0) || testSheets[0];
 }
 
 function changeLogDetail(applied: string): { target: string; description: string } {
@@ -1031,27 +1197,38 @@ function changeLogDetail(applied: string): { target: string; description: string
     };
 }
 
-function applyApprovedChanges(parsed: ParsedSCSEM, session: SCSEMUpdaterSession): {
+function applyApprovedChanges(
+    parsed: ParsedSCSEM,
+    session: SCSEMUpdaterSession,
+    uploadedForAssessmentCarryForward?: ParsedSCSEM
+): {
     sheets: ExportSheet[];
     applied: string[];
+    carriedForward: ReturnType<typeof carryForwardAssessmentValues>;
 } {
     const sheets = cloneParsedSheets(parsed);
-    const controls = sheets.flatMap((sheet) => sheet.controls);
-    const byTestId = new Map(controls.map((control) => [control.testId, control]));
+    const carriedForward = carryForwardAssessmentValues(sheets, uploadedForAssessmentCarryForward);
+    const controlsWithSheets = sheets.flatMap((sheet) =>
+        sheet.controls.map((control) => ({ control, sheet }))
+    );
+    const controls = controlsWithSheets.map(({ control }) => control);
+    const byTestId = new Map<string, Array<{ control: ExportControl; sheet: ExportSheet }>>();
+    for (const entry of controlsWithSheets) {
+        byTestId.set(entry.control.testId, [...(byTestId.get(entry.control.testId) || []), entry]);
+    }
     const approvedChanges = session.changes.filter((change) => change.status === "APPROVED");
     const applied: string[] = [];
 
-    const primarySheet = sheets.find((sheet) => sheet.sheetType === "test_cases" && sheet.controls.length > 0) ||
-        sheets.find((sheet) => sheet.sheetType === "test_cases");
     const existingTestIds = controls.map((control) => control.testId);
 
     for (const change of approvedChanges) {
         if (change.action === "addControl") {
-            if (!primarySheet || !change.newControl) continue;
+            const targetSheet = targetSheetForNewControl(sheets, change);
+            if (!targetSheet || !change.newControl) continue;
 
             const newTestId = generateNextTestId(existingTestIds, fallbackPrefix(session));
             existingTestIds.push(newTestId);
-            const maxRowIndex = primarySheet.controls.reduce((max, control) => Math.max(max, control.rowIndex), 0);
+            const maxRowIndex = targetSheet.controls.reduce((max, control) => Math.max(max, control.rowIndex), 0);
             const newControl: ExportControl = {
                 rowIndex: maxRowIndex + 1,
                 testId: newTestId,
@@ -1082,26 +1259,34 @@ function applyApprovedChanges(parsed: ParsedSCSEM, session: SCSEMUpdaterSession)
                     originalSuggestedTestId: change.testId,
                     reason: change.reason,
                     confidence: change.confidence || null,
+                    targetSheet: targetSheet.sheetName,
                     sourceEvidence: change.sourceEvidence || null,
                 },
                 updateHighlight: true,
             };
-            primarySheet.controls.push(newControl);
-            applied.push(`Added ${newTestId} from ${change.testId}`);
+            targetSheet.controls.push(newControl);
+            applied.push(`Added ${newTestId} from ${change.testId} to ${targetSheet.sheetName}`);
             continue;
         }
 
         if (!ALLOWED_UPDATE_FIELDS.has(change.field)) continue;
-        const control = byTestId.get(change.testId);
-        if (!control) continue;
+        const matchingControls = byTestId.get(change.testId) || [];
+        const requestedSheet = change.targetSheet || evidenceString(change, "sourceSheet");
+        const match = requestedSheet
+            ? matchingControls.find(({ sheet }) =>
+                normalizedSheetKey(sheet.sheetName) === normalizedSheetKey(requestedSheet)
+            ) || matchingControls[0]
+            : matchingControls[0];
+        if (!match) continue;
+        const { control, sheet } = match;
 
         (control as unknown as Record<string, unknown>)[change.field] = change.proposedValue;
         control.notesEvidence = appendEvidenceNote(control.notesEvidence, change);
         control.updateHighlight = true;
-        applied.push(`Updated ${change.testId} ${change.field}`);
+        applied.push(`Updated ${change.testId} ${change.field} on ${sheet.sheetName}`);
     }
 
-    return { sheets, applied };
+    return { sheets, applied, carriedForward };
 }
 
 export async function buildSCSEMTemplateWorkbookBuffer(template: TemplateWorkbookExport): Promise<Buffer> {
@@ -1129,17 +1314,40 @@ export async function buildSCSEMTemplateWorkbookBuffer(template: TemplateWorkboo
 export async function buildSCSEMUpdaterWorkbookBuffer(
     session: SCSEMUpdaterSession,
     parsed: ParsedSCSEM,
-    originalAbsolutePath: string
+    originalAbsolutePath: string,
+    uploadedForAssessmentCarryForward?: ParsedSCSEM
 ): Promise<Buffer> {
-    const { sheets, applied } = applyApprovedChanges(parsed, session);
-    const changeLogs: ChangeLogEntry[] = applied.length > 0
+    const { sheets, applied, carriedForward } = applyApprovedChanges(
+        parsed,
+        session,
+        uploadedForAssessmentCarryForward
+    );
+    const officialUpgrade = session.audit.officialReference?.selectedAsBase
+        ? session.audit.officialReference
+        : null;
+    const changeLogs: ChangeLogEntry[] = applied.length > 0 || officialUpgrade || carriedForward.valueCount > 0
         ? [{
             version: `SCSEM Updater ${new Date().toISOString().slice(0, 10)}`,
             changeDate: new Date(),
-            description: `${applied.length} approved SkyShield SCSEM Updater change(s) applied after CIS, STIG, and Pub 1075 review. ${applied.slice(0, 12).join("; ")}`,
+            description: [
+                officialUpgrade
+                    ? `Rebased on official IRS SCSEM ${officialUpgrade.workbookVersion || "current version"}: ${officialUpgrade.upgradeReason}.`
+                    : null,
+                carriedForward.valueCount > 0
+                    ? `Carried forward ${carriedForward.valueCount} assessment value(s) across ${carriedForward.controlCount} matching control(s).`
+                    : null,
+                `${applied.length} approved SkyShield change(s) applied after IRS Pub 1075, NIST SP 800-53 fallback, CIS, and STIG review.`,
+                applied.slice(0, 12).join("; "),
+            ].filter(Boolean).join(" "),
             changedBy: "SkyShield SCSEM Updater",
             source: "scsem_updater",
-            details: applied.map(changeLogDetail),
+            details: [
+                ...(officialUpgrade ? [{
+                    target: "Workbook structure",
+                    description: `Rebased on ${officialUpgrade.sourceUrl}`,
+                }] : []),
+                ...applied.map(changeLogDetail),
+            ],
         }]
         : [];
 
@@ -1147,7 +1355,8 @@ export async function buildSCSEMUpdaterWorkbookBuffer(
         originalAbsolutePath,
         sheets,
         changeLogs,
-        session
+        session,
+        carriedForward.fieldsByTestId
     );
     if (preservedWorkbook) return preservedWorkbook;
 

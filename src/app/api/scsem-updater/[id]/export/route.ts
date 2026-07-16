@@ -12,6 +12,7 @@ import {
     excelContentTypeForFileName,
     updatedSCSEMFileName,
 } from "@/lib/scsem-workbook-export";
+import { resolveOfficialReferencePath } from "@/lib/scsem-official-reference";
 
 export const runtime = "nodejs";
 
@@ -30,13 +31,20 @@ export async function GET(
         const updaterSession = readSCSEMUpdaterSessionForUser(id, user);
         const originalPath = resolveUpdaterPath(updaterSession.originalFilePath);
         const approvedChanges = updaterSession.changes.filter((change) => change.status === "APPROVED");
+        const officialReference = updaterSession.audit.officialReference?.selectedAsBase
+            ? updaterSession.audit.officialReference
+            : null;
+        const baseWorkbookPath = officialReference
+            ? resolveOfficialReferencePath(officialReference)
+            : originalPath;
         const exportFileName = updatedSCSEMFileName(updaterSession.originalFileName);
-        const buffer = approvedChanges.length === 0
+        const buffer = approvedChanges.length === 0 && !officialReference
             ? fs.readFileSync(originalPath)
             : await buildSCSEMUpdaterWorkbookBuffer(
                 updaterSession,
-                parseSCSEMFile(originalPath),
-                originalPath
+                parseSCSEMFile(baseWorkbookPath),
+                baseWorkbookPath,
+                officialReference ? parseSCSEMFile(originalPath) : undefined
             );
 
         await logAudit({
@@ -50,6 +58,7 @@ export async function GET(
                     fileName: updaterSession.originalFileName,
                     inferredTechnology: updaterSession.inferredTechnology,
                     approvedChangeIds: approvedChanges.map((change) => change.id),
+                    officialReference: officialReference?.sourceUrl || null,
                 },
                 output: {
                     exportFileName,

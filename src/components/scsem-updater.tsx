@@ -31,6 +31,7 @@ interface UpdaterChange {
     proposedValue: string;
     reason: string;
     confidence?: string;
+    targetSheet?: string;
     sourceEvidence?: Record<string, unknown> | null;
     newControl?: {
         nistId?: string | null;
@@ -74,6 +75,11 @@ interface UpdaterSession {
     originalFileName: string;
     uploadedAt: string;
     inferredTechnology: string;
+    technologyInference?: {
+        source: "content" | "subject" | "filename" | "fallback";
+        confidence: "high" | "medium" | "low";
+        signals: string[];
+    };
     status: "uploaded" | "analyzing" | "review_ready" | "error";
     summary?: string;
     error?: string;
@@ -95,6 +101,36 @@ interface UpdaterSession {
         uploadedSha256: string;
         uploadedSizeBytes: number;
         pub1075Version?: string;
+        nistVersion?: string;
+        nistSourceUrl?: string;
+        complianceCoverage?: {
+            requested: number;
+            pub1075: number;
+            nistFallback: number;
+            uncovered: number;
+        };
+        benchmarkLookupError?: string;
+        benchmarkResolution?: Array<{
+            kind: "CIS" | "STIG";
+            query: string;
+            sheetName: string;
+            catalogCandidateCount: number;
+            attempts: Array<{
+                benchmarkTitle: string;
+                benchmarkVersion: string;
+                outcome: string;
+                reason: string;
+            }>;
+        }>;
+        officialReference?: {
+            sourceUrl: string;
+            workbookVersion: string | null;
+            workbookEffectiveDate: string | null;
+            irsEffectiveDate: string;
+            addedSheets: string[];
+            selectedAsBase: boolean;
+            upgradeReason: string | null;
+        } | null;
         cis?: AuditSource | null;
         stig?: AuditSource | null;
         cisSources?: AuditSource[];
@@ -186,6 +222,19 @@ export function SCSEMUpdater() {
 
     const adjacentAuditSources = useMemo(() => {
         return session?.audit.adjacentSources || [];
+    }, [session]);
+
+    const cisResolutionMessage = useMemo(() => {
+        const diagnostics = session?.audit.benchmarkResolution?.filter((item) => item.kind === "CIS") || [];
+        const attempted = diagnostics.find((item) => item.attempts.length > 0);
+        if (attempted) {
+            const lastAttempt = attempted.attempts[attempted.attempts.length - 1];
+            return `Tried ${attempted.sheetName} as “${attempted.query}”; ${lastAttempt.reason}`;
+        }
+        const catalogMiss = diagnostics.find((item) => item.catalogCandidateCount === 0);
+        return catalogMiss
+            ? `No CIS catalog candidate matched ${catalogMiss.sheetName} as “${catalogMiss.query}”.`
+            : null;
     }, [session]);
 
     async function uploadFile(file: File) {
@@ -441,15 +490,28 @@ export function SCSEMUpdater() {
                             Run Update Analysis
                         </button>
                     </div>
+                    {session.technologyInference && (
+                        <div className="mt-3 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs text-[var(--sky-text-secondary)]">
+                            Identified automatically from {session.technologyInference.source} evidence
+                            {` (${session.technologyInference.confidence} confidence)`}
+                            {session.technologyInference.signals.length > 0
+                                ? `: ${session.technologyInference.signals.join(", ")}`
+                                : "."}
+                        </div>
+                    )}
                 </section>
             )}
 
-            {session && (cisAuditSources.length > 0 || stigAuditSources.length > 0 || adjacentAuditSources.length > 0 || session.audit.pub1075Version) && (
+            {session && (cisAuditSources.length > 0 || stigAuditSources.length > 0 || adjacentAuditSources.length > 0 || session.audit.pub1075Version || session.audit.nistVersion || session.audit.officialReference || session.audit.benchmarkLookupError) && (
                 <section className="mb-6 rounded-xl border border-[var(--sky-border)] bg-[var(--sky-surface)] p-5">
                     <div className="mb-4 flex items-center gap-2">
                         <ShieldCheck className="h-5 w-5 text-[var(--sky-light)]" />
                         <h2 className="text-base font-semibold text-white">Evidence Sources</h2>
                     </div>
+                    <p className="mb-4 text-xs leading-5 text-[var(--sky-text-muted)]">
+                        CIS access uses POST /license, then GET /benchmarks and GET /excel; selected workbooks use GET /excel/&#123;workbenchId&#125;.
+                        SkyShield matches the returned catalog locally from workbook content, sheet names, platform generation, profiles, and control overlap—renaming the upload is not required.
+                    </p>
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                         {cisAuditSources.length > 0
                             ? cisAuditSources.map((source, index) => (
@@ -459,7 +521,13 @@ export function SCSEMUpdater() {
                                     source={source}
                                 />
                             ))
-                            : <AuditSourceCard title="CIS Benchmark" source={null} />}
+                            : <AuditSourceCard
+                                title="CIS Benchmark"
+                                source={null}
+                                emptyMessage={session.audit.benchmarkLookupError
+                                    ? `Lookup unavailable: ${session.audit.benchmarkLookupError}. Compliance review still completed.`
+                                    : `${cisResolutionMessage || "No direct workbook passed content/profile validation."} Compliance review still completed.`}
+                            />}
                         {stigAuditSources.length > 0
                             ? stigAuditSources.map((source, index) => (
                                 <AuditSourceCard
@@ -468,7 +536,7 @@ export function SCSEMUpdater() {
                                     source={source}
                                 />
                             ))
-                            : <AuditSourceCard title="STIG Benchmark" source={null} />}
+                            : <AuditSourceCard title="STIG Benchmark" source={null} emptyMessage="No direct STIG workbook passed content/profile validation." />}
                         {adjacentAuditSources.map((source, index) => (
                             <AuditSourceCard
                                 key={`adjacent-${source.workbenchId}-${index}`}
@@ -479,8 +547,37 @@ export function SCSEMUpdater() {
                         <article className="rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] p-4">
                             <p className="text-xs font-semibold uppercase text-[var(--sky-text-muted)]">Publication 1075</p>
                             <p className="mt-2 text-sm font-medium text-white">{session.audit.pub1075Version || "Unknown"}</p>
-                            <p className="mt-1 text-xs text-[var(--sky-text-secondary)]">Compliance floor for final recommendation text</p>
+                            <p className="mt-1 text-xs text-[var(--sky-text-secondary)]">
+                                Governing source · {session.audit.complianceCoverage?.pub1075 ?? 0} mapped control ID(s)
+                            </p>
                         </article>
+                        <article className="rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] p-4">
+                            <p className="text-xs font-semibold uppercase text-[var(--sky-text-muted)]">NIST SP 800-53 Fallback</p>
+                            <p className="mt-2 text-sm font-medium text-white">{session.audit.nistVersion || "Unknown"}</p>
+                            <p className="mt-1 text-xs text-[var(--sky-text-secondary)]">
+                                Used only when Pub 1075 has no matching section · {session.audit.complianceCoverage?.nistFallback ?? 0} mapped ID(s)
+                            </p>
+                        </article>
+                        {session.audit.officialReference && (
+                            <article className="rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] p-4">
+                                <p className="text-xs font-semibold uppercase text-[var(--sky-text-muted)]">Official IRS SCSEM Baseline</p>
+                                <p className="mt-2 text-sm font-medium text-white">
+                                    v{session.audit.officialReference.workbookVersion || "current"}
+                                    {session.audit.officialReference.selectedAsBase ? " selected automatically" : " — upload is structurally current"}
+                                </p>
+                                <p className="mt-1 text-xs text-[var(--sky-text-secondary)]">
+                                    IRS-listed effective date: {session.audit.officialReference.irsEffectiveDate}
+                                </p>
+                                <p className="mt-1 text-xs leading-5 text-[var(--sky-text-secondary)]">
+                                    {session.audit.officialReference.upgradeReason || "No newer official version or platform tab was detected."}
+                                </p>
+                                {session.audit.officialReference.addedSheets.length > 0 && (
+                                    <p className="mt-2 text-xs text-emerald-300">
+                                        Adds: {session.audit.officialReference.addedSheets.join(", ")}
+                                    </p>
+                                )}
+                            </article>
+                        )}
                     </div>
                 </section>
             )}
@@ -569,12 +666,20 @@ function StatusPill({ status, count }: { status: ChangeStatus; count: number }) 
     );
 }
 
-function AuditSourceCard({ title, source }: { title: string; source: AuditSource | null }) {
+function AuditSourceCard({
+    title,
+    source,
+    emptyMessage = "No matching workbook selected",
+}: {
+    title: string;
+    source: AuditSource | null;
+    emptyMessage?: string;
+}) {
     if (!source) {
         return (
             <article className="rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] p-4">
                 <p className="text-xs font-semibold uppercase text-[var(--sky-text-muted)]">{title}</p>
-                <p className="mt-2 text-sm font-medium text-[var(--sky-text-secondary)]">No matching workbook selected</p>
+                <p className="mt-2 text-sm leading-5 text-[var(--sky-text-secondary)]">{emptyMessage}</p>
             </article>
         );
     }
@@ -628,11 +733,13 @@ function sourceEvidenceText(evidence: Record<string, unknown> | null | undefined
     return String(value);
 }
 
-function evidenceTier(change: UpdaterChange): "direct" | "adjacent" | "pub1075" | null {
+function evidenceTier(change: UpdaterChange): "direct" | "adjacent" | "pub1075" | "nist" | null {
     const tier = sourceEvidenceText(change.sourceEvidence, "evidenceTier");
     const relationship = sourceEvidenceText(change.sourceEvidence, "sourceRelationship");
+    const complianceSource = sourceEvidenceText(change.sourceEvidence, "complianceSource") || "";
     if (tier === "adjacent" || relationship === "adjacent") return "adjacent";
-    if (sourceEvidenceText(change.sourceEvidence, "pub1075Only") === "true") return "pub1075";
+    if (complianceSource.includes("NIST")) return "nist";
+    if (complianceSource.includes("Publication 1075") || sourceEvidenceText(change.sourceEvidence, "pub1075Only") === "true") return "pub1075";
     if (change.sourceEvidence) return "direct";
     return null;
 }
@@ -645,11 +752,13 @@ function EvidenceTierBadge({ change }: { change: UpdaterChange }) {
         direct: "border-blue-500/25 bg-blue-500/10 text-blue-300",
         adjacent: "border-amber-500/25 bg-amber-500/10 text-amber-300",
         pub1075: "border-indigo-500/25 bg-indigo-500/10 text-indigo-300",
+        nist: "border-cyan-500/25 bg-cyan-500/10 text-cyan-300",
     };
     const labels = {
         direct: "direct source",
         adjacent: "adjacent source",
         pub1075: "Pub 1075",
+        nist: "NIST fallback",
     };
 
     return (
@@ -673,7 +782,9 @@ function SourceEvidencePanel({ change }: { change: UpdaterChange }) {
         ["STIG Profile", sourceEvidenceText(evidence, "stigProfile")],
         ["Adjacent Category", sourceEvidenceText(evidence, "adjacentSourceCategory")],
         ["Applicability", sourceEvidenceText(evidence, "applicabilityRationale")],
+        ["Target sheet", change.targetSheet || sourceEvidenceText(evidence, "sourceSheet")],
         ["Pub 1075", sourceEvidenceText(evidence, "pub1075Version")],
+        ["NIST fallback", sourceEvidenceText(evidence, "nistVersion")],
     ].filter(([, value]) => Boolean(value));
 
     if (rows.length === 0) return null;
@@ -732,6 +843,11 @@ function ChangeReview({
                         <span className="rounded border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 font-mono text-xs font-medium text-blue-300">
                             {change.testId}
                         </span>
+                        {change.targetSheet && (
+                            <span className="max-w-64 truncate rounded border border-[var(--sky-border)] bg-[var(--sky-navy)] px-2 py-0.5 text-xs text-[var(--sky-text-secondary)]" title={change.targetSheet}>
+                                {change.targetSheet}
+                            </span>
+                        )}
                         <span className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-medium ${isNewControl
                             ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-300"
                             : "border-purple-500/25 bg-purple-500/10 text-purple-300"

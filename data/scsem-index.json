@@ -155,6 +155,11 @@
     "name": "Oracle_Solaris v34 093023"
   },
   {
+    "file": "data/scsems/UNIX-Linux/Safeguards-SCSEM Amazon Linux 2023-v1_0.xlsx",
+    "category": "UNIX-Linux",
+    "name": "Amazon Linux 2023 v1_0"
+  },
+  {
     "file": "data/scsems/UNIX-Linux/Safeguards-SCSEM Red Hat Enterprise Linux (RHEL)-v7_02182025.xlsx",
     "category": "UNIX-Linux",
     "name": "Red Hat Enterprise Linux (RHEL) v7_02182025"

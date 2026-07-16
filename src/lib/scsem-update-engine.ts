@@ -1,5 +1,3 @@
-import * as fs from "fs";
-import * as path from "path";
 import {
     downloadBenchmarkExcel,
     type CISBenchmark,
@@ -14,7 +12,7 @@ import {
     type CISBenchmarkRecommendation,
     type CISBenchmarkSnapshot,
 } from "@/lib/cis-benchmark-xlsx";
-import { detectPub1075Version } from "@/lib/knowledge/ingest";
+import { extractComplianceEvidence } from "@/lib/compliance-evidence";
 
 export const ALLOWED_UPDATE_FIELDS = new Set([
     "testProcedures",
@@ -59,68 +57,11 @@ export function extractPub1075Sections(nistIds: Array<string | null | undefined>
     sourcePath: string;
     excerpts: string;
 } {
-    const pub1075Path = path.join(process.cwd(), "data", "pub1075", "p1075-full-text.md");
-    if (!fs.existsSync(pub1075Path)) {
-        return {
-            version: "Unknown",
-            sourcePath: "data/pub1075/p1075-full-text.md",
-            excerpts: "",
-        };
-    }
-
-    const fullText = fs.readFileSync(pub1075Path, "utf8");
-    const version = detectPub1075Version(fullText);
-    const lines = fullText.split("\n");
-    const controlPrefixes = new Set<string>();
-
-    for (const nistId of nistIds) {
-        const match = (nistId || "").match(/^([A-Z]{2}-\d+)/);
-        if (match) controlPrefixes.add(match[1]);
-    }
-
-    if (controlPrefixes.size === 0) {
-        return {
-            version,
-            sourcePath: "data/pub1075/p1075-full-text.md",
-            excerpts: "",
-        };
-    }
-
-    const sections: string[] = [];
-    let currentSection = "";
-    let capturing = false;
-    let totalChars = 0;
-    const maxCharsPerSection = 2200;
-    const maxTotalChars = 14000;
-
-    for (const line of lines) {
-        if (totalChars >= maxTotalChars) break;
-
-        const sectionMatch = line.match(/^([A-Z]{2}-\d+)[\s:]/);
-        if (sectionMatch) {
-            if (capturing && currentSection.length > 0) {
-                sections.push(currentSection.trim());
-                totalChars += currentSection.length;
-            }
-
-            capturing = controlPrefixes.has(sectionMatch[1]);
-            currentSection = capturing ? `${line}\n` : "";
-            continue;
-        }
-
-        if (capturing && currentSection.length < maxCharsPerSection) {
-            currentSection += `${line}\n`;
-        }
-    }
-
-    if (capturing && currentSection.length > 0 && totalChars < maxTotalChars) {
-        sections.push(currentSection.trim());
-    }
-
+    const compliance = extractComplianceEvidence(nistIds);
     return {
-        version,
-        sourcePath: "data/pub1075/p1075-full-text.md",
-        excerpts: sections.join("\n\n---\n\n"),
+        version: compliance.version,
+        sourcePath: compliance.sourcePath,
+        excerpts: compliance.excerpts,
     };
 }
 
@@ -389,13 +330,27 @@ export function validateChanges(rawChanges: any[], controls: SCSEMControlEvidenc
 
     return rawChanges
         .filter((change) => change && typeof change === "object")
-        .map((change) => ({
-            action: change.action === "addControl" ? "addControl" : "updateField",
-            ...change,
-        }))
+        .map((change) => {
+            const action = change.action === "addControl" ? "addControl" : "updateField";
+            const control = action === "updateField" ? controlByTestId.get(change.testId) : undefined;
+            return {
+                ...change,
+                action,
+                targetSheet: change.targetSheet || change.sourceEvidence?.sourceSheet || control?.sourceSheet,
+                sourceEvidence: {
+                    ...(change.sourceEvidence || {}),
+                    ...(control?.sourceSheet && !change.sourceEvidence?.sourceSheet
+                        ? { sourceSheet: control.sourceSheet }
+                        : {}),
+                },
+            };
+        })
         .filter((change) => {
             if (change.action === "addControl") {
-                return Boolean(change.newControl?.recommendationNum && change.newControl?.description);
+                return Boolean(
+                    change.newControl?.description &&
+                    (change.newControl?.recommendationNum || change.newControl?.nistId)
+                );
             }
 
             const control = controlByTestId.get(change.testId);

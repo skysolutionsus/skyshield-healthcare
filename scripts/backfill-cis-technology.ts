@@ -67,6 +67,7 @@ const EMBEDDED_INDEX: IndexEntry[] = [
   { name: "OEL v5_0_0   03312025", category: "UNIX-Linux", file: "data/scsems/UNIX-Linux/Safeguards-SCSEM OEL-v5_0_0 - 03312025.xlsx" },
   { name: "Oracle Solaris v4_0_0   05222025", category: "UNIX-Linux", file: "data/scsems/UNIX-Linux/Safeguards-SCSEM Oracle-Solaris-v4_0_0 - 05222025.xlsx" },
   { name: "Oracle_Solaris v34 093023", category: "UNIX-Linux", file: "data/scsems/UNIX-Linux/Safeguards-SCSEM Oracle_Solaris-v34-093023.xlsx" },
+  { name: "Amazon Linux 2023 v1_0", category: "UNIX-Linux", file: "data/scsems/UNIX-Linux/Safeguards-SCSEM Amazon Linux 2023-v1_0.xlsx" },
   { name: "Red Hat Enterprise Linux (RHEL) v7_02182025", category: "UNIX-Linux", file: "data/scsems/UNIX-Linux/Safeguards-SCSEM Red Hat Enterprise Linux (RHEL)-v7_02182025.xlsx" },
   { name: "Rocky v10 093023", category: "UNIX-Linux", file: "data/scsems/UNIX-Linux/Safeguards-SCSEM Rocky-v10-093023.xlsx" },
   { name: "SUSE Linux v5_0_0   03312025", category: "UNIX-Linux", file: "data/scsems/UNIX-Linux/Safeguards-SCSEM SUSE-Linux-v5_0_0 - 03312025.xlsx" },

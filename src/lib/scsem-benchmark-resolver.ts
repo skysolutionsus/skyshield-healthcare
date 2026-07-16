@@ -1,10 +1,10 @@
 import type { CISBenchmark, CISExcelFile } from "@/lib/cis-api";
 import {
     normalizeRecommendation,
+    rankCISBenchmarkCandidatesForTechnology,
     selectApplicableSTIGProfiles,
     selectBestCISProfile,
-    selectLatestBenchmarkForTechnology,
-    selectLatestSTIGBenchmarkForTechnology,
+    type CISBenchmarkCandidateDiagnostic,
     type SelectedCISProfile,
 } from "@/lib/cis-benchmark-xlsx";
 import {
@@ -37,6 +37,41 @@ export interface ResolveSCSEMBenchmarkSourcesInput {
     downloadedBenchmarks: Map<number, DownloadedBenchmark>;
 }
 
+export type BenchmarkCandidateResolutionOutcome =
+    | "accepted"
+    | "download_failed"
+    | "no_profile"
+    | "insufficient_control_overlap";
+
+export interface BenchmarkCandidateResolutionDiagnostic {
+    kind: ResolvedBenchmarkKind;
+    query: string;
+    sheetName: string;
+    workbenchId: number;
+    benchmarkTitle: string;
+    benchmarkVersion: string;
+    productFamily: string | null;
+    productGeneration: string | null;
+    titleScore: number;
+    outcome: BenchmarkCandidateResolutionOutcome;
+    reason: string;
+    sharedRecommendationCount?: number;
+    sheetRecommendationCount?: number;
+}
+
+export interface BenchmarkQueryResolutionDiagnostic {
+    kind: ResolvedBenchmarkKind;
+    query: string;
+    sheetName: string;
+    catalogCandidates: CISBenchmarkCandidateDiagnostic[];
+    candidateAttempts: BenchmarkCandidateResolutionDiagnostic[];
+}
+
+export interface ResolveSCSEMBenchmarkSourcesDetailedResult {
+    sources: ResolvedBenchmarkSource[];
+    diagnostics: BenchmarkQueryResolutionDiagnostic[];
+}
+
 type CandidateSelection = {
     query: string;
     downloaded: DownloadedBenchmark;
@@ -46,11 +81,24 @@ type CandidateSelection = {
     score: number;
 };
 
+type QueryEvaluationResult = {
+    selection: CandidateSelection | null;
+    diagnostic: BenchmarkQueryResolutionDiagnostic;
+};
+
+type KindResolutionResult = {
+    source: ResolvedBenchmarkSource | null;
+    diagnostics: BenchmarkQueryResolutionDiagnostic[];
+};
+
 type AdjacentBenchmarkPlan = {
     category: string;
     rationale: string;
     queries: string[];
 };
+
+const MAX_CANDIDATE_DOWNLOADS_PER_QUERY = 8;
+const MAX_CATALOG_DIAGNOSTICS_PER_QUERY = 40;
 
 function normalizeText(value: string | null | undefined): string {
     return (value || "")
@@ -105,6 +153,14 @@ function isGenericSheetBase(value: string): boolean {
         normalized === "gen";
 }
 
+function matchedVersion(value: string, patterns: RegExp[]): string | null {
+    for (const pattern of patterns) {
+        const match = value.match(pattern);
+        if (match?.[1]) return match[1];
+    }
+    return null;
+}
+
 function aliasesForText(value: string): string[] {
     const normalized = normalizeText(value);
     const compact = compactText(value);
@@ -141,8 +197,14 @@ function aliasesForText(value: string): string[] {
     if (normalized.includes("oracle database") || normalized === "oracle") aliases.push("Oracle Database");
     if (normalized.includes("teradata")) aliases.push("Teradata");
 
-    if (normalized.includes("red hat enterprise linux") || normalized.includes("rhel")) {
-        aliases.push("Red Hat Enterprise Linux");
+    if (normalized.includes("red hat enterprise linux") || /\brhel\s*\d*\b/.test(normalized)) {
+        const rhelGeneration = matchedVersion(normalized, [
+            /\brhel\s*(\d{1,2})\b/,
+            /\bred hat enterprise linux\s*(\d{1,2})\b/,
+        ]);
+        aliases.push(rhelGeneration
+            ? `Red Hat Enterprise Linux ${rhelGeneration}`
+            : "Red Hat Enterprise Linux");
     }
     if (normalized.includes("oracle linux") || /\boel\b/.test(normalized)) aliases.push("Oracle Linux");
     if (normalized.includes("suse")) aliases.push("SUSE Linux Enterprise");
@@ -150,7 +212,45 @@ function aliasesForText(value: string): string[] {
     if (normalized.includes("aix")) aliases.push("IBM AIX");
     if (normalized.includes("solaris")) aliases.push("Oracle Solaris");
 
-    if (normalized.includes("vmware") || normalized.includes("esxi")) aliases.push("VMware ESXi");
+    if (normalized.includes("vmware") || normalized.includes("esxi")) {
+        const esxiGeneration = matchedVersion(normalized, [
+            /\besxi\s*(\d+(?:\.\d+)?)\b/,
+            /\bvsphere\s*(\d+(?:\.\d+)?)\s+esxi\b/,
+        ]);
+        aliases.push(esxiGeneration ? `VMware ESXi ${esxiGeneration}` : "VMware ESXi");
+    }
+
+    if (normalized.includes("amazon linux")) {
+        const amazonLinuxGeneration = matchedVersion(normalized, [
+            /\bamazon linux\s*(2023|\d+)\b/,
+        ]);
+        aliases.push(amazonLinuxGeneration
+            ? `Amazon Linux ${amazonLinuxGeneration}`
+            : "Amazon Linux");
+    } else if (/\baws\b/.test(normalized) || normalized.includes("amazon web services")) {
+        if (normalized.includes("end user compute")) {
+            aliases.push("AWS End User Compute Services");
+        } else if (/\bcompute(?: services?)?\b/.test(normalized)) {
+            aliases.push("AWS Compute Services");
+        } else if (/\bstorage(?: services?)?\b/.test(normalized)) {
+            aliases.push("AWS Storage Services");
+        } else if (/\bdatabase(?: services?)?\b/.test(normalized)) {
+            aliases.push("AWS Database Services");
+        } else if (/\bfoundations?\b/.test(normalized)) {
+            aliases.push("Amazon Web Services Foundations");
+        } else {
+            // A generic AWS workbook may span multiple benchmark families. Each
+            // is evaluated against the actual SCSEM recommendation IDs and the
+            // best-supported family wins.
+            aliases.push(
+                "Amazon Web Services Foundations",
+                "AWS Compute Services",
+                "AWS Storage Services",
+                "AWS Database Services",
+                "AWS End User Compute Services"
+            );
+        }
+    }
     if (normalized.includes("windows server 2022")) aliases.push("Microsoft Windows Server 2022");
     else if (normalized.includes("windows server 2019")) aliases.push("Microsoft Windows Server 2019");
     else if (normalized.includes("windows server 2016")) aliases.push("Microsoft Windows Server 2016");
@@ -317,13 +417,45 @@ function selectionScore(selection: SelectedCISProfile, sheetRefCount: number): n
     return selection.sharedRecommendationCount * 2 + sharedRatio * 100 + profileRatio * 35;
 }
 
-function acceptsSelection(selection: SelectedCISProfile, sheetRefCount: number): boolean {
+function acceptsSelection(
+    selection: SelectedCISProfile,
+    sheetRefCount: number,
+    allowExactProductUpgrade = false
+): boolean {
     if (sheetRefCount <= 0) return false;
     const shared = selection.sharedRecommendationCount;
     const sharedRatio = shared / sheetRefCount;
 
     if (sheetRefCount <= 5) return shared === sheetRefCount;
-    return shared >= 5 && sharedRatio >= 0.45;
+    if (shared >= 5 && sharedRatio >= 0.45) return true;
+
+    // A newer revision of the exact same product generation can legitimately
+    // renumber many recommendations. Retain a meaningful overlap floor, but do
+    // not fall back to an older benchmark merely because the new revision is
+    // precisely what the updater needs to compare and propose.
+    return allowExactProductUpgrade && shared >= 5 && sharedRatio >= 0.15;
+}
+
+function isExactProductUpgradeCandidate(
+    queryProduct: { family: string | null; productGeneration: string | null },
+    candidate: { productFamily: string | null; productGeneration: string | null }
+): boolean {
+    if (!queryProduct.family || queryProduct.family !== candidate.productFamily) return false;
+    if (queryProduct.productGeneration) {
+        const generationParts = (value: string | null) => (value || "")
+            .split(".")
+            .map((part) => Number.parseInt(part, 10))
+            .filter((part) => Number.isFinite(part));
+        const queryParts = generationParts(queryProduct.productGeneration);
+        const candidateParts = generationParts(candidate.productGeneration);
+        const length = Math.max(queryParts.length, candidateParts.length);
+        return length > 0 && Array.from({ length }, (_, index) => index)
+            .every((index) => (queryParts[index] || 0) === (candidateParts[index] || 0));
+    }
+
+    // These families are already specific products; their leading version is
+    // the CIS document revision, not a platform generation.
+    return queryProduct.family.startsWith("aws-");
 }
 
 async function evaluateQuery({
@@ -344,33 +476,105 @@ async function evaluateQuery({
     benchmarks: CISBenchmark[];
     excelFiles: CISExcelFile[];
     downloadedBenchmarks: Map<number, DownloadedBenchmark>;
-}): Promise<CandidateSelection | null> {
-    const selected = kind === "CIS"
-        ? selectLatestBenchmarkForTechnology(query, benchmarks, excelFiles)
-        : selectLatestSTIGBenchmarkForTechnology(query, benchmarks, excelFiles);
-    if (!selected) return null;
-
-    const downloaded = await downloadAndParseBenchmark(
-        token,
-        selected.benchmark,
-        selected.excel,
-        downloadedBenchmarks
+}): Promise<QueryEvaluationResult> {
+    const ranking = rankCISBenchmarkCandidatesForTechnology(
+        query,
+        benchmarks,
+        excelFiles,
+        kind === "CIS" ? "benchmark" : "stig"
     );
-    const selectedProfile = kind === "CIS"
-        ? selectBestCISProfile(sheetName, controls, downloaded.recommendations)
-        : selectApplicableSTIGProfiles(sheetName, controls, downloaded.recommendations);
-    if (!selectedProfile) return null;
-
+    const candidateAttempts: BenchmarkCandidateResolutionDiagnostic[] = [];
     const sheetRecommendationCount = recommendationCount(controls);
-    if (!acceptsSelection(selectedProfile, sheetRecommendationCount)) return null;
+    const diagnostic = (): BenchmarkQueryResolutionDiagnostic => ({
+        kind,
+        query,
+        sheetName,
+        catalogCandidates: ranking.diagnostics.slice(0, MAX_CATALOG_DIAGNOSTICS_PER_QUERY),
+        candidateAttempts,
+    });
+
+    for (const candidate of ranking.candidates.slice(0, MAX_CANDIDATE_DOWNLOADS_PER_QUERY)) {
+        const attemptBase = {
+            kind,
+            query,
+            sheetName,
+            workbenchId: Number(candidate.benchmark.workbenchId),
+            benchmarkTitle: candidate.benchmark.benchmarkTitle,
+            benchmarkVersion: candidate.benchmark.benchmarkVersion,
+            productFamily: candidate.productFamily,
+            productGeneration: candidate.productGeneration,
+            titleScore: candidate.titleScore,
+            sheetRecommendationCount,
+        };
+        let downloaded: DownloadedBenchmark;
+
+        try {
+            downloaded = await downloadAndParseBenchmark(
+                token,
+                candidate.benchmark,
+                candidate.excel,
+                downloadedBenchmarks
+            );
+        } catch (error) {
+            candidateAttempts.push({
+                ...attemptBase,
+                outcome: "download_failed",
+                reason: error instanceof Error ? error.message : String(error),
+            });
+            continue;
+        }
+
+        const selectedProfile = kind === "CIS"
+            ? selectBestCISProfile(sheetName, controls, downloaded.recommendations)
+            : selectApplicableSTIGProfiles(sheetName, controls, downloaded.recommendations);
+        if (!selectedProfile) {
+            candidateAttempts.push({
+                ...attemptBase,
+                outcome: "no_profile",
+                reason: "downloaded workbook contained no usable recommendation profile",
+            });
+            continue;
+        }
+
+        const exactProductUpgrade = kind === "CIS" && isExactProductUpgradeCandidate(
+            ranking.queryProduct,
+            candidate
+        );
+        if (!acceptsSelection(selectedProfile, sheetRecommendationCount, exactProductUpgrade)) {
+            candidateAttempts.push({
+                ...attemptBase,
+                outcome: "insufficient_control_overlap",
+                reason: `${selectedProfile.sharedRecommendationCount}/${sheetRecommendationCount} SCSEM recommendation IDs overlap`,
+                sharedRecommendationCount: selectedProfile.sharedRecommendationCount,
+            });
+            continue;
+        }
+
+        candidateAttempts.push({
+            ...attemptBase,
+            outcome: "accepted",
+            reason: `${selectedProfile.sharedRecommendationCount}/${sheetRecommendationCount} SCSEM recommendation IDs overlap${exactProductUpgrade && selectedProfile.sharedRecommendationCount / sheetRecommendationCount < 0.45
+                ? "; accepted as the newest exact product generation/revision for upgrade analysis"
+                : ""}`,
+            sharedRecommendationCount: selectedProfile.sharedRecommendationCount,
+        });
+
+        return {
+            selection: {
+                query,
+                downloaded,
+                selectedProfile,
+                sheetRecommendationCount,
+                sharedRecommendationCount: selectedProfile.sharedRecommendationCount,
+                score: selectionScore(selectedProfile, sheetRecommendationCount),
+            },
+            diagnostic: diagnostic(),
+        };
+    }
 
     return {
-        query,
-        downloaded,
-        selectedProfile,
-        sheetRecommendationCount,
-        sharedRecommendationCount: selectedProfile.sharedRecommendationCount,
-        score: selectionScore(selectedProfile, sheetRecommendationCount),
+        selection: null,
+        diagnostic: diagnostic(),
     };
 }
 
@@ -395,39 +599,51 @@ async function evaluateAdjacentQuery({
     excelFiles: CISExcelFile[];
     downloadedBenchmarks: Map<number, DownloadedBenchmark>;
 }): Promise<ResolvedBenchmarkSource | null> {
-    const selected = kind === "CIS"
-        ? selectLatestBenchmarkForTechnology(query, benchmarks, excelFiles)
-        : selectLatestSTIGBenchmarkForTechnology(query, benchmarks, excelFiles);
-    if (!selected) return null;
-
-    const downloaded = await downloadAndParseBenchmark(
-        token,
-        selected.benchmark,
-        selected.excel,
-        downloadedBenchmarks
-    );
     const allControls = parsed.sheets
         .filter((candidate) => candidate.sheetType === "test_cases")
         .flatMap((sheet) => sheet.controls);
-    const selectedProfile = kind === "CIS"
-        ? selectBestCISProfile(query, allControls, downloaded.recommendations)
-        : selectApplicableSTIGProfiles(query, allControls, downloaded.recommendations);
-    if (!selectedProfile) return null;
+    const ranking = rankCISBenchmarkCandidatesForTechnology(
+        query,
+        benchmarks,
+        excelFiles,
+        kind === "CIS" ? "benchmark" : "stig"
+    );
 
-    return {
-        kind,
-        sourceRelationship: "adjacent",
-        matchQuery: query,
-        matchedSheets: parsed.sheets
-            .filter((candidate) => candidate.sheetType === "test_cases")
-            .map((sheet) => sheet.sheetName),
-        selectedProfile,
-        downloaded,
-        sheetRecommendationCount: recommendationCount(allControls),
-        sharedRecommendationCount: selectedProfile.sharedRecommendationCount,
-        adjacentCategory: category,
-        adjacentRationale: rationale,
-    };
+    for (const candidate of ranking.candidates.slice(0, MAX_CANDIDATE_DOWNLOADS_PER_QUERY)) {
+        let downloaded: DownloadedBenchmark;
+        try {
+            downloaded = await downloadAndParseBenchmark(
+                token,
+                candidate.benchmark,
+                candidate.excel,
+                downloadedBenchmarks
+            );
+        } catch {
+            continue;
+        }
+
+        const selectedProfile = kind === "CIS"
+            ? selectBestCISProfile(query, allControls, downloaded.recommendations)
+            : selectApplicableSTIGProfiles(query, allControls, downloaded.recommendations);
+        if (!selectedProfile) continue;
+
+        return {
+            kind,
+            sourceRelationship: "adjacent",
+            matchQuery: query,
+            matchedSheets: parsed.sheets
+                .filter((candidateSheet) => candidateSheet.sheetType === "test_cases")
+                .map((sheet) => sheet.sheetName),
+            selectedProfile,
+            downloaded,
+            sheetRecommendationCount: recommendationCount(allControls),
+            sharedRecommendationCount: selectedProfile.sharedRecommendationCount,
+            adjacentCategory: category,
+            adjacentRationale: rationale,
+        };
+    }
+
+    return null;
 }
 
 async function resolveKindForSheet({
@@ -448,8 +664,8 @@ async function resolveKindForSheet({
     benchmarks: CISBenchmark[];
     excelFiles: CISExcelFile[];
     downloadedBenchmarks: Map<number, DownloadedBenchmark>;
-}): Promise<ResolvedBenchmarkSource | null> {
-    const candidates = await Promise.all(queries.map((query) => evaluateQuery({
+}): Promise<KindResolutionResult> {
+    const evaluations = await Promise.all(queries.map((query) => evaluateQuery({
         kind,
         query,
         sheetName,
@@ -459,32 +675,38 @@ async function resolveKindForSheet({
         excelFiles,
         downloadedBenchmarks,
     })));
-    const selected = candidates
+    const selected = evaluations
+        .map((evaluation) => evaluation.selection)
         .filter((candidate): candidate is CandidateSelection => Boolean(candidate))
         .sort((a, b) => b.score - a.score)[0];
-    if (!selected) return null;
+    const diagnostics = evaluations.map((evaluation) => evaluation.diagnostic);
+    if (!selected) return { source: null, diagnostics };
 
     return {
-        kind,
-        sourceRelationship: "direct",
-        matchQuery: selected.query,
-        matchedSheets: [sheetName],
-        selectedProfile: selected.selectedProfile,
-        downloaded: selected.downloaded,
-        sheetRecommendationCount: selected.sheetRecommendationCount,
-        sharedRecommendationCount: selected.sharedRecommendationCount,
+        source: {
+            kind,
+            sourceRelationship: "direct",
+            matchQuery: selected.query,
+            matchedSheets: [sheetName],
+            selectedProfile: selected.selectedProfile,
+            downloaded: selected.downloaded,
+            sheetRecommendationCount: selected.sheetRecommendationCount,
+            sharedRecommendationCount: selected.sharedRecommendationCount,
+        },
+        diagnostics,
     };
 }
 
-export async function resolveSCSEMBenchmarkSources({
+export async function resolveSCSEMBenchmarkSourcesDetailed({
     token,
     technology,
     parsed,
     benchmarks,
     excelFiles,
     downloadedBenchmarks,
-}: ResolveSCSEMBenchmarkSourcesInput): Promise<ResolvedBenchmarkSource[]> {
+}: ResolveSCSEMBenchmarkSourcesInput): Promise<ResolveSCSEMBenchmarkSourcesDetailedResult> {
     const byKey = new Map<string, ResolvedBenchmarkSource>();
+    const diagnostics: BenchmarkQueryResolutionDiagnostic[] = [];
 
     for (const sheet of parsed.sheets.filter((candidate) => candidate.sheetType === "test_cases")) {
         const sheetRecommendationCount = recommendationCount(sheet.controls);
@@ -493,7 +715,7 @@ export async function resolveSCSEMBenchmarkSources({
         const queries = sheetQueries(sheet.sheetName, technology, parsed);
         if (queries.length === 0) continue;
 
-        const [cisSource, stigSource] = await Promise.all([
+        const [cisResolution, stigResolution] = await Promise.all([
             resolveKindForSheet({
                 kind: "CIS",
                 queries,
@@ -516,15 +738,28 @@ export async function resolveSCSEMBenchmarkSources({
             }),
         ]);
 
-        if (cisSource) mergeSource(byKey, cisSource);
-        if (stigSource) mergeSource(byKey, stigSource);
+        diagnostics.push(...cisResolution.diagnostics, ...stigResolution.diagnostics);
+        if (cisResolution.source) mergeSource(byKey, cisResolution.source);
+        if (stigResolution.source) mergeSource(byKey, stigResolution.source);
     }
 
-    return [...byKey.values()].sort((a, b) => {
+    const sources = [...byKey.values()].sort((a, b) => {
         const kindDiff = a.kind.localeCompare(b.kind);
         if (kindDiff !== 0) return kindDiff;
         return a.downloaded.snapshot.benchmarkTitle.localeCompare(b.downloaded.snapshot.benchmarkTitle);
     });
+
+    return { sources, diagnostics };
+}
+
+/**
+ * Backwards-compatible source-only resolver. New diagnostic consumers can call
+ * resolveSCSEMBenchmarkSourcesDetailed without requiring route/UI changes here.
+ */
+export async function resolveSCSEMBenchmarkSources(
+    input: ResolveSCSEMBenchmarkSourcesInput
+): Promise<ResolvedBenchmarkSource[]> {
+    return (await resolveSCSEMBenchmarkSourcesDetailed(input)).sources;
 }
 
 export async function resolveAdjacentSCSEMBenchmarkSources({

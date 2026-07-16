@@ -44,6 +44,46 @@ export interface SelectedCISProfile {
     totalRecommendationCount: number;
 }
 
+export type CISBenchmarkKind = "benchmark" | "stig";
+
+/**
+ * Product identity is intentionally separate from the CIS benchmarkVersion.
+ * For example, ESXi 8.0 is the product generation while 1.3.0 is the CIS
+ * document revision.
+ */
+export interface CISProductIdentity {
+    family: string | null;
+    productGeneration: string | null;
+}
+
+export interface RankedCISBenchmarkCandidate {
+    benchmark: CISBenchmark;
+    excel: CISExcelFile;
+    titleScore: number;
+    productFamily: string | null;
+    productGeneration: string | null;
+}
+
+export interface CISBenchmarkCandidateDiagnostic {
+    workbenchId: number;
+    benchmarkTitle: string;
+    benchmarkVersion: string;
+    excelFileName: string | null;
+    titleScore: number;
+    productFamily: string | null;
+    productGeneration: string | null;
+    eligible: boolean;
+    rejectionReasons: string[];
+}
+
+export interface RankedCISBenchmarkCandidates {
+    query: string;
+    kind: CISBenchmarkKind;
+    queryProduct: CISProductIdentity;
+    candidates: RankedCISBenchmarkCandidate[];
+    diagnostics: CISBenchmarkCandidateDiagnostic[];
+}
+
 const EXCLUDED_TITLE_PATTERNS = [
     /\bSTIG\b/i,
     /\bStand-alone\b/i,
@@ -83,6 +123,7 @@ function normalizeBenchmarkSearchText(value: string | null | undefined): string 
     return normalizeText(value)
         .replace(/\bms\s+sql\b/g, "sql server")
         .replace(/\bsqlserver\b/g, "sql server")
+        .replace(/\baws\b/g, "amazon web services")
         .replace(/\bred\s+hat\s+linux\b/g, "red hat enterprise linux")
         .replace(/\brhel\b/g, "red hat enterprise linux")
         .replace(/\boel\b/g, "oracle linux")
@@ -128,6 +169,153 @@ function searchTokens(value: string): Set<string> {
 
 function numericTokens(value: string): Set<string> {
     return new Set(value.match(/\b\d{1,4}\b/g) || []);
+}
+
+function productIdentityText(value: string): string {
+    return value
+        .toLowerCase()
+        // A trailing benchmark vX.Y.Z is the document revision, not a product version.
+        .replace(/\bbenchmark\s+v(?:ersion\s*)?\d+(?:\.\d+)+\b/gi, " ")
+        .replace(/[_/\\:;,|-]+/g, " ")
+        .replace(/[^a-z0-9.]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+function firstMatch(value: string, patterns: RegExp[]): string | null {
+    for (const pattern of patterns) {
+        const match = value.match(pattern);
+        if (match?.[1]) return match[1];
+    }
+    return null;
+}
+
+/**
+ * Extracts identities only for product families where a number in the title is
+ * known to be a product generation. This deliberately does not interpret the
+ * version of AWS Foundations/Compute/Storage/Database benchmarks as a product
+ * generation.
+ */
+export function identifyCISProduct(value: string): CISProductIdentity {
+    const text = productIdentityText(value);
+
+    if (
+        /\brhel\s*\d*\b.*\bibm z\b/.test(text) ||
+        /\bibm z\b.*\brhel\s*\d*\b/.test(text) ||
+        /\bred hat enterprise linux\b.*\bibm z\b/.test(text)
+    ) {
+        return {
+            family: "rhel-ibm-z",
+            productGeneration: firstMatch(text, [
+                /\brhel\s*(\d{1,2})\b/,
+                /\bred hat enterprise linux\s*(\d{1,2})\b/,
+            ]),
+        };
+    }
+
+    if (/\bred hat enterprise linux\b|\brhel\s*\d*\b/.test(text)) {
+        return {
+            family: "rhel",
+            productGeneration: firstMatch(text, [
+                /\brhel\s*(\d{1,2})\b/,
+                /\bred hat enterprise linux\s*(\d{1,2})\b/,
+            ]),
+        };
+    }
+
+    if (/\besxi\b|\besxi\s*\d/.test(text)) {
+        return {
+            family: "vmware-esxi",
+            productGeneration: firstMatch(text, [
+                /\besxi\s*(\d+(?:\.\d+)?)\b/,
+                /\bvsphere\s*(\d+(?:\.\d+)?)\s+esxi\b/,
+            ]),
+        };
+    }
+
+    if (/\bamazon elastic kubernetes service\b|\baws eks\b/.test(text)) {
+        return { family: "amazon-eks", productGeneration: null };
+    }
+
+    if (/\bamazon linux\b/.test(text)) {
+        return {
+            family: "amazon-linux",
+            productGeneration: firstMatch(text, [/\bamazon linux\s*(2023|\d+)\b/]),
+        };
+    }
+
+    if (/\bamazon web services\b|\baws\b/.test(text)) {
+        if (/\bend user compute(?: services)?\b/.test(text)) {
+            return { family: "aws-end-user-compute", productGeneration: null };
+        }
+        if (/\bcompute services?\b/.test(text)) {
+            return { family: "aws-compute", productGeneration: null };
+        }
+        if (/\bstorage services?\b/.test(text)) {
+            return { family: "aws-storage", productGeneration: null };
+        }
+        if (/\bdatabase services?\b/.test(text)) {
+            return { family: "aws-database", productGeneration: null };
+        }
+        if (/\bfoundations?\b/.test(text)) {
+            return { family: "aws-foundations", productGeneration: null };
+        }
+        return { family: "aws", productGeneration: null };
+    }
+
+    if (/\boracle linux\b/.test(text)) {
+        return {
+            family: "oracle-linux",
+            productGeneration: firstMatch(text, [/\boracle linux\s*(\d{1,2})\b/]),
+        };
+    }
+
+    if (/\bwindows server\b/.test(text)) {
+        return {
+            family: "windows-server",
+            productGeneration: firstMatch(text, [/\bwindows server\s*(\d{4})\b/]),
+        };
+    }
+
+    if (/\bwindows\s+(?:10|11)\b/.test(text)) {
+        return {
+            family: "windows-client",
+            productGeneration: firstMatch(text, [/\bwindows\s*(10|11)\b/]),
+        };
+    }
+
+    return { family: null, productGeneration: null };
+}
+
+function familiesAreCompatible(queryFamily: string | null, candidateFamily: string | null): boolean {
+    if (!queryFamily) return true;
+    if (queryFamily === "aws") {
+        return candidateFamily === "aws" || Boolean(candidateFamily?.startsWith("aws-"));
+    }
+    return queryFamily === candidateFamily;
+}
+
+function generationParts(value: string | null): number[] {
+    if (!value) return [];
+    return value
+        .split(".")
+        .map((part) => Number.parseInt(part, 10))
+        .filter((part) => Number.isFinite(part));
+}
+
+function compareProductGenerations(a: string | null, b: string | null): number {
+    const left = generationParts(a);
+    const right = generationParts(b);
+    const max = Math.max(left.length, right.length);
+    for (let i = 0; i < max; i++) {
+        const diff = (left[i] || 0) - (right[i] || 0);
+        if (diff !== 0) return diff;
+    }
+    return 0;
+}
+
+function sameProductGeneration(a: string, b: string): boolean {
+    return compareProductGenerations(a, b) === 0;
 }
 
 function matchingScore(technology: string, titleText: string): number {
@@ -224,7 +412,13 @@ export function selectLatestBenchmarkForTechnology(
     benchmarks: CISBenchmark[],
     excelFiles: CISExcelFile[]
 ): { benchmark: CISBenchmark; excel: CISExcelFile } | null {
-    return selectLatestBenchmarkByKind(technology, benchmarks, excelFiles, "benchmark");
+    const selected = rankCISBenchmarkCandidatesForTechnology(
+        technology,
+        benchmarks,
+        excelFiles,
+        "benchmark"
+    ).candidates[0];
+    return selected ? { benchmark: selected.benchmark, excel: selected.excel } : null;
 }
 
 export function selectLatestSTIGBenchmarkForTechnology(
@@ -232,49 +426,132 @@ export function selectLatestSTIGBenchmarkForTechnology(
     benchmarks: CISBenchmark[],
     excelFiles: CISExcelFile[]
 ): { benchmark: CISBenchmark; excel: CISExcelFile } | null {
-    return selectLatestBenchmarkByKind(technology, benchmarks, excelFiles, "stig");
+    const selected = rankCISBenchmarkCandidatesForTechnology(
+        technology,
+        benchmarks,
+        excelFiles,
+        "stig"
+    ).candidates[0];
+    return selected ? { benchmark: selected.benchmark, excel: selected.excel } : null;
 }
 
-function selectLatestBenchmarkByKind(
+/**
+ * Returns every eligible catalog candidate in resolution order plus explicit
+ * rejection diagnostics. Callers that can validate workbook contents should
+ * walk this list until a candidate passes that validation instead of assuming
+ * the first title match is usable.
+ */
+export function rankCISBenchmarkCandidatesForTechnology(
     technology: string,
     benchmarks: CISBenchmark[],
     excelFiles: CISExcelFile[],
-    kind: "benchmark" | "stig"
-): { benchmark: CISBenchmark; excel: CISExcelFile } | null {
+    kind: CISBenchmarkKind = "benchmark"
+): RankedCISBenchmarkCandidates {
     const excelById = new Map(excelFiles.map((excel) => [Number(excel.workbenchId), excel]));
+    const queryProduct = identifyCISProduct(technology);
+    const candidates: RankedCISBenchmarkCandidate[] = [];
+    const diagnostics: CISBenchmarkCandidateDiagnostic[] = [];
 
-    const candidates = benchmarks
-        .map((benchmark) => ({
-            benchmark,
-            excel: excelById.get(Number(benchmark.workbenchId)),
-            score: 0,
-        }))
-        .filter((candidate): candidate is { benchmark: CISBenchmark; excel: CISExcelFile; score: number } =>
-            Boolean(candidate.excel)
-        )
-        .map((candidate) => {
-            const titleText = `${candidate.benchmark.benchmarkTitle} ${candidate.excel.excelTitle} ${candidate.excel.excelFileName}`;
-            return {
-                ...candidate,
-                score: matchingScore(technology, titleText),
-            };
-        })
-        .filter(({ benchmark, excel, score }) => {
-            const titleText = `${benchmark.benchmarkTitle} ${excel.excelTitle} ${excel.excelFileName}`;
-            const isStig = /\bSTIG\b/i.test(titleText);
-            if (kind === "benchmark" && EXCLUDED_TITLE_PATTERNS.some((pattern) => pattern.test(titleText))) return false;
-            if (kind === "stig" && (!isStig || EXCLUDED_STIG_TITLE_PATTERNS.some((pattern) => pattern.test(titleText)))) return false;
-            return score >= 65;
+    for (const benchmark of benchmarks) {
+        const excel = excelById.get(Number(benchmark.workbenchId));
+        const titleText = [
+            benchmark.benchmarkTitle,
+            excel?.excelTitle,
+            excel?.excelFileName,
+        ].filter(Boolean).join(" ");
+        const titleScore = matchingScore(technology, titleText);
+        const candidateProduct = identifyCISProduct(titleText);
+        const rejectionReasons: string[] = [];
+        const isStig = /\bSTIG\b/i.test(titleText);
+
+        if (!excel) rejectionReasons.push("no CIS Excel workbook is available");
+        if (kind === "benchmark" && EXCLUDED_TITLE_PATTERNS.some((pattern) => pattern.test(titleText))) {
+            rejectionReasons.push(isStig ? "STIG benchmark requested separately" : "excluded benchmark variant");
+        }
+        if (
+            kind === "stig" &&
+            (!isStig || EXCLUDED_STIG_TITLE_PATTERNS.some((pattern) => pattern.test(titleText)))
+        ) {
+            rejectionReasons.push(!isStig ? "not a STIG benchmark" : "excluded STIG variant");
+        }
+
+        if (!familiesAreCompatible(queryProduct.family, candidateProduct.family)) {
+            rejectionReasons.push(
+                `product family mismatch (${queryProduct.family || "unknown"} vs ${candidateProduct.family || "unknown"})`
+            );
+        }
+
+        if (queryProduct.productGeneration) {
+            if (!candidateProduct.productGeneration) {
+                rejectionReasons.push(
+                    `candidate does not identify target product generation ${queryProduct.productGeneration}`
+                );
+            } else if (!sameProductGeneration(
+                queryProduct.productGeneration,
+                candidateProduct.productGeneration
+            )) {
+                rejectionReasons.push(
+                    `product generation mismatch (${queryProduct.productGeneration} vs ${candidateProduct.productGeneration})`
+                );
+            }
+        }
+
+        if (titleScore < 65) rejectionReasons.push(`title similarity ${titleScore.toFixed(1)} is below 65`);
+
+        diagnostics.push({
+            workbenchId: Number(benchmark.workbenchId),
+            benchmarkTitle: benchmark.benchmarkTitle,
+            benchmarkVersion: benchmark.benchmarkVersion,
+            excelFileName: excel?.excelFileName || null,
+            titleScore,
+            productFamily: candidateProduct.family,
+            productGeneration: candidateProduct.productGeneration,
+            eligible: rejectionReasons.length === 0,
+            rejectionReasons,
         });
 
+        if (!excel || rejectionReasons.length > 0) continue;
+        candidates.push({
+            benchmark,
+            excel,
+            titleScore,
+            productFamily: candidateProduct.family,
+            productGeneration: candidateProduct.productGeneration,
+        });
+    }
+
     candidates.sort((a, b) => {
-        const scoreDiff = b.score - a.score;
-        if (scoreDiff !== 0) return scoreDiff;
+        if (!queryProduct.family) {
+            const scoreDiff = b.titleScore - a.titleScore;
+            if (scoreDiff !== 0) return scoreDiff;
+        }
 
         const acceptedScore =
             Number((b.benchmark.benchmarkStatus?.status || "").toLowerCase() === "accepted") -
             Number((a.benchmark.benchmarkStatus?.status || "").toLowerCase() === "accepted");
         if (acceptedScore !== 0) return acceptedScore;
+
+        // With a family-only query, product generation is the primary version
+        // axis. This is what makes a generic ESXi query prefer ESXi 8 over an
+        // ESXi 7 document that happens to have a larger benchmark revision.
+        if (queryProduct.family && !queryProduct.productGeneration) {
+            const generationDiff = compareProductGenerations(
+                b.productGeneration,
+                a.productGeneration
+            );
+            if (generationDiff !== 0) return generationDiff;
+        }
+
+        if (queryProduct.family === "aws") {
+            const familyPreference = (family: string | null) => family === "aws-foundations" ? 1 : 0;
+            const familyDiff = familyPreference(b.productFamily) - familyPreference(a.productFamily);
+            if (familyDiff !== 0) return familyDiff;
+        }
+
+        if (queryProduct.family) {
+            const scoreDiff = b.titleScore - a.titleScore;
+            if (scoreDiff !== 0) return scoreDiff;
+        }
 
         const versionDiff = compareVersions(b.benchmark.benchmarkVersion, a.benchmark.benchmarkVersion);
         if (versionDiff !== 0) return versionDiff;
@@ -285,8 +562,27 @@ function selectLatestBenchmarkByKind(
         );
     });
 
-    const selected = candidates[0];
-    return selected ? { benchmark: selected.benchmark, excel: selected.excel } : null;
+    const rankByWorkbenchId = new Map(candidates.map((candidate, index) => [
+        Number(candidate.benchmark.workbenchId),
+        index,
+    ]));
+    diagnostics.sort((a, b) => {
+        if (a.eligible !== b.eligible) return a.eligible ? -1 : 1;
+        const leftRank = rankByWorkbenchId.get(a.workbenchId);
+        const rightRank = rankByWorkbenchId.get(b.workbenchId);
+        if (leftRank !== undefined || rightRank !== undefined) {
+            return (leftRank ?? Number.MAX_SAFE_INTEGER) - (rightRank ?? Number.MAX_SAFE_INTEGER);
+        }
+        return b.titleScore - a.titleScore;
+    });
+
+    return {
+        query: technology,
+        kind,
+        queryProduct,
+        candidates,
+        diagnostics,
+    };
 }
 
 export function saveCISBenchmarkSnapshot(

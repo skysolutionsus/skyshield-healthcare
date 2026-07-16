@@ -16,6 +16,8 @@
     "rag:ingest:interim-guidance": "npx tsx scripts/ingest-interim-guidance.ts",
     "rag:ingest:pub1075": "npx tsx scripts/ingest-pub1075.ts",
     "rag:sync:pub1075": "npx tsx scripts/sync-pub1075.ts",
+    "rag:sync:nist80053": "npx tsx scripts/sync-nist-80053.ts",
+    "test:scsem-updater": "npx tsx scripts/test-scsem-updater.ts",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate"
   },
@@ -52,6 +54,7 @@
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.574.0",
     "next": "^16.1.6",
     "next-auth": "^5.0.0-beta.30",
