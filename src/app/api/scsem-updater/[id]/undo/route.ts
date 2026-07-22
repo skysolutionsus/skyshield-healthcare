@@ -1,17 +1,24 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { auditRequestContext, logAudit, truncateAuditText } from "@/lib/audit";
+import { auditRequestContext } from "@/lib/audit";
 import {
+    assertSCSEMUpdaterRevision,
     readSCSEMUpdaterSessionForUser,
+    isSCSEMUpdaterReviewableStatus,
+    requireSCSEMUpdaterExpectedRevision,
+    scsemUpdaterRevisionETag,
     writeSCSEMUpdaterSession,
     type SCSEMUpdaterHistoryEntry,
 } from "@/lib/scsem-updater-store";
+import { requireScsemSteward } from "@/lib/scsem-steward-auth";
+import { scsemUpdaterRouteFailureDetails } from "@/lib/scsem-updater-route-failure";
+import { clientSafeSCSEMUpdaterSession } from "@/lib/scsem-updater-client-session";
 
 export const runtime = "nodejs";
 
 function latestStatusHistory(history: SCSEMUpdaterHistoryEntry[]): SCSEMUpdaterHistoryEntry | null {
-    const lastUndoIndex = history.map((entry) => entry.action).lastIndexOf("undo");
-    for (let i = history.length - 1; i > lastUndoIndex; i--) {
+    const lastBoundaryIndex = history.reduce((latest, entry, index) =>
+        (["undo", "edit", "analyze"].includes(entry.action) ? index : latest), -1);
+    for (let i = history.length - 1; i > lastBoundaryIndex; i--) {
         const entry = history[i];
         if (entry.action === "status" && entry.changeId && entry.previousStatus && entry.nextStatus) {
             return entry;
@@ -20,33 +27,25 @@ function latestStatusHistory(history: SCSEMUpdaterHistoryEntry[]): SCSEMUpdaterH
     return null;
 }
 
-function auditChange(change: { id: string; action: string; testId: string; field: string; status: string; currentValue: string; proposedValue: string; reason: string; confidence?: string }) {
-    return {
-        id: change.id,
-        action: change.action,
-        testId: change.testId,
-        field: change.field,
-        status: change.status,
-        confidence: change.confidence,
-        currentValue: truncateAuditText(change.currentValue, 1000),
-        proposedValue: truncateAuditText(change.proposedValue, 1800),
-        reason: truncateAuditText(change.reason, 1200),
-    };
-}
-
 export async function POST(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await auth();
-        if (!session?.user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
-        const user = session.user as unknown as { id: string; organizationId: string };
+        const access = await requireScsemSteward();
+        if (!access.ok) return access.response;
+        const user = access.user;
 
         const { id } = await params;
+        const expectedRevision = requireSCSEMUpdaterExpectedRevision(request);
         const updaterSession = readSCSEMUpdaterSessionForUser(id, user);
+        assertSCSEMUpdaterRevision(updaterSession, expectedRevision);
+        if (!isSCSEMUpdaterReviewableStatus(updaterSession.status)) {
+            return NextResponse.json({
+                error: "Review actions can only be undone after analysis has finished.",
+                code: "SCSEM_SESSION_NOT_REVIEWABLE",
+            }, { status: 409 });
+        }
         const lastStatusChange = latestStatusHistory(updaterSession.history);
         if (!lastStatusChange) {
             return NextResponse.json({ error: "No review action is available to undo." }, { status: 400 });
@@ -63,7 +62,7 @@ export async function POST(
         }
 
         const previousCurrentStatus = change.status;
-        const before = auditChange(change);
+        const before = structuredClone(change);
         change.status = previousStatus;
         updaterSession.history.push({
             at: new Date().toISOString(),
@@ -74,21 +73,16 @@ export async function POST(
             description: "Reviewer undid the most recent approve/reject action.",
         });
 
-        writeSCSEMUpdaterSession(updaterSession);
-        await logAudit({
-            organizationId: user.organizationId,
-            userId: user.id,
+        await writeSCSEMUpdaterSession(updaterSession, expectedRevision, {
             action: "SCSEM_UPDATER_UNDO",
-            resourceType: "scsem_updater_session",
-            resourceId: updaterSession.id,
-            metadata: {
-                input: {
+            affectedPayload: {
+                request: {
                     undoneHistory: lastStatusChange,
                 },
-                output: {
+                result: {
                     change: {
                         before,
-                        after: auditChange(change),
+                        after: change,
                     },
                     previousStatus: previousCurrentStatus,
                     restoredStatus: change.status,
@@ -96,12 +90,16 @@ export async function POST(
             },
             ...auditRequestContext(request),
         });
-        return NextResponse.json({ session: updaterSession });
-    } catch (error: any) {
-        console.error("SCSEM updater undo error:", error);
         return NextResponse.json(
-            { error: error.message || "Failed to undo SCSEM updater review action." },
-            { status: 500 }
+            { session: clientSafeSCSEMUpdaterSession(updaterSession) },
+            { headers: { ETag: scsemUpdaterRevisionETag(updaterSession) } }
         );
+    } catch (error: unknown) {
+        console.error("SCSEM updater undo error:", error);
+        const failure = scsemUpdaterRouteFailureDetails(
+            error,
+            "Failed to undo the SCSEM updater review action."
+        );
+        return NextResponse.json(failure.response, { status: failure.status });
     }
 }

@@ -22,6 +22,12 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["xlsx", "bcryptjs"],
+  outputFileTracingIncludes: {
+    "/api/scsem-updater/**/*": [
+      "./data/scsem-manifest.json",
+      "./data/scsems/current/**/*",
+    ],
+  },
   async headers() {
     return [
       {

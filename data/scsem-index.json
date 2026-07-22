@@ -1,297 +1,350 @@
 [
   {
-    "file": "data/scsems/Database/Safeguards-SCSEM DB2_LUW_zOS-v12-093023.xlsx",
-    "category": "Database",
-    "name": "DB2_LUW_zOS v12 093023"
+    "id": "official-500d0541967340d1a87d",
+    "file": "data/scsems/current/safeguards-scsem-acf2.xlsx",
+    "category": "Mainframe",
+    "name": "zOS-ACF2 v3.8"
   },
   {
-    "file": "data/scsems/Database/Safeguards-SCSEM MongoDB-v25-093023.xlsx",
-    "category": "Database",
-    "name": "MongoDB v25 093023"
+    "id": "official-dce856e0f534bbd9207f",
+    "file": "data/scsems/current/safeguards-scsem-aix7-v3-0-03312025.xlsx",
+    "category": "UNIX-Linux",
+    "name": "AIX v3.0"
   },
   {
-    "file": "data/scsems/Database/Safeguards-SCSEM MySQL-v24-093023.xlsx",
-    "category": "Database",
-    "name": "MySQL v24 093023"
+    "id": "official-dfcb4946c5353b474bc3",
+    "file": "data/scsems/current/safeguards-scsem-amazon-linux-2023-v1-0.xlsx",
+    "category": "UNIX-Linux",
+    "name": "Amazon Linux 2023 v1.0"
   },
   {
-    "file": "data/scsems/Database/Safeguards-SCSEM SQL-Server-v6_0-08252024.xlsx",
-    "category": "Database",
-    "name": "SQL Server v6_0 08252024"
+    "id": "official-c02ea824df26ef1cb652",
+    "file": "data/scsems/current/safeguards-scsem-apacheo-tomcat.xlsx",
+    "category": "Application",
+    "name": "Application Server v3.0"
   },
   {
-    "file": "data/scsems/Database/Safeguards-SCSEM data_warehouse-v28-093023.xlsx",
-    "category": "Database",
-    "name": "data_warehouse v28 093023"
-  },
-  {
-    "file": "data/scsems/Database/Safeguards-SCSEM generic-db-v29-093023.xlsx",
-    "category": "Database",
-    "name": "generic db v29 093023"
-  },
-  {
-    "file": "data/scsems/Database/Safeguards-SCSEM oracle-v44-093023.xlsx",
-    "category": "Database",
-    "name": "oracle v44 093023"
-  },
-  {
-    "file": "data/scsems/Database/Safeguards-SCSEM sql-server-v50-093023.xlsx",
-    "category": "Database",
-    "name": "sql server v50 093023"
-  },
-  {
-    "file": "data/scsems/MacOS/Safeguards-SCSEM MacOSX-80-093023.xlsx",
-    "category": "MacOS",
-    "name": "MacOSX 80 093023"
-  },
-  {
-    "file": "data/scsems/Web/Safeguards-SCSEM Apache24_IIS-10-WebServer-SCSEM-v6_0_06162025.xlsx",
+    "id": "official-ba7e19cc8a79e37c4040",
+    "file": "data/scsems/current/safeguards-scsem-apache24-iis-10-webserver-v6-1.xlsx",
     "category": "Web",
-    "name": "Apache24_IIS 10 WebServer SCSEM v6_0_06162025"
+    "name": "Web Server v6.1"
   },
   {
-    "file": "data/scsems/Web/Safeguards-SCSEM NGINX-WebServer-v10-093023.xlsx",
-    "category": "Web",
-    "name": "NGINX WebServer v10 093023"
-  },
-  {
-    "file": "data/scsems/Web/Safeguards-SCSEM generic-web-server-v29-093023.xlsx",
-    "category": "Web",
-    "name": "generic web server v29 093023"
-  },
-  {
-    "file": "data/scsems/Network/Safeguards-SCSEM Check-Point Firewall-v1_0-02202025.xlsx",
-    "category": "Network",
-    "name": "Check Point Firewall v1_0 02202025"
-  },
-  {
-    "file": "data/scsems/Network/Safeguards-SCSEM Cisco-ASA-Firewall-v1_1-02202025.xlsx",
-    "category": "Network",
-    "name": "Cisco ASA Firewall v1_1 02202025"
-  },
-  {
-    "file": "data/scsems/Network/Safeguards-SCSEM Generic-Firewall-v7_0-02202025.xlsx",
-    "category": "Network",
-    "name": "Generic Firewall v7_0 02202025"
-  },
-  {
-    "file": "data/scsems/Network/Safeguards-SCSEM Palo Alto Firewall-V1_0 - 10082024.xlsx",
-    "category": "Network",
-    "name": "Palo Alto Firewall V1_0   10082024"
-  },
-  {
-    "file": "data/scsems/Network/Safeguards-SCSEM Switch_Router-v62-093023.xlsx",
-    "category": "Network",
-    "name": "Switch_Router v62 093023"
-  },
-  {
-    "file": "data/scsems/Network/Safeguards-SCSEM network-assessment-v34-093023.xlsx",
-    "category": "Network",
-    "name": "network assessment v34 093023"
-  },
-  {
-    "file": "data/scsems/Network/Safeguards-SCSEM san-v33-093023.xlsx",
-    "category": "Network",
-    "name": "san v33 093023"
-  },
-  {
-    "file": "data/scsems/Network/Safeguards-SCSEM voip-network-v29-093023.xlsx",
-    "category": "Network",
-    "name": "voip network v29 093023"
-  },
-  {
-    "file": "data/scsems/Network/Safeguards-SCSEM vpn-v29-0930253.xlsx",
-    "category": "Network",
-    "name": "vpn v29 0930253"
-  },
-  {
-    "file": "data/scsems/Network/Safeguards-SCSEM wireless-networking-v29-093023.xlsx",
-    "category": "Network",
-    "name": "wireless networking v29 093023"
-  },
-  {
-    "file": "data/scsems/Network/safeguards-scsem-fortigate-v10-120124.xlsx",
-    "category": "Network",
-    "name": "safeguards scsem fortigate v10 120124"
-  },
-  {
-    "file": "data/scsems/MOT/safeguards-scsem-mot-v50-12312024.xlsx",
-    "category": "MOT",
-    "name": "safeguards scsem mot v50 12312024"
-  },
-  {
-    "file": "data/scsems/UNIX-Linux/Safeguards-SCSEM AIX7-v3_0_0 - 03312025.xlsx",
-    "category": "UNIX-Linux",
-    "name": "AIX7 v3_0_0   03312025"
-  },
-  {
-    "file": "data/scsems/UNIX-Linux/Safeguards-SCSEM Debian-v20-093023.xlsx",
-    "category": "UNIX-Linux",
-    "name": "Debian v20 093023"
-  },
-  {
-    "file": "data/scsems/UNIX-Linux/Safeguards-SCSEM Generic-unix-linux-v115-093023.xlsx",
-    "category": "UNIX-Linux",
-    "name": "Generic unix linux v115 093023"
-  },
-  {
-    "file": "data/scsems/UNIX-Linux/Safeguards-SCSEM HPUX11i-v18-093023.xlsx",
-    "category": "UNIX-Linux",
-    "name": "HPUX11i v18 093023"
-  },
-  {
-    "file": "data/scsems/UNIX-Linux/Safeguards-SCSEM OEL-v5_0_0 - 03312025.xlsx",
-    "category": "UNIX-Linux",
-    "name": "OEL v5_0_0   03312025"
-  },
-  {
-    "file": "data/scsems/UNIX-Linux/Safeguards-SCSEM Oracle-Solaris-v4_0_0 - 05222025.xlsx",
-    "category": "UNIX-Linux",
-    "name": "Oracle Solaris v4_0_0   05222025"
-  },
-  {
-    "file": "data/scsems/UNIX-Linux/Safeguards-SCSEM Oracle_Solaris-v34-093023.xlsx",
-    "category": "UNIX-Linux",
-    "name": "Oracle_Solaris v34 093023"
-  },
-  {
-    "file": "data/scsems/UNIX-Linux/Safeguards-SCSEM Amazon Linux 2023-v1_0.xlsx",
-    "category": "UNIX-Linux",
-    "name": "Amazon Linux 2023 v1_0"
-  },
-  {
-    "file": "data/scsems/UNIX-Linux/Safeguards-SCSEM Red Hat Enterprise Linux (RHEL)-v7_02182025.xlsx",
-    "category": "UNIX-Linux",
-    "name": "Red Hat Enterprise Linux (RHEL) v7_02182025"
-  },
-  {
-    "file": "data/scsems/UNIX-Linux/Safeguards-SCSEM Rocky-v10-093023.xlsx",
-    "category": "UNIX-Linux",
-    "name": "Rocky v10 093023"
-  },
-  {
-    "file": "data/scsems/UNIX-Linux/Safeguards-SCSEM SUSE-Linux-v5_0_0 - 03312025.xlsx",
-    "category": "UNIX-Linux",
-    "name": "SUSE Linux v5_0_0   03312025"
-  },
-  {
-    "file": "data/scsems/Others/Safeguards-SCSEM Apple-iOS-iPadOS-v1_0-02212025.xlsx",
+    "id": "official-5a628c9286a98dfa5274",
+    "file": "data/scsems/current/safeguards-scsem-apple-ios-ipad-os-v1-0-02212025.xlsx",
     "category": "Others",
-    "name": "Apple iOS iPadOS v1_0 02212025"
+    "name": "Apple iOS/iPadOS v1"
   },
   {
-    "file": "data/scsems/Others/Safeguards-SCSEM Cloud-v7_0-11152024.xlsx",
+    "id": "official-4553b3aa46ae4986084a",
+    "file": "data/scsems/current/safeguards-scsem-application-v4-1.xlsx",
+    "category": "Application",
+    "name": "Generic Application v4.1"
+  },
+  {
+    "id": "official-26c788823f7e196f1315",
+    "file": "data/scsems/current/safeguards-scsem-check-point-firewall-v1-0-02202025.xlsx",
+    "category": "Network",
+    "name": "Check Point Firewall v1.0"
+  },
+  {
+    "id": "official-9680954f5f16bdc6e192",
+    "file": "data/scsems/current/safeguards-scsem-cisco-asa-firewall-v1-1-02202025.xlsx",
+    "category": "Network",
+    "name": "Cisco ASA Firewall v1.1"
+  },
+  {
+    "id": "official-a4c51058369d81b04dd2",
+    "file": "data/scsems/current/safeguard-cloud-scsem-v7-0-01152025.xlsx",
     "category": "Others",
-    "name": "Cloud v7_0 11152024"
+    "name": "safeguard cloud scsem v7 0 01152025 v7.0"
   },
   {
-    "file": "data/scsems/Others/Safeguards-SCSEM generic-os-v29-093023.xlsx",
-    "category": "Others",
-    "name": "generic os v29 093023"
-  },
-  {
-    "file": "data/scsems/Others/Safeguards-SCSEM printer-v44-093023.xlsx",
-    "category": "Others",
-    "name": "printer v44 093023"
-  },
-  {
-    "file": "data/scsems/Virtulization/Safeguards-SCSEM Generic_VDI-v18-093023.xlsx",
-    "category": "Virtulization",
-    "name": "Generic_VDI v18 093023"
-  },
-  {
-    "file": "data/scsems/Virtulization/Safeguards-SCSEM VMWare-ESXi-v5_0-0918024.xlsx",
-    "category": "Virtulization",
-    "name": "VMWare ESXi v5_0 0918024"
-  },
-  {
-    "file": "data/scsems/Containers/Safeguards-SCSEM Containers-v2--06262025.xlsx",
+    "id": "official-e56a102d9491786d3447",
+    "file": "data/scsems/current/Safeguards-SCSEM Containers-v2--06262025.xlsx",
     "category": "Containers",
-    "name": "Containers v2  06262025"
+    "name": "Containers v2.0"
   },
   {
-    "file": "data/scsems/Application/Safeguards-SCSEM Apache_Tomcat-v30-093023.xlsx",
+    "id": "official-0746d73ce6df6cf5935b",
+    "file": "data/scsems/current/safeguards-scsem-data-warehouse.xlsx",
+    "category": "Database",
+    "name": "Data Warehouse v2.8"
+  },
+  {
+    "id": "official-3575ab43155555f586ba",
+    "file": "data/scsems/current/safeguards-scsem-db2-luw-zos.xlsx",
+    "category": "Database",
+    "name": "DB2 for Linux, Unix, and Windows v1.2"
+  },
+  {
+    "id": "official-299ea982bcba40cd0d17",
+    "file": "data/scsems/current/safeguards-scsem-debian.xlsx",
+    "category": "UNIX-Linux",
+    "name": "Debian (Linux) v2.0"
+  },
+  {
+    "id": "official-d731ebafb4b9464368e0",
+    "file": "data/scsems/current/Safeguards-SCSEM-Fortigate-v10-120124.xlsx",
+    "category": "Network",
+    "name": "Fortinet Fortigate Firewall v1.0"
+  },
+  {
+    "id": "official-11993ebeac8527439411",
+    "file": "data/scsems/current/safeguards-scsem-generic-db.xlsx",
+    "category": "Database",
+    "name": "Generic Database v2.9"
+  },
+  {
+    "id": "official-658d726e6fadb25ceb98",
+    "file": "data/scsems/current/Safeguards-SCSEM Generic-Firewall-v7_0-02202025.xlsx",
+    "category": "Network",
+    "name": "Firewall v7.0"
+  },
+  {
+    "id": "official-4a8171c90775bff42ba8",
+    "file": "data/scsems/current/safeguards-scsem-generic-unix-linux.xlsx",
+    "category": "UNIX-Linux",
+    "name": "Unix/Linux v1.15"
+  },
+  {
+    "id": "official-335225ce07617d00aa13",
+    "file": "data/scsems/current/safeguards-scsem-generic-vdi.xlsx",
+    "category": "Virtualization",
+    "name": "Generic VDI Environment v1.8"
+  },
+  {
+    "id": "official-bbce4c778fb672d0e8a9",
+    "file": "data/scsems/current/safeguards-scsem-generic-web-server.xlsx",
+    "category": "Web",
+    "name": "Generic Web Server (Non-Apache 2.4 and non-IIS Web Servers) v2.9"
+  },
+  {
+    "id": "official-0f1018dfe66d6c3d859b",
+    "file": "data/scsems/current/safeguards-scsem-gentax.xlsx",
     "category": "Application",
-    "name": "Apache_Tomcat v30 093023"
+    "name": "Fast Enterprises GenTax Application v4.4"
   },
   {
-    "file": "data/scsems/Application/Safeguards-SCSEM Application-v4_0_0 - 03312025.xlsx",
-    "category": "Application",
-    "name": "Application v4_0_0   03312025"
+    "id": "official-6cecf61c875c3ca673ed",
+    "file": "data/scsems/current/safeguards-scsem-hpux11i.xlsx",
+    "category": "UNIX-Linux",
+    "name": "HP-UX 11i v1.8"
   },
   {
-    "file": "data/scsems/Application/Safeguards-SCSEM etpm-v28-093023.xlsx",
-    "category": "Application",
-    "name": "etpm v28 093023"
-  },
-  {
-    "file": "data/scsems/Application/Safeguards-SCSEM gentax-v44-093023.xlsx",
-    "category": "Application",
-    "name": "gentax v44 093023"
-  },
-  {
-    "file": "data/scsems/Application/Safeguards-SCSEM rsi-revenue-premier-v37-093023.xlsx",
-    "category": "Application",
-    "name": "rsi revenue premier v37 093023"
-  },
-  {
-    "file": "data/scsems/Application/Safeguards-SCSEM teradata-v37-093023.xlsx",
-    "category": "Application",
-    "name": "teradata v37 093023"
-  },
-  {
-    "file": "data/scsems/Mainframe/Safeguards-SCSEM ACF2-v38-093023.xlsx",
+    "id": "official-38e82f478296713e3098",
+    "file": "data/scsems/current/safeguards-scsem-ibmi-os.xlsx",
     "category": "Mainframe",
-    "name": "ACF2 v38 093023"
+    "name": "IBM i Operating System (replaces i5OS) v1.5"
   },
   {
-    "file": "data/scsems/Mainframe/Safeguards-SCSEM IBMi-OS-v15-093023.xlsx",
+    "id": "official-71e7f2f298d9fcaabf9a",
+    "file": "data/scsems/current/safeguards-scsem-macosx.xlsx",
+    "category": "MacOS",
+    "name": "Macintosh OS X 10.15, 11.0, 12.0, and 13.0. v8.0"
+  },
+  {
+    "id": "official-064f76de388b5d015e5d",
+    "file": "data/scsems/current/Safeguards-SCSEM-MOT-v6-1.xlsx",
+    "category": "MOT",
+    "name": "Management, Operational and Technical Controls v6.1"
+  },
+  {
+    "id": "official-8cbc7928bb01533bb0fe",
+    "file": "data/scsems/current/safeguards-scsem-mongodb.xlsx",
+    "category": "Database",
+    "name": "MongoDB v2.5"
+  },
+  {
+    "id": "official-a38e9da08fb6a76c6a89",
+    "file": "data/scsems/current/safeguards-scsem-mysql.xlsx",
+    "category": "Database",
+    "name": "MySQL 5.6,  5.7, and 8.0 v2.4"
+  },
+  {
+    "id": "official-376a64a06bf0de5a5c46",
+    "file": "data/scsems/current/safeguards-scsem-network-assessment-v4-0.xlsx",
+    "category": "Network",
+    "name": "Network Assessment v4.0"
+  },
+  {
+    "id": "official-f7485ed79a6d914fcd6d",
+    "file": "data/scsems/current/safeguards-scsem-printer.xlsx",
+    "category": "Others",
+    "name": "Printing v4.4"
+  },
+  {
+    "id": "official-3b6eef52cbf472c4e20c",
+    "file": "data/scsems/current/safeguards-scsem-generic-os.xlsx",
+    "category": "Others",
+    "name": "Generic Operating System v2.9"
+  },
+  {
+    "id": "official-aed0e5f86a998c6acaa8",
+    "file": "data/scsems/current/safeguards-scsem-oracle.xlsx",
+    "category": "Database",
+    "name": "Oracle 12c, 18c, and 19c v4.4"
+  },
+  {
+    "id": "official-7ea2be7512d025b1b65c",
+    "file": "data/scsems/current/safeguards-scsem-oel-v5-0-03312025.xlsx",
+    "category": "UNIX-Linux",
+    "name": "Oracle Linux (Oracle Enterprise Linux) v5.0"
+  },
+  {
+    "id": "official-9039ac9a31779fdc31d6",
+    "file": "data/scsems/current/safeguards-scsem-etpm.xlsx",
+    "category": "Application",
+    "name": "etpm v2.8"
+  },
+  {
+    "id": "official-49db7ceaa69c57ed6c64",
+    "file": "data/scsems/current/Safeguards-SCSEM Oracle-Solaris-v4_0_0 - 05222025.xlsx",
+    "category": "UNIX-Linux",
+    "name": "Oracle Solaris 10, 11.4 v4.0"
+  },
+  {
+    "id": "official-414fdf8e76d4c3bde670",
+    "file": "data/scsems/current/safeguards-scsem-palo-alto-firewall-v1.xlsx",
+    "category": "Network",
+    "name": "Palo Alto Firewall v1.0"
+  },
+  {
+    "id": "official-37f1d170120a4e54d3f0",
+    "file": "data/scsems/current/Safeguards-SCSEM Red Hat Enterprise Linux (RHEL)-v7_02182025.xlsx",
+    "category": "UNIX-Linux",
+    "name": "Red Hat Linux v7.0"
+  },
+  {
+    "id": "official-ce8fdddbcd0bc72b5cef",
+    "file": "data/scsems/current/safeguards-scsem-racf.xlsx",
     "category": "Mainframe",
-    "name": "IBMi OS v15 093023"
+    "name": "RACF v3.5"
   },
   {
-    "file": "data/scsems/Mainframe/Safeguards-SCSEM racf-v35-093023.xlsx",
+    "id": "official-acfd41815ab72d3eb67b",
+    "file": "data/scsems/current/safeguards-scsem-rocky.xlsx",
+    "category": "UNIX-Linux",
+    "name": "Rocky Rocky Linux v1.0"
+  },
+  {
+    "id": "official-1d10a031ef5771df565e",
+    "file": "data/scsems/current/safeguards-scsem-rsi-revenue-premier.xlsx",
+    "category": "Application",
+    "name": "rsi revenue premier v3.7"
+  },
+  {
+    "id": "official-a862a9b71b5727822363",
+    "file": "data/scsems/current/safeguards-microsoft-sql-server-scem-v60-08252024.xlsx",
+    "category": "Database",
+    "name": "SQL Server v6.0"
+  },
+  {
+    "id": "official-e868666306dafbc43ac6",
+    "file": "data/scsems/current/safeguards-scsem-san.xlsx",
+    "category": "Network",
+    "name": "Storage Area Network v3.3"
+  },
+  {
+    "id": "official-da689bdd8f3f04d36552",
+    "file": "data/scsems/current/safeguards-scsem-suse-linux-v5-0-03312025.xlsx",
+    "category": "UNIX-Linux",
+    "name": "SUSE Linux Enterprise Server 12, 15 v5.0"
+  },
+  {
+    "id": "official-c1f05b3c7999980edbc5",
+    "file": "data/scsems/current/safeguards-scsem-switch-router-v7-0.xlsx",
+    "category": "Network",
+    "name": "Switch Router (SR) v7.0"
+  },
+  {
+    "id": "official-929adf46c5154accffae",
+    "file": "data/scsems/current/safeguards-scsem-teradata.xlsx",
+    "category": "Application",
+    "name": "teradata v3.7"
+  },
+  {
+    "id": "official-66b006303f046d3bd02c",
+    "file": "data/scsems/current/safeguards-scsem-top-secret.xlsx",
     "category": "Mainframe",
-    "name": "racf v35 093023"
+    "name": "CA-Top Secret v3.5"
   },
   {
-    "file": "data/scsems/Mainframe/Safeguards-SCSEM top-secret-v35-093023.xlsx",
+    "id": "official-0f30b89bae46506738d3",
+    "file": "data/scsems/current/safeguards-scsem-unisys.xlsx",
     "category": "Mainframe",
-    "name": "top secret v35 093023"
+    "name": "UNISYS v3.8"
   },
   {
-    "file": "data/scsems/Mainframe/Safeguards-SCSEM unisys-v38-093023.xlsx",
-    "category": "Mainframe",
-    "name": "unisys v38 093023"
+    "id": "official-5f4be6ee77378f7e17fd",
+    "file": "data/scsems/current/safeguards-scsem-vmwareesxi-v5.xlsx",
+    "category": "Virtualization",
+    "name": "vmwareesxi v5 v5.0"
   },
   {
-    "file": "data/scsems/Windows/Safeguards-SCSEM Windows 10-v6_0-08122024.xlsx",
+    "id": "official-01393f9735d24a274808",
+    "file": "data/scsems/current/safeguards-scsem-voip-network.xlsx",
+    "category": "Network",
+    "name": "Voice Over Internet Protocol Network v2.9"
+  },
+  {
+    "id": "official-412f6f515c582d28bdcb",
+    "file": "data/scsems/current/safeguards-scsem-vpn-v3-0.xlsx",
+    "category": "Network",
+    "name": "Virtual Private Network v3.0"
+  },
+  {
+    "id": "official-8c4ad7ed2445f76d4f78",
+    "file": "data/scsems/current/safeguard-microsoft-windows-10-scsem-v60-08122024.xlsx",
     "category": "Windows",
-    "name": "Windows 10 v6_0 08122024"
+    "name": "Windows 10 v6.0"
   },
   {
-    "file": "data/scsems/Windows/Safeguards-SCSEM Windows 11-v3_0_1-03312025.xlsx",
+    "id": "official-1ed7d8f0979adbfb3dc3",
+    "file": "data/scsems/current/safeguards-scsem-microsoft-windows-11-v3-01-03312025.xlsx",
     "category": "Windows",
-    "name": "Windows 11 v3_0_1 03312025"
+    "name": "Windows 11 v3.0"
   },
   {
-    "file": "data/scsems/Windows/Safeguards-SCSEM Windows Server 2012R2-v36-093023.xlsx",
+    "id": "official-346793ee22e18b3b5ba2",
+    "file": "data/scsems/current/safeguards-scsem-win-server2012.xlsx",
     "category": "Windows",
-    "name": "Windows Server 2012R2 v36 093023"
+    "name": "Microsoft Server 2012 v3.6"
   },
   {
-    "file": "data/scsems/Windows/Safeguards-SCSEM Windows Server 2016-v3_0-08122024.xlsx",
+    "id": "official-1950a49eebca735a0f58",
+    "file": "data/scsems/current/safeguards-scsem-win-server2012r2.xlsx",
     "category": "Windows",
-    "name": "Windows Server 2016 v3_0 08122024"
+    "name": "Microsoft Server 2012R2 v3.6"
   },
   {
-    "file": "data/scsems/Windows/Safeguards-SCSEM Windows Server 2019-v2.0-07142024.xlsx",
+    "id": "official-f13e1d3c6074fb66291a",
+    "file": "data/scsems/current/safeguard-microsoft-windows-server-2016-scsem-v30-08122024.xlsx",
     "category": "Windows",
-    "name": "Windows Server 2019 v2.0 07142024"
+    "name": "Microsoft Server 2016 v3.0"
   },
   {
-    "file": "data/scsems/Windows/Safeguards-SCSEM Windows Server 2022-v2_0-08122024.xlsx",
+    "id": "official-e43942b8c598aec075f8",
+    "file": "data/scsems/current/safeguards-scsem-win-server2019-v2-point-0-10242024.xlsx",
     "category": "Windows",
-    "name": "Windows Server 2022 v2_0 08122024"
+    "name": "Microsoft Server 2019 v2.0"
+  },
+  {
+    "id": "official-305e7157181c99ca12c2",
+    "file": "data/scsems/current/safeguard-microsoft-windows-server-2022-scsem-v20-08122024.xlsx",
+    "category": "Windows",
+    "name": "Microsoft Server 2022 v2.0"
+  },
+  {
+    "id": "official-a139c9d0ce80a08f36cd",
+    "file": "data/scsems/current/safeguards-scsem-windows-server-2025-v1-0.xlsx",
+    "category": "Windows",
+    "name": "Microsoft Server 2025 v1.0"
+  },
+  {
+    "id": "official-10952ff5c5a76a8da6e3",
+    "file": "data/scsems/current/safeguards-scsem-wireless-networking.xlsx",
+    "category": "Network",
+    "name": "Wireless Networking v2.9"
   }
 ]

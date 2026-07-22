@@ -28,10 +28,27 @@ export function isAdminRole(role?: string | null): boolean {
   return role === ADMIN_ROLE;
 }
 
+export function isScsemStewardRole(role?: string | null): boolean {
+  return role === ADMIN_ROLE || role === COMPUTER_SECURITY_REVIEW_ROLE;
+}
+
 export function canAccessPath(role: string | undefined | null, pathname: string): boolean {
   if (isAdminRole(role)) return true;
 
   if (pathname === "/") return true;
+
+  if (pathname === "/api/account/password") return true;
+
+  if (
+    pathname === "/scsems" ||
+    pathname.startsWith("/scsems/") ||
+    pathname === "/api/scsems" ||
+    pathname.startsWith("/api/scsems/") ||
+    pathname === "/api/scsem-updater" ||
+    pathname.startsWith("/api/scsem-updater/")
+  ) {
+    return isScsemStewardRole(role);
+  }
 
   return LIMITED_ACCESS_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)

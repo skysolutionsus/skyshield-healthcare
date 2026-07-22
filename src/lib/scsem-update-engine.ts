@@ -171,6 +171,8 @@ export function buildComparisonCandidates(
 ): {
     updateCandidates: Array<{ control: SCSEMControlEvidence; recommendation: CISBenchmarkRecommendation; score: number }>;
     newControlCandidates: CISBenchmarkRecommendation[];
+    totalUpdateCandidates: number;
+    totalNewControlCandidates: number;
 } {
     const maxUpdateCandidates = options.maxUpdateCandidates ?? 10;
     const maxNewControlCandidates = options.maxNewControlCandidates ?? 10;
@@ -216,6 +218,8 @@ export function buildComparisonCandidates(
     return {
         updateCandidates: updateCandidates.slice(0, maxUpdateCandidates),
         newControlCandidates: newControlCandidates.slice(0, maxNewControlCandidates),
+        totalUpdateCandidates: updateCandidates.length,
+        totalNewControlCandidates: newControlCandidates.length,
     };
 }
 
@@ -325,26 +329,48 @@ function insertMissingCommasBetweenObjects(jsonText: string): string {
 }
 
 export function validateChanges(rawChanges: any[], controls: SCSEMControlEvidence[], maxChanges = 8): any[] {
-    const existingTestIds = new Set(controls.map((control) => control.testId));
-    const controlByTestId = new Map(controls.map((control) => [control.testId, control]));
+    const controlsByTestId = new Map<string, SCSEMControlEvidence[]>();
+    for (const control of controls) {
+        controlsByTestId.set(control.testId, [
+            ...(controlsByTestId.get(control.testId) || []),
+            control,
+        ]);
+    }
 
     return rawChanges
         .filter((change) => change && typeof change === "object")
         .map((change) => {
             const action = change.action === "addControl" ? "addControl" : "updateField";
-            const control = action === "updateField" ? controlByTestId.get(change.testId) : undefined;
+            if (action === "addControl") return { ...change, action };
+
+            const requestedSheet = typeof change.targetSheet === "string" && change.targetSheet.trim()
+                ? change.targetSheet.trim()
+                : typeof change.sourceEvidence?.sourceSheet === "string" && change.sourceEvidence.sourceSheet.trim()
+                    ? change.sourceEvidence.sourceSheet.trim()
+                    : null;
+            const matches = (controlsByTestId.get(String(change.testId || "")) || [])
+                .filter((control) => !requestedSheet || control.sourceSheet === requestedSheet);
+            // Duplicate Test IDs are common across provider/version tabs. Never
+            // bind a model proposal to the first matching ID or repair a wrong
+            // sheet guess silently.
+            if (matches.length !== 1) return null;
+            const control = matches[0];
+            const field = String(change.field || "");
+
             return {
                 ...change,
                 action,
-                targetSheet: change.targetSheet || change.sourceEvidence?.sourceSheet || control?.sourceSheet,
+                testId: control.testId,
+                field,
+                targetSheet: control.sourceSheet,
+                currentValue: String((control as unknown as Record<string, unknown>)[field] || ""),
                 sourceEvidence: {
                     ...(change.sourceEvidence || {}),
-                    ...(control?.sourceSheet && !change.sourceEvidence?.sourceSheet
-                        ? { sourceSheet: control.sourceSheet }
-                        : {}),
+                    sourceSheet: control.sourceSheet,
                 },
             };
         })
+        .filter((change): change is Record<string, any> => Boolean(change))
         .filter((change) => {
             if (change.action === "addControl") {
                 return Boolean(
@@ -353,13 +379,9 @@ export function validateChanges(rawChanges: any[], controls: SCSEMControlEvidenc
                 );
             }
 
-            const control = controlByTestId.get(change.testId);
-            const currentValue = control ? String((control as any)[change.field] || "") : "";
-
-            return existingTestIds.has(change.testId) &&
-                ALLOWED_UPDATE_FIELDS.has(change.field) &&
+            return ALLOWED_UPDATE_FIELDS.has(change.field) &&
                 typeof change.proposedValue === "string" &&
-                isMaterialTextDelta(currentValue, change.proposedValue);
+                isMaterialTextDelta(change.currentValue, change.proposedValue);
         })
         .slice(0, maxChanges);
 }

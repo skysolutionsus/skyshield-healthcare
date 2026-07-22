@@ -1,12 +1,25 @@
 import * as fs from "fs";
 import * as path from "path";
+import { createHash } from "node:crypto";
+import { fileURLToPath } from "node:url";
 
+const DEFAULT_SOURCE_COMMIT = "78650f02ad9321bb7b817846f8fbd4f2bcd620de";
 const DEFAULT_SOURCE_URL =
-    "https://raw.githubusercontent.com/usnistgov/oscal-content/main/nist.gov/SP800-53/rev5/json/NIST_SP-800-53_rev5_catalog.json";
+    `https://raw.githubusercontent.com/usnistgov/oscal-content/${DEFAULT_SOURCE_COMMIT}/nist.gov/SP800-53/rev5/json/NIST_SP-800-53_rev5_catalog.json`;
+
+type OscalProp = {
+    name?: string;
+    value?: string;
+    class?: string;
+    ns?: string;
+};
 
 type OscalPart = {
+    id?: string;
     name?: string;
+    title?: string;
     prose?: string;
+    props?: OscalProp[];
     parts?: OscalPart[];
 };
 
@@ -20,6 +33,33 @@ type OscalControl = {
     }>;
     parts?: OscalPart[];
     controls?: OscalControl[];
+};
+
+export type NormalizedAssessmentObjective = {
+    id: string;
+    label: string;
+    text: string;
+    children: NormalizedAssessmentObjective[];
+};
+
+export type NormalizedAssessmentMethod = {
+    id: string;
+    label: string;
+    method: string;
+    assessmentObjects: Array<{
+        id: string;
+        title: string;
+        text: string;
+    }>;
+};
+
+export type NormalizedNistControl = {
+    id: string;
+    title: string;
+    statement: string;
+    guidance: string;
+    assessmentObjectives: NormalizedAssessmentObjective[];
+    assessmentMethods: NormalizedAssessmentMethod[];
 };
 
 function normalizeControlId(value: string): string {
@@ -66,25 +106,98 @@ function textForPart(control: OscalControl, partName: string): string {
     return part ? compactText(flattenPart(part, control).join(" ")) : "";
 }
 
-function normalizeControls(controls: OscalControl[]): Array<{
-    id: string;
-    title: string;
-    statement: string;
-    guidance: string;
-}> {
+function propertyValue(part: OscalPart, propertyName: string): string {
+    return compactText(
+        part.props?.find((property) => property.name === propertyName)?.value || ""
+    );
+}
+
+function normalizeAssessmentObjective(
+    part: OscalPart,
+    control: OscalControl
+): NormalizedAssessmentObjective {
+    return {
+        id: part.id || "",
+        label: propertyValue(part, "label"),
+        text: compactText(resolveParameters(part.prose || "", control)),
+        children: (part.parts || [])
+            .filter((child) => child.name === "assessment-objective")
+            .map((child) => normalizeAssessmentObjective(child, control)),
+    };
+}
+
+function normalizeAssessmentMethod(
+    part: OscalPart,
+    control: OscalControl
+): NormalizedAssessmentMethod {
+    return {
+        id: part.id || "",
+        label: propertyValue(part, "label"),
+        method: propertyValue(part, "method").toUpperCase(),
+        assessmentObjects: (part.parts || [])
+            .filter((child) => child.name === "assessment-objects")
+            .map((child) => ({
+                id: child.id || "",
+                title: compactText(child.title || ""),
+                text: compactText(flattenPart(child, control).join(" ")),
+            })),
+    };
+}
+
+export function normalizeOscalControls(controls: OscalControl[]): NormalizedNistControl[] {
     return controls.flatMap((control) => [
         {
             id: normalizeControlId(control.id),
             title: compactText(control.title || ""),
             statement: textForPart(control, "statement"),
             guidance: textForPart(control, "guidance"),
+            assessmentObjectives: (control.parts || [])
+                .filter((part) => part.name === "assessment-objective")
+                .map((part) => normalizeAssessmentObjective(part, control)),
+            assessmentMethods: (control.parts || [])
+                .filter((part) => part.name === "assessment-method")
+                .map((part) => normalizeAssessmentMethod(part, control)),
         },
-        ...normalizeControls(control.controls || []),
+        ...normalizeOscalControls(control.controls || []),
     ]);
 }
 
+export function resolveNistSourceConfig(
+    environment: Record<string, string | undefined> = process.env
+): { sourceUrl: string; sourceCommit: string; expectedSha256: string } {
+    const sourceUrl = environment.NIST_80053_OSCAL_URL?.trim() || DEFAULT_SOURCE_URL;
+    const embeddedCommit = sourceUrl.match(
+        /raw\.githubusercontent\.com\/usnistgov\/oscal-content\/([0-9a-f]{40})\//i
+    )?.[1]?.toLowerCase();
+    const declaredCommit = environment.NIST_80053_OSCAL_COMMIT?.trim().toLowerCase();
+    const sourceCommit = declaredCommit || embeddedCommit || "";
+
+    if (!/^[0-9a-f]{40}$/.test(sourceCommit)) {
+        throw new Error(
+            "NIST OSCAL synchronization requires an immutable 40-character source commit. " +
+            "Use a commit-pinned NIST_80053_OSCAL_URL or set NIST_80053_OSCAL_COMMIT."
+        );
+    }
+    if (embeddedCommit && embeddedCommit !== sourceCommit) {
+        throw new Error(
+            `NIST OSCAL source commit mismatch: URL contains ${embeddedCommit}, ` +
+            `but metadata declares ${sourceCommit}.`
+        );
+    }
+    if (/raw\.githubusercontent\.com\/usnistgov\/oscal-content\//i.test(sourceUrl) && !embeddedCommit) {
+        throw new Error("NIST OSCAL GitHub URLs must contain a full immutable commit, not a branch name.");
+    }
+
+    const expectedSha256 = environment.NIST_80053_OSCAL_SHA256?.trim().toLowerCase() || "";
+    if (expectedSha256 && !/^[0-9a-f]{64}$/.test(expectedSha256)) {
+        throw new Error("NIST_80053_OSCAL_SHA256 must be a 64-character SHA-256 digest.");
+    }
+
+    return { sourceUrl, sourceCommit, expectedSha256 };
+}
+
 async function main() {
-    const sourceUrl = process.env.NIST_80053_OSCAL_URL || DEFAULT_SOURCE_URL;
+    const { sourceUrl, sourceCommit, expectedSha256 } = resolveNistSourceConfig();
     const response = await fetch(sourceUrl, {
         headers: { Accept: "application/json" },
     });
@@ -92,13 +205,21 @@ async function main() {
         throw new Error(`NIST OSCAL download failed (${response.status} ${response.statusText}).`);
     }
 
-    const source = await response.json() as any;
+    const sourceBody = await response.text();
+    const sourceSha256 = createHash("sha256").update(sourceBody).digest("hex");
+    if (expectedSha256 && sourceSha256 !== expectedSha256) {
+        throw new Error(
+            `NIST OSCAL SHA-256 mismatch: expected ${expectedSha256}, received ${sourceSha256}.`
+        );
+    }
+
+    const source = JSON.parse(sourceBody) as any;
     const catalog = source?.catalog;
     if (!catalog?.metadata || !Array.isArray(catalog.groups)) {
         throw new Error("NIST OSCAL response did not contain a control catalog.");
     }
 
-    const controls = normalizeControls(
+    const controls = normalizeOscalControls(
         catalog.groups.flatMap((group: { controls?: OscalControl[] }) => group.controls || [])
     ).filter((control) => control.id && control.title && control.statement);
 
@@ -107,6 +228,8 @@ async function main() {
         version: catalog.metadata.version,
         lastModified: catalog.metadata["last-modified"],
         sourceUrl,
+        sourceCommit,
+        sourceSha256,
         publicationUrl: "https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final",
         generatedAt: new Date().toISOString(),
         controls,
@@ -123,7 +246,10 @@ async function main() {
     console.log(`Wrote ${controls.length} NIST SP 800-53 controls to ${outputPath}`);
 }
 
-main().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-});
+const invokedPath = process.argv[1] ? path.resolve(process.argv[1]) : "";
+if (invokedPath === fileURLToPath(import.meta.url)) {
+    main().catch((error) => {
+        console.error(error);
+        process.exitCode = 1;
+    });
+}

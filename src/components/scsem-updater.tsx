@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
     AlertCircle,
     CheckCircle2,
@@ -18,126 +18,13 @@ import {
     XCircle,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
+import type {
+    SCSEMUpdaterClientAuditSource as AuditSource,
+    SCSEMUpdaterClientChange as UpdaterChange,
+    SCSEMUpdaterClientSession as UpdaterSession,
+} from "@/lib/scsem-updater-client-session";
 
 type ChangeStatus = "PENDING" | "APPROVED" | "REJECTED";
-
-interface UpdaterChange {
-    id: string;
-    status: ChangeStatus;
-    action: "updateField" | "addControl";
-    testId: string;
-    field: string;
-    currentValue: string;
-    proposedValue: string;
-    reason: string;
-    confidence?: string;
-    targetSheet?: string;
-    sourceEvidence?: Record<string, unknown> | null;
-    newControl?: {
-        nistId?: string | null;
-        nistControlName?: string | null;
-        testMethod?: string | null;
-        sectionTitle?: string | null;
-        description?: string | null;
-        testProcedures?: string | null;
-        expectedResults?: string | null;
-        criticality?: string | null;
-        cisBenchmarkRef?: string | null;
-        recommendationNum?: string | null;
-        rationale?: string | null;
-        impact?: string | null;
-        remediationProcedure?: string | null;
-    };
-}
-
-interface AuditSource {
-    sourceKind?: "CIS" | "STIG";
-    sourceRelationship?: "direct" | "adjacent";
-    workbenchId: number;
-    benchmarkTitle: string;
-    benchmarkVersion: string;
-    releaseDate: string;
-    excelTitle: string;
-    excelFileName: string;
-    filePath: string;
-    sha256: string;
-    selectedProfile?: string | null;
-    sharedRecommendationCount?: number;
-    selectedProfileRecommendationCount?: number;
-    matchedSheets?: string[];
-    matchQuery?: string;
-    adjacentCategory?: string;
-    adjacentRationale?: string;
-}
-
-interface UpdaterSession {
-    id: string;
-    originalFileName: string;
-    uploadedAt: string;
-    inferredTechnology: string;
-    technologyInference?: {
-        source: "content" | "subject" | "filename" | "fallback";
-        confidence: "high" | "medium" | "low";
-        signals: string[];
-    };
-    status: "uploaded" | "analyzing" | "review_ready" | "error";
-    summary?: string;
-    error?: string;
-    scsem: {
-        subject: string | null;
-        version: string | null;
-        effectiveDate: string | null;
-        totalControls: number;
-        testCaseSheets: string[];
-    };
-    changes: UpdaterChange[];
-    history: Array<{
-        action: string;
-        changeId?: string;
-        previousStatus?: ChangeStatus;
-        nextStatus?: ChangeStatus;
-    }>;
-    audit: {
-        uploadedSha256: string;
-        uploadedSizeBytes: number;
-        pub1075Version?: string;
-        nistVersion?: string;
-        nistSourceUrl?: string;
-        complianceCoverage?: {
-            requested: number;
-            pub1075: number;
-            nistFallback: number;
-            uncovered: number;
-        };
-        benchmarkLookupError?: string;
-        benchmarkResolution?: Array<{
-            kind: "CIS" | "STIG";
-            query: string;
-            sheetName: string;
-            catalogCandidateCount: number;
-            attempts: Array<{
-                benchmarkTitle: string;
-                benchmarkVersion: string;
-                outcome: string;
-                reason: string;
-            }>;
-        }>;
-        officialReference?: {
-            sourceUrl: string;
-            workbookVersion: string | null;
-            workbookEffectiveDate: string | null;
-            irsEffectiveDate: string;
-            addedSheets: string[];
-            selectedAsBase: boolean;
-            upgradeReason: string | null;
-        } | null;
-        cis?: AuditSource | null;
-        stig?: AuditSource | null;
-        cisSources?: AuditSource[];
-        stigSources?: AuditSource[];
-        adjacentSources?: AuditSource[];
-    };
-}
 
 const FIELD_LABELS: Record<string, string> = {
     testProcedures: "Test Procedures",
@@ -156,6 +43,94 @@ const STATUS_STYLES: Record<ChangeStatus, string> = {
     APPROVED: "bg-emerald-500/10 text-emerald-300 border-emerald-500/25",
     REJECTED: "bg-red-500/10 text-red-300 border-red-500/25",
 };
+
+const MAX_ANALYSIS_LEASE_MS = 6 * 60 * 60 * 1000;
+const LEASE_TIMER_GRACE_MS = 100;
+
+type AnalysisLeaseViewState = "none" | "checking" | "fresh" | "stale";
+
+export function scsemAnalysisLeaseViewState(
+    session: Pick<
+        UpdaterSession,
+        "status" | "analysisLeasePresent" | "analysisStartedAt" | "analysisLeaseExpiresAt"
+    > | null,
+    nowMs: number | null,
+    serverRetryNotBeforeMs: number | null = null
+): {
+    state: AnalysisLeaseViewState;
+    expiresAtMs: number | null;
+    retryAfterMs: number;
+    invalid: boolean;
+} {
+    if (session?.status !== "analyzing") {
+        return { state: "none", expiresAtMs: null, retryAfterMs: 0, invalid: false };
+    }
+    if (nowMs === null) {
+        return { state: "checking", expiresAtMs: null, retryAfterMs: 0, invalid: false };
+    }
+
+    const startedAtMs = Date.parse(session.analysisStartedAt || "");
+    const expiresAtMs = Date.parse(session.analysisLeaseExpiresAt || "");
+    const metadataValid = Boolean(
+        session.analysisLeasePresent &&
+        Number.isFinite(startedAtMs) &&
+        Number.isFinite(expiresAtMs) &&
+        startedAtMs <= nowMs &&
+        expiresAtMs > startedAtMs &&
+        expiresAtMs - startedAtMs <= MAX_ANALYSIS_LEASE_MS
+    );
+    const boundedServerRetryMs = Number.isFinite(serverRetryNotBeforeMs)
+        ? Math.min(
+            Math.max((serverRetryNotBeforeMs as number) - nowMs, 0),
+            MAX_ANALYSIS_LEASE_MS
+        )
+        : 0;
+    const persistedRetryMs = metadataValid
+        ? Math.min(Math.max(expiresAtMs - nowMs, 0), MAX_ANALYSIS_LEASE_MS)
+        : 0;
+    const retryAfterMs = Math.max(boundedServerRetryMs, persistedRetryMs);
+
+    if (retryAfterMs > 0) {
+        return {
+            state: "fresh",
+            expiresAtMs: metadataValid ? expiresAtMs : null,
+            retryAfterMs,
+            invalid: !metadataValid,
+        };
+    }
+    return {
+        state: "stale",
+        expiresAtMs: metadataValid ? expiresAtMs : null,
+        retryAfterMs: 0,
+        invalid: !metadataValid,
+    };
+}
+
+function formatLeaseDeadline(expiresAtMs: number): string {
+    return new Date(expiresAtMs)
+        .toISOString()
+        .replace("T", " ")
+        .replace(/\.\d{3}Z$/, " UTC");
+}
+
+function formatRetryWindow(milliseconds: number): string {
+    const minutes = Math.max(1, Math.ceil(milliseconds / 60_000));
+    if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return remainingMinutes === 0
+        ? `${hours} hour${hours === 1 ? "" : "s"}`
+        : `${hours}h ${remainingMinutes}m`;
+}
+
+function supplementalComparisonLabel(
+    mode: "ai" | "deterministic_fallback" | "no_delta" | "failed"
+): string {
+    if (mode === "ai") return "AI evidence comparison";
+    if (mode === "deterministic_fallback") return "Deterministic evidence comparison";
+    if (mode === "no_delta") return "Direct sources checked — no material delta";
+    return "Supplemental comparison failed or unavailable";
+}
 
 async function readApiJson<T>(res: Response, fallbackMessage: string): Promise<T> {
     const text = await res.text();
@@ -178,6 +153,26 @@ async function readApiJson<T>(res: Response, fallbackMessage: string): Promise<T
     }
 }
 
+function safeExportFileName(contentDisposition: string | null, fallback: string): string {
+    const encoded = contentDisposition?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+    const quoted = contentDisposition?.match(/filename="([^"]+)"/i)?.[1];
+    let candidate = quoted || fallback;
+    if (encoded) {
+        try {
+            candidate = decodeURIComponent(encoded);
+        } catch {
+            candidate = quoted || fallback;
+        }
+    }
+
+    const sanitized = candidate
+        .replace(/[\u0000-\u001f\u007f"/\\:]+/g, "-")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 180);
+    return sanitized || fallback;
+}
+
 export function SCSEMUpdater() {
     const inputRef = useRef<HTMLInputElement | null>(null);
     const [session, setSession] = useState<UpdaterSession | null>(null);
@@ -185,6 +180,64 @@ export function SCSEMUpdater() {
     const [dragActive, setDragActive] = useState(false);
     const [busy, setBusy] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [leaseClockMs, setLeaseClockMs] = useState<number | null>(null);
+    const [analysisRetryNotBeforeMs, setAnalysisRetryNotBeforeMs] = useState<number | null>(null);
+
+    const sessionStatus = session?.status || null;
+    const analysisLeasePresent = session?.analysisLeasePresent || false;
+    const analysisStartedAt = session?.analysisStartedAt || null;
+    const analysisLeaseExpiresAt = session?.analysisLeaseExpiresAt || null;
+
+    useEffect(() => {
+        if (sessionStatus !== "analyzing") {
+            setLeaseClockMs(null);
+            setAnalysisRetryNotBeforeMs(null);
+            return;
+        }
+
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+        let cancelled = false;
+        const refreshAtLeaseBoundary = () => {
+            if (cancelled) return;
+            const nowMs = Date.now();
+            setLeaseClockMs(nowMs);
+            const view = scsemAnalysisLeaseViewState({
+                status: "analyzing",
+                analysisLeasePresent,
+                analysisStartedAt: analysisStartedAt || undefined,
+                analysisLeaseExpiresAt: analysisLeaseExpiresAt || undefined,
+            }, nowMs, analysisRetryNotBeforeMs);
+            if (view.state === "fresh") {
+                timeoutId = setTimeout(
+                    refreshAtLeaseBoundary,
+                    Math.max(1, view.retryAfterMs + LEASE_TIMER_GRACE_MS)
+                );
+            }
+        };
+
+        refreshAtLeaseBoundary();
+        return () => {
+            cancelled = true;
+            if (timeoutId !== null) clearTimeout(timeoutId);
+        };
+    }, [
+        sessionStatus,
+        analysisLeasePresent,
+        analysisStartedAt,
+        analysisLeaseExpiresAt,
+        analysisRetryNotBeforeMs,
+    ]);
+
+    const analysisLeaseView = scsemAnalysisLeaseViewState(
+        session,
+        leaseClockMs,
+        analysisRetryNotBeforeMs
+    );
+    const analysisBusy = busy === "analyze" || busy === "recover-analysis";
+    const staleAnalysisRecoverable = sessionStatus === "analyzing" &&
+        analysisLeaseView.state === "stale";
+    const activeAnalysisProtected = sessionStatus === "analyzing" &&
+        analysisLeaseView.state !== "stale";
 
     const counts = useMemo(() => {
         const base = { pending: 0, approved: 0, rejected: 0 };
@@ -237,6 +290,69 @@ export function SCSEMUpdater() {
             : null;
     }, [session]);
 
+    async function reloadLatestSession(sessionId: string): Promise<boolean> {
+        const latestResponse = await fetch(`/api/scsem-updater/${sessionId}`, {
+            cache: "no-store",
+        });
+        const latest = await readApiJson<{ session?: UpdaterSession }>(
+            latestResponse,
+            "Could not reload the latest SCSEM session"
+        );
+        if (!latestResponse.ok || !latest.session) return false;
+        setSession(latest.session);
+        setAnalysisRetryNotBeforeMs(null);
+        return true;
+    }
+
+    async function throwMutationError(
+        res: Response,
+        data: {
+            error?: string;
+            code?: string;
+            retryAfterMs?: number;
+            analysisLeaseExpiresAt?: string;
+        },
+        fallback: string,
+        sessionId: string
+    ): Promise<never> {
+        if (res.status === 409 && data.code === "SCSEM_SESSION_CONFLICT") {
+            try {
+                await reloadLatestSession(sessionId);
+            } catch {
+                // Keep the conflict visible even if the convenience reload fails.
+            }
+            const conflict = new Error(
+                `${data.error || fallback} The latest saved session was reloaded when available.`
+            );
+            conflict.name = "SCSEM_SESSION_CONFLICT";
+            throw conflict;
+        }
+        if (res.status === 409 && data.code === "SCSEM_ANALYSIS_ALREADY_RUNNING") {
+            const retryAfterMs = Number.isFinite(data.retryAfterMs) && Number(data.retryAfterMs) > 0
+                ? Math.min(Number(data.retryAfterMs), MAX_ANALYSIS_LEASE_MS)
+                : 60_000;
+            const nowMs = Date.now();
+            setLeaseClockMs(nowMs);
+            setAnalysisRetryNotBeforeMs(nowMs + retryAfterMs);
+            if (data.analysisLeaseExpiresAt) {
+                setSession((current) => current?.id === sessionId
+                    ? {
+                        ...current,
+                        status: "analyzing",
+                        analysisLeaseExpiresAt: data.analysisLeaseExpiresAt,
+                    }
+                    : current
+                );
+            }
+            const activeLease = new Error(
+                `${data.error || fallback} Retry after the active server lease expires.`
+            );
+            activeLease.name = "SCSEM_ANALYSIS_ALREADY_RUNNING";
+            throw activeLease;
+        }
+        throw new Error(data.error || fallback);
+    }
+
     async function uploadFile(file: File) {
         setBusy("upload");
         setError(null);
@@ -260,20 +376,38 @@ export function SCSEMUpdater() {
 
     async function runAnalysis() {
         if (!session) return;
-        setBusy("analyze");
+        const recoveringStaleLease = staleAnalysisRecoverable;
+        setBusy(recoveringStaleLease ? "recover-analysis" : "analyze");
         setError(null);
-        setSession({ ...session, status: "analyzing" });
         try {
             const res = await fetch(`/api/scsem-updater/${session.id}/analyze`, {
                 method: "POST",
+                headers: { "If-Match": `"${session.revision}"` },
             });
-            const data = await readApiJson<{ error?: string; session: UpdaterSession }>(res, "Analysis failed");
-            if (!res.ok) throw new Error(data.error || "Analysis failed.");
+            const data = await readApiJson<{
+                error?: string;
+                code?: string;
+                retryAfterMs?: number;
+                analysisLeaseExpiresAt?: string;
+                session?: UpdaterSession;
+            }>(res, "Analysis failed");
+            if (!res.ok) await throwMutationError(res, data, "Analysis failed.", session.id);
+            if (!data.session) throw new Error("Analysis completed without returning the updated session.");
+            setAnalysisRetryNotBeforeMs(null);
             setSession(data.session);
             setExpandedChangeId(data.session?.changes?.[0]?.id || null);
         } catch (err: any) {
             setError(err.message || "Analysis failed.");
-            setSession((current) => current ? { ...current, status: "error", error: err.message } : current);
+            if (
+                err.name !== "SCSEM_SESSION_CONFLICT" &&
+                err.name !== "SCSEM_ANALYSIS_ALREADY_RUNNING"
+            ) {
+                try {
+                    await reloadLatestSession(session.id);
+                } catch {
+                    // Preserve the last canonical client snapshot if reload is unavailable.
+                }
+            }
         } finally {
             setBusy(null);
         }
@@ -284,13 +418,22 @@ export function SCSEMUpdater() {
         setBusy(`${status || "save"}:${changeId}`);
         setError(null);
         try {
+            const editableChange = change
+                ? {
+                    proposedValue: change.proposedValue,
+                    ...(change.newControl ? { newControl: change.newControl } : {}),
+                }
+                : undefined;
             const res = await fetch(`/api/scsem-updater/${session.id}/changes`, {
                 method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ changeId, status, change }),
+                headers: {
+                    "Content-Type": "application/json",
+                    "If-Match": `"${session.revision}"`,
+                },
+                body: JSON.stringify({ changeId, status, change: editableChange }),
             });
-            const data = await readApiJson<{ error?: string; session: UpdaterSession }>(res, "Could not update change");
-            if (!res.ok) throw new Error(data.error || "Could not update change.");
+            const data = await readApiJson<{ error?: string; code?: string; session: UpdaterSession }>(res, "Could not update change");
+            if (!res.ok) await throwMutationError(res, data, "Could not update change.", session.id);
             setSession(data.session);
         } catch (err: any) {
             setError(err.message || "Could not update change.");
@@ -311,11 +454,14 @@ export function SCSEMUpdater() {
         try {
             const res = await fetch(`/api/scsem-updater/${session.id}/changes`, {
                 method: "PATCH",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    "If-Match": `"${session.revision}"`,
+                },
                 body: JSON.stringify({ changeIds: pendingIds, status }),
             });
-            const data = await readApiJson<{ error?: string; session: UpdaterSession }>(res, "Could not update changes");
-            if (!res.ok) throw new Error(data.error || "Could not update changes.");
+            const data = await readApiJson<{ error?: string; code?: string; session: UpdaterSession }>(res, "Could not update changes");
+            if (!res.ok) await throwMutationError(res, data, "Could not update changes.", session.id);
             setSession(data.session);
         } catch (err: any) {
             setError(err.message || "Could not update changes.");
@@ -331,12 +477,76 @@ export function SCSEMUpdater() {
         try {
             const res = await fetch(`/api/scsem-updater/${session.id}/undo`, {
                 method: "POST",
+                headers: { "If-Match": `"${session.revision}"` },
             });
-            const data = await readApiJson<{ error?: string; session: UpdaterSession }>(res, "Could not undo review action");
-            if (!res.ok) throw new Error(data.error || "Could not undo review action.");
+            const data = await readApiJson<{ error?: string; code?: string; session: UpdaterSession }>(res, "Could not undo review action");
+            if (!res.ok) await throwMutationError(res, data, "Could not undo review action.", session.id);
             setSession(data.session);
         } catch (err: any) {
             setError(err.message || "Could not undo review action.");
+        } finally {
+            setBusy(null);
+        }
+    }
+
+    async function exportCandidate() {
+        if (!session) return;
+        setBusy("export");
+        setError(null);
+        try {
+            const suffix = session.status === "analysis_incomplete"
+                ? "?draft=1"
+                : "";
+            const res = await fetch(`/api/scsem-updater/${session.id}/export${suffix}`, {
+                headers: { "If-Match": `"${session.revision}"` },
+                cache: "no-store",
+            });
+            if (!res.ok) {
+                const data = await readApiJson<{ error?: string; code?: string }>(
+                    res,
+                    "Could not export the candidate workbook"
+                );
+                await throwMutationError(
+                    res,
+                    data,
+                    "Could not export the candidate workbook.",
+                    session.id
+                );
+            }
+
+            const exportedRevisionHeader = res.headers.get("X-SCSEM-Revision");
+            const exportedRevision = exportedRevisionHeader === null
+                ? Number.NaN
+                : Number(exportedRevisionHeader);
+            if (!Number.isSafeInteger(exportedRevision) || exportedRevision !== session.revision) {
+                throw new Error(
+                    "The export response did not match the reviewed session revision. Reload the session and retry."
+                );
+            }
+
+            const fallbackName = session.originalFileName.replace(
+                /(\.xlsx|\.xlsm)$/i,
+                session.status === "analysis_incomplete"
+                    ? "-updated-DRAFT-INCOMPLETE$1"
+                    : "-updated-CANDIDATE$1"
+            );
+            const fileName = safeExportFileName(
+                res.headers.get("Content-Disposition"),
+                fallbackName
+            );
+            const blob = await res.blob();
+            const downloadUrl = URL.createObjectURL(blob);
+            const anchor = document.createElement("a");
+            anchor.href = downloadUrl;
+            anchor.download = fileName;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
+        } catch (err: unknown) {
+            setError(err instanceof Error
+                ? err.message
+                : "Could not export the candidate workbook.");
         } finally {
             setBusy(null);
         }
@@ -385,13 +595,32 @@ export function SCSEMUpdater() {
         if (file) void uploadFile(file);
     }
 
+    const analysisButtonLabel = analysisBusy
+        ? busy === "recover-analysis"
+            ? "Recovering analysis…"
+            : "Generating candidate updates…"
+        : staleAnalysisRecoverable
+            ? "Recover stale analysis"
+            : activeAnalysisProtected
+                ? "Analysis in progress"
+                : "Generate Candidate Updates";
+    const leaseDeadlineLabel = analysisLeaseView.expiresAtMs === null
+        ? null
+        : formatLeaseDeadline(analysisLeaseView.expiresAtMs);
+    const leaseRetryWindow = analysisLeaseView.retryAfterMs > 0
+        ? formatRetryWindow(analysisLeaseView.retryAfterMs)
+        : null;
+
     return (
         <div className="p-6 lg:p-8 max-w-7xl mx-auto">
             <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-white">SCSEM Updater</h1>
                     <p className="mt-1 text-sm text-[var(--sky-text-secondary)]">
-                        Upload an IRS Safeguards SCSEM workbook, review benchmark-driven changes, and export the approved XLSX.
+                        Internal Office of Safeguards workspace for drafting canonical SCSEM template updates. This is not an agency assessment or compliance-certification tool.
+                    </p>
+                    <p className="mt-2 max-w-4xl text-xs leading-5 text-[var(--sky-text-muted)]">
+                        Start from a pinned official IRS source, review every candidate change and unresolved source condition, then export a candidate workbook for separate quality-control and release approval.
                     </p>
                 </div>
                 {session && (
@@ -404,13 +633,16 @@ export function SCSEMUpdater() {
                             {busy === "undo" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
                             Undo
                         </button>
-                        <a
-                            href={`/api/scsem-updater/${session.id}/export`}
-                            className="inline-flex items-center gap-2 rounded-lg bg-[var(--sky-royal)] px-3 py-2 text-sm font-medium text-white transition hover:bg-[var(--sky-blue)]"
+                        <button
+                            onClick={() => void exportCandidate()}
+                            disabled={Boolean(busy)}
+                            className="inline-flex items-center gap-2 rounded-lg bg-[var(--sky-royal)] px-3 py-2 text-sm font-medium text-white transition hover:bg-[var(--sky-blue)] disabled:opacity-50"
                         >
-                            <Download className="h-4 w-4" />
-                            Export Updated XLSX
-                        </a>
+                            {busy === "export"
+                                ? <Loader2 className="h-4 w-4 animate-spin" />
+                                : <Download className="h-4 w-4" />}
+                            {session.status === "analysis_incomplete" ? "Export Incomplete Draft XLSX" : "Export Candidate XLSX"}
+                        </button>
                     </div>
                 )}
             </div>
@@ -440,12 +672,12 @@ export function SCSEMUpdater() {
                     </div>
                     <div>
                         <p className="text-sm font-semibold text-white">
-                            {session ? session.originalFileName : "Drop IRS SCSEM workbook"}
+                            {session ? session.originalFileName : "Drop official IRS SCSEM template"}
                         </p>
                         <p className="mt-1 text-xs text-[var(--sky-text-muted)]">
                             {session
                                 ? `${session.inferredTechnology} - ${session.scsem.totalControls} controls`
-                                : "Safeguards-SCSEM XLSX"}
+                                : "Pinned Safeguards-SCSEM XLSX source only"}
                         </p>
                     </div>
                     <input
@@ -465,7 +697,7 @@ export function SCSEMUpdater() {
                         className="inline-flex items-center gap-2 rounded-lg bg-[var(--sky-royal)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[var(--sky-blue)] disabled:opacity-50"
                     >
                         {busy === "upload" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                        Choose Workbook
+                        Choose Official Template
                     </button>
                 </div>
             </section>
@@ -481,15 +713,61 @@ export function SCSEMUpdater() {
                         </div>
                         <button
                             onClick={runAnalysis}
-                            disabled={busy === "analyze" || session.status === "analyzing"}
+                            disabled={analysisBusy || activeAnalysisProtected}
+                            type="button"
                             className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
                         >
-                            {busy === "analyze" || session.status === "analyzing"
+                            {analysisBusy || activeAnalysisProtected
                                 ? <Loader2 className="h-4 w-4 animate-spin" />
-                                : <SearchCheck className="h-4 w-4" />}
-                            Run Update Analysis
+                                : staleAnalysisRecoverable
+                                    ? <RotateCcw className="h-4 w-4" />
+                                    : <SearchCheck className="h-4 w-4" />}
+                            {analysisButtonLabel}
                         </button>
                     </div>
+                    {session.status === "analyzing" && (
+                        <div
+                            role={staleAnalysisRecoverable ? "alert" : "status"}
+                            className={`mt-3 flex items-start gap-3 rounded-lg border px-3 py-3 text-xs leading-5 ${staleAnalysisRecoverable
+                                ? "border-amber-500/30 bg-amber-500/10 text-amber-100"
+                                : "border-blue-500/25 bg-blue-500/10 text-blue-100"
+                                }`}
+                        >
+                            {staleAnalysisRecoverable
+                                ? <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+                                : <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-blue-300" />}
+                            <div>
+                                {analysisLeaseView.state === "checking" ? (
+                                    <p>Checking the persisted server analysis lease before enabling recovery.</p>
+                                ) : analysisLeaseView.state === "fresh" ? (
+                                    <p>
+                                        {analysisLeaseView.invalid || !leaseDeadlineLabel
+                                            ? "The server confirmed that another analysis lease is still active."
+                                            : <>
+                                                The persisted analysis lease remains active until{" "}
+                                                <time dateTime={session.analysisLeaseExpiresAt}>
+                                                    {leaseDeadlineLabel}
+                                                </time>.
+                                            </>}
+                                        {leaseRetryWindow
+                                            ? ` Recovery remains locked for up to ${leaseRetryWindow}.`
+                                            : " Recovery remains locked while that lease is active."}
+                                    </p>
+                                ) : (
+                                    <>
+                                        <p className="font-medium">
+                                            {analysisLeaseView.invalid || !leaseDeadlineLabel
+                                                ? "The saved analysis lease is missing or invalid."
+                                                : `The saved analysis lease expired at ${leaseDeadlineLabel}.`}
+                                        </p>
+                                        <p className="mt-1 text-amber-100/80">
+                                            Recover stale analysis submits this exact session revision through the normal audited analysis route. It does not clear or overwrite analysis state in the browser.
+                                        </p>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    )}
                     {session.technologyInference && (
                         <div className="mt-3 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs text-[var(--sky-text-secondary)]">
                             Identified automatically from {session.technologyInference.source} evidence
@@ -502,7 +780,7 @@ export function SCSEMUpdater() {
                 </section>
             )}
 
-            {session && (cisAuditSources.length > 0 || stigAuditSources.length > 0 || adjacentAuditSources.length > 0 || session.audit.pub1075Version || session.audit.nistVersion || session.audit.officialReference || session.audit.benchmarkLookupError) && (
+            {session && (cisAuditSources.length > 0 || stigAuditSources.length > 0 || adjacentAuditSources.length > 0 || session.audit.pub1075Version || session.audit.nistVersion || session.audit.officialReference || session.audit.benchmarkLookupError || session.audit.supplementalComparison) && (
                 <section className="mb-6 rounded-xl border border-[var(--sky-border)] bg-[var(--sky-surface)] p-5">
                     <div className="mb-4 flex items-center gap-2">
                         <ShieldCheck className="h-5 w-5 text-[var(--sky-light)]" />
@@ -510,9 +788,35 @@ export function SCSEMUpdater() {
                     </div>
                     <p className="mb-4 text-xs leading-5 text-[var(--sky-text-muted)]">
                         CIS access uses POST /license, then GET /benchmarks and GET /excel; selected workbooks use GET /excel/&#123;workbenchId&#125;.
-                        SkyShield matches the returned catalog locally from workbook content, sheet names, platform generation, profiles, and control overlap—renaming the upload is not required.
+                        SkyShield matches CIS Benchmark and CIS-published STIG profile workbooks (CIS-STIG) returned by CIS WorkBench. Licensed access or a technical match does not establish applicability; an authorized reviewer must verify the source, profile, permitted use, and proposed change. Independent DISA STIG release validation is not implemented.
                     </p>
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                        {session.audit.supplementalComparison && (
+                            <article className="rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] p-4">
+                                <p className="text-xs font-semibold uppercase text-[var(--sky-text-muted)]">Supplemental Comparison</p>
+                                <p className="mt-2 text-sm font-medium text-white">
+                                    {supplementalComparisonLabel(session.audit.supplementalComparison.mode)}
+                                </p>
+                                <div className={`mt-2 rounded border px-2 py-1 text-xs ${session.audit.supplementalComparison.complete
+                                    ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-200"
+                                    : "border-amber-500/25 bg-amber-500/10 text-amber-200"
+                                    }`}>
+                                    {session.audit.supplementalComparison.complete
+                                        ? "Comparison completed; source matching remains candidate-only."
+                                        : "Comparison incomplete; this session cannot be review-ready."}
+                                </div>
+                                <p className="mt-2 text-xs leading-5 text-[var(--sky-text-secondary)]">
+                                    Compared {session.audit.supplementalComparison.comparedDirectSourceCount} of {session.audit.supplementalComparison.directSourceCount} direct source(s).{" "}
+                                    Compared {session.audit.supplementalComparison.comparedCandidateCount} of {session.audit.supplementalComparison.candidateCount} candidate(s); rebound {session.audit.supplementalComparison.evidenceBoundProposalCount} of {session.audit.supplementalComparison.rawProposalCount} proposal(s) to exact evidence.
+                                </p>
+                                <p className="mt-2 text-xs leading-5 text-[var(--sky-text-secondary)]">
+                                    {session.audit.supplementalComparison.reason}
+                                </p>
+                                <p className="mt-2 text-xs leading-5 text-blue-200">
+                                    A technical source match is not an applicability decision. The reviewer must confirm technology, generation, profile, scope, authority, and permitted use.
+                                </p>
+                            </article>
+                        )}
                         {cisAuditSources.length > 0
                             ? cisAuditSources.map((source, index) => (
                                 <AuditSourceCard
@@ -525,18 +829,18 @@ export function SCSEMUpdater() {
                                 title="CIS Benchmark"
                                 source={null}
                                 emptyMessage={session.audit.benchmarkLookupError
-                                    ? `Lookup unavailable: ${session.audit.benchmarkLookupError}. Compliance review still completed.`
-                                    : `${cisResolutionMessage || "No direct workbook passed content/profile validation."} Compliance review still completed.`}
+                                    ? `CIS source unresolved: ${session.audit.benchmarkLookupError}. Reviewer disposition is required before release.`
+                                    : `${cisResolutionMessage || "No direct workbook passed content/profile validation."} CIS applicability remains unresolved until a reviewer records a disposition.`}
                             />}
                         {stigAuditSources.length > 0
                             ? stigAuditSources.map((source, index) => (
                                 <AuditSourceCard
                                     key={`stig-${source.workbenchId}-${index}`}
-                                    title={stigAuditSources.length > 1 ? `STIG Benchmark ${index + 1}` : "STIG Benchmark"}
+                                    title={stigAuditSources.length > 1 ? `CIS-STIG Workbook ${index + 1}` : "CIS-STIG Workbook"}
                                     source={source}
                                 />
                             ))
-                            : <AuditSourceCard title="STIG Benchmark" source={null} emptyMessage="No direct STIG workbook passed content/profile validation." />}
+                            : <AuditSourceCard title="CIS-STIG Workbook" source={null} emptyMessage="No direct CIS-STIG workbook from CIS WorkBench passed content/profile validation. Applicability remains unresolved until a reviewer records a disposition; independent DISA STIG validation is not implemented." />}
                         {adjacentAuditSources.map((source, index) => (
                             <AuditSourceCard
                                 key={`adjacent-${source.workbenchId}-${index}`}
@@ -545,25 +849,25 @@ export function SCSEMUpdater() {
                             />
                         ))}
                         <article className="rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] p-4">
-                            <p className="text-xs font-semibold uppercase text-[var(--sky-text-muted)]">Publication 1075</p>
+                            <p className="text-xs font-semibold uppercase text-[var(--sky-text-muted)]">Pinned Publication 1075</p>
                             <p className="mt-2 text-sm font-medium text-white">{session.audit.pub1075Version || "Unknown"}</p>
                             <p className="mt-1 text-xs text-[var(--sky-text-secondary)]">
-                                Governing source · {session.audit.complianceCoverage?.pub1075 ?? 0} mapped control ID(s)
+                                Governing policy evidence for candidate drafting · {session.audit.complianceCoverage?.pub1075 ?? 0} mapped control ID(s)
                             </p>
                         </article>
                         <article className="rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] p-4">
-                            <p className="text-xs font-semibold uppercase text-[var(--sky-text-muted)]">NIST SP 800-53 Fallback</p>
+                            <p className="text-xs font-semibold uppercase text-[var(--sky-text-muted)]">Pinned NIST SP 800-53 Mapping</p>
                             <p className="mt-2 text-sm font-medium text-white">{session.audit.nistVersion || "Unknown"}</p>
                             <p className="mt-1 text-xs text-[var(--sky-text-secondary)]">
-                                Used only when Pub 1075 has no matching section · {session.audit.complianceCoverage?.nistFallback ?? 0} mapped ID(s)
+                                Secondary mapping when Pub 1075 has no matching section · {session.audit.complianceCoverage?.nistFallback ?? 0} mapped ID(s)
                             </p>
                         </article>
                         {session.audit.officialReference && (
                             <article className="rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] p-4">
-                                <p className="text-xs font-semibold uppercase text-[var(--sky-text-muted)]">Official IRS SCSEM Baseline</p>
+                                <p className="text-xs font-semibold uppercase text-[var(--sky-text-muted)]">Pinned Official IRS SCSEM Source</p>
                                 <p className="mt-2 text-sm font-medium text-white">
                                     v{session.audit.officialReference.workbookVersion || "current"}
-                                    {session.audit.officialReference.selectedAsBase ? " selected automatically" : " — upload is structurally current"}
+                                    {session.audit.officialReference.selectedAsBase ? " used as candidate drafting baseline" : " — uploaded source is structurally current"}
                                 </p>
                                 <p className="mt-1 text-xs text-[var(--sky-text-secondary)]">
                                     IRS-listed effective date: {session.audit.officialReference.irsEffectiveDate}
@@ -582,12 +886,20 @@ export function SCSEMUpdater() {
                 </section>
             )}
 
-            {session && session.status === "review_ready" && (
+            {session && (session.status === "review_ready" || session.status === "analysis_incomplete") && (
                 <section className="rounded-xl border border-[var(--sky-border)] bg-[var(--sky-surface)] p-5">
+                    {session.status === "analysis_incomplete" && (
+                        <div className="mb-5 flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+                            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+                            <p>
+                                Analysis is incomplete because one or more required source, AI, or applicability checks could not be resolved. You may inspect proposals and export an explicitly marked working draft, but this session is not release-ready.
+                            </p>
+                        </div>
+                    )}
                     <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                         <div>
                             <div className="flex flex-wrap items-center gap-2">
-                                <h2 className="text-base font-semibold text-white">Proposed Updates</h2>
+                                <h2 className="text-base font-semibold text-white">Candidate Template Changes</h2>
                                 <span className="rounded-full border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-2 py-0.5 text-xs text-[var(--sky-text-secondary)]">
                                     {session.changes.length} total
                                 </span>
@@ -597,6 +909,9 @@ export function SCSEMUpdater() {
                                     {session.summary}
                                 </p>
                             )}
+                            <p className="mt-2 max-w-4xl text-xs leading-5 text-amber-200">
+                                Automation output is advisory. Approval includes a change in this candidate draft only; it does not certify completeness, compliance, applicability, or official release.
+                            </p>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
                             <StatusPill status="PENDING" count={counts.pending} />
@@ -608,7 +923,7 @@ export function SCSEMUpdater() {
                                 className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm font-medium text-emerald-200 transition hover:bg-emerald-500/20 disabled:opacity-50"
                             >
                                 {busy === "batch:APPROVED" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                                Approve Pending
+                                Approve Pending for Draft
                             </button>
                             <button
                                 onClick={() => batchStatus("REJECTED")}
@@ -623,7 +938,7 @@ export function SCSEMUpdater() {
 
                     {session.changes.length === 0 ? (
                         <div className="rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] p-5 text-sm text-[var(--sky-text-secondary)]">
-                            No proposed control updates are available for review. See the analysis summary above for source coverage and reasoning status.
+                            No candidate template changes are available. Review the source-coverage diagnostics above; an empty proposal list does not certify that the template is complete or release-ready.
                         </div>
                     ) : (
                         <div className="space-y-3">
@@ -691,6 +1006,11 @@ function AuditSourceCard({
             {source.sourceRelationship === "adjacent" && (
                 <div className="mt-2 rounded border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-xs text-amber-200">
                     Adjacent evidence only. Reviewer approval required.
+                </div>
+            )}
+            {source.sourceRelationship === "direct" && (
+                <div className="mt-2 rounded border border-blue-500/25 bg-blue-500/10 px-2 py-1 text-xs text-blue-200">
+                    Candidate source match only. Reviewer applicability confirmation required.
                 </div>
             )}
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-[var(--sky-text-secondary)]">
@@ -778,8 +1098,8 @@ function SourceEvidencePanel({ change }: { change: UpdaterChange }) {
         ["Workbench", sourceEvidenceText(evidence, "sourceWorkbenchId")],
         ["CIS", sourceEvidenceText(evidence, "cisRecommendation")],
         ["CIS Profile", sourceEvidenceText(evidence, "cisProfile")],
-        ["STIG", sourceEvidenceText(evidence, "stigRecommendation")],
-        ["STIG Profile", sourceEvidenceText(evidence, "stigProfile")],
+        ["CIS-STIG", sourceEvidenceText(evidence, "stigRecommendation")],
+        ["CIS-STIG Profile", sourceEvidenceText(evidence, "stigProfile")],
         ["Adjacent Category", sourceEvidenceText(evidence, "adjacentSourceCategory")],
         ["Applicability", sourceEvidenceText(evidence, "applicabilityRationale")],
         ["Target sheet", change.targetSheet || sourceEvidenceText(evidence, "sourceSheet")],
@@ -877,11 +1197,9 @@ function ChangeReview({
                         <span className="mb-2 block text-[10px] font-bold uppercase text-[var(--sky-text-muted)]">
                             Why This Is Proposed
                         </span>
-                        <Textarea
-                            value={change.reason}
-                            onChange={(event) => onLocalChange({ reason: event.target.value })}
-                            className="min-h-[120px]"
-                        />
+                        <p className="whitespace-pre-wrap text-sm leading-6 text-[var(--sky-text-secondary)]">
+                            {change.reason}
+                        </p>
                     </div>
 
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -928,7 +1246,7 @@ function ChangeReview({
                             className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
                         >
                             {busy === `APPROVED:${change.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                            Approve
+                            Approve for Draft
                         </button>
                         <button
                             onClick={onReject}
@@ -961,6 +1279,7 @@ function NewControlEditor({
         ["nistControlName", "NIST Control Name"],
         ["testMethod", "Test Method"],
         ["criticality", "Criticality"],
+        ["issueCode", "IRS Issue Code (required; one per line)"],
         ["cisBenchmarkRef", "CIS Benchmark Section"],
         ["recommendationNum", "Recommendation #"],
     ];
@@ -968,6 +1287,7 @@ function NewControlEditor({
         ["description", "Description"],
         ["testProcedures", "Test Procedures"],
         ["expectedResults", "Expected Results"],
+        ["findingStatement", "Standard Finding Statement (required when this template has the column)"],
         ["rationale", "Rationale"],
         ["impact", "Impact"],
         ["remediationProcedure", "Remediation Procedure"],
@@ -992,11 +1312,24 @@ function NewControlEditor({
                         <span className="mb-1 block text-[10px] font-bold uppercase text-[var(--sky-text-primary)]">
                             {label}
                         </span>
-                        <input
-                            value={(control[field] as string | null | undefined) || ""}
-                            onChange={(event) => onFieldChange(field, event.target.value)}
-                            className="w-full rounded-md border border-[var(--sky-border)] bg-[var(--sky-navy)] px-3 py-2 text-sm text-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-                        />
+                        {field === "issueCode" ? (
+                            <Textarea
+                                value={(control[field] as string | null | undefined) || ""}
+                                onChange={(event) => onFieldChange(field, event.target.value)}
+                                className="min-h-[72px]"
+                            />
+                        ) : (
+                            <input
+                                value={(control[field] as string | null | undefined) || ""}
+                                onChange={(event) => onFieldChange(field, event.target.value)}
+                                className="w-full rounded-md border border-[var(--sky-border)] bg-[var(--sky-navy)] px-3 py-2 text-sm text-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                            />
+                        )}
+                        {field === "issueCode" && (
+                            <span className="mt-1 block text-[10px] leading-4 text-amber-200">
+                                Must match the uploaded template&apos;s Issue Code Table exactly. Automation does not choose this risk mapping.
+                            </span>
+                        )}
                     </label>
                 ))}
             </div>

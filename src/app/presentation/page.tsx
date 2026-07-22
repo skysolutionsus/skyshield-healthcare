@@ -163,7 +163,7 @@ export default function PresentationPage() {
                             <div className="absolute top-0 right-0 p-4 opacity-10"><Users className="w-24 h-24" /></div>
                             <div className="text-emerald-400 font-bold text-xl mb-4">3. Review</div>
                             <h4 className="text-white font-medium mb-2">Human-in-the-Loop</h4>
-                            <p className="text-sm text-slate-400 leading-relaxed">The Safeguards team views a clear diff side-by-side, quickly approving or rejecting the AI's proposed modifications before authoring the new official Excel file.</p>
+                            <p className="text-sm text-slate-400 leading-relaxed">The Safeguards team views a clear diff side-by-side, quickly approving or rejecting the AI&apos;s proposed modifications before authoring the new official Excel file.</p>
                         </div>
                     </div>
                 </div>

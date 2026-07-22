@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { officialSCSEMManifest } from "@/lib/scsem-official-manifest";
+import { requireScsemSteward } from "@/lib/scsem-steward-auth";
 
 export async function GET() {
   try {
@@ -11,19 +13,12 @@ export async function GET() {
 
     const orgId = (session.user as unknown as { organizationId: string })
       .organizationId;
+    const scsemAccess = await requireScsemSteward();
+    const scsemManifest = officialSCSEMManifest();
 
-    const [
-      openIncidents,
-      totalAssessments,
-      completedAssessments,
-      recentLogs,
-    ] = await Promise.all([
+    const [openIncidents, recentLogs] = await Promise.all([
       db.incident.count({
         where: { organizationId: orgId, status: { not: "CLOSED" } },
-      }),
-      db.sCSEMTemplate.count(),
-      db.sCSEMUpdateReview.count({
-        where: { status: "PENDING" },
       }),
       db.auditLog.findMany({
         where: { organizationId: orgId },
@@ -35,8 +30,16 @@ export async function GET() {
 
     return NextResponse.json({
       openIncidents,
-      totalAssessments,
-      completedAssessments,
+      scsemSourceManifest: scsemAccess.ok
+        ? {
+            workbookCount: scsemManifest.expectedWorkbookCount,
+            sourcePolicy: scsemManifest.sourcePolicy,
+            sourcePageUrl: scsemManifest.sourcePageUrl,
+            sourcePageReviewedAt: scsemManifest.sourcePageReviewedAt,
+            candidateOnly: true,
+            humanReviewRequired: true,
+          }
+        : null,
       recentLogs,
     });
   } catch (error) {

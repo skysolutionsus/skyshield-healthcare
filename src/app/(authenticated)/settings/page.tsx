@@ -6,6 +6,7 @@ import { UserManagement } from "@/components/user-management";
 import { LLMSettings } from "@/components/llm-settings";
 import { MfaSettings } from "@/components/mfa-settings";
 import { AdminUserActions } from "@/components/admin-user-actions";
+import { PasswordSettings } from "@/components/password-settings";
 import { isAdminRole, roleLabel } from "@/lib/roles";
 
 export default async function SettingsPage({
@@ -14,7 +15,7 @@ export default async function SettingsPage({
   searchParams: Promise<{ mfa?: string }>;
 }) {
   const session = await auth();
-  if (!session?.user) return null;
+  if (!session?.user || session.user.sessionInvalid) return null;
   const params = await searchParams;
 
   const userInfo = session.user as unknown as {
@@ -130,6 +131,8 @@ export default async function SettingsPage({
         status={mfaStatus}
         setupRequested={params.mfa === "setup"}
       />
+
+      <PasswordSettings />
 
       {/* Admin sections */}
       {isAdmin && (

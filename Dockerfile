@@ -33,9 +33,6 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-# Prisma generate needs a DATABASE_URL while building the runtime image. Coolify
-# overrides this at runtime with the real internal PostgreSQL connection string.
-ENV DATABASE_URL="postgresql://postgres:postgres@db:5432/irs_skyshield?schema=public"
 
 RUN apk add --no-cache poppler-utils
 
@@ -48,9 +45,10 @@ RUN mkdir -p /var/lib/skyshield && chown -R nextjs:nodejs /var/lib/skyshield
 # full build-time node_modules layer can make Coolify deployments fail on small
 # hosts during image export.
 COPY package.json package-lock.json* ./
-COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma/schema.prisma ./prisma/schema.prisma
+COPY --from=builder /app/prisma/migrations ./prisma/migrations
 RUN npm ci --omit=dev --ignore-scripts \
-  && npx prisma generate \
+  && DATABASE_URL="postgresql://build:build@localhost:5432/build?schema=public" npx prisma generate \
   && npm cache clean --force
 
 # Copy all necessary files
@@ -58,11 +56,12 @@ COPY --from=builder /app/data ./data
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 
-# Copy source files needed for lightweight startup scripts and optional legacy seed.
-COPY --from=builder /app/src/lib/xlsx-parser.ts ./src/lib/xlsx-parser.ts
-COPY --from=builder /app/src/lib/db.ts ./src/lib/db.ts
-COPY --from=builder /app/assets ./assets
-COPY --from=builder /app/scripts ./scripts
+# Copy only the source files needed by the runtime validator and one-shot
+# administrator bootstrap command.
+COPY --from=builder /app/src/lib/runtime-config.ts ./src/lib/runtime-config.ts
+COPY --from=builder /app/src/lib/password-policy.ts ./src/lib/password-policy.ts
+COPY --from=builder /app/scripts/validate-runtime-config.ts ./scripts/validate-runtime-config.ts
+COPY --from=builder /app/scripts/bootstrap-admin.ts ./scripts/bootstrap-admin.ts
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
 # Copy entrypoint script

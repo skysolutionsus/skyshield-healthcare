@@ -80,7 +80,7 @@ export function LLMSettings() {
             <div className="bg-[var(--sky-surface)] border border-[var(--sky-border)] rounded-xl p-6 mb-8">
                 <div className="flex items-center gap-2 mb-4">
                     <Bot className="w-5 h-5 text-gray-500" />
-                    <h2 className="font-semibold text-white">AI Configuration</h2>
+                    <h2 className="font-semibold text-white">Assistant AI Configuration</h2>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-[var(--sky-text-muted)]">
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -94,7 +94,7 @@ export function LLMSettings() {
         <div className="bg-[var(--sky-surface)] border border-[var(--sky-border)] rounded-xl overflow-hidden mb-8">
             <div className="px-6 py-4 border-b border-[var(--sky-border)] flex items-center gap-2">
                 <Bot className="w-5 h-5 text-gray-500" />
-                <h2 className="font-semibold text-white">AI Configuration</h2>
+                <h2 className="font-semibold text-white">Assistant AI Configuration</h2>
             </div>
             <div className="p-6 space-y-5">
                 {/* Model Selector */}
@@ -114,7 +114,11 @@ export function LLMSettings() {
                         ))}
                     </select>
                     <p className="text-xs text-[var(--sky-text-muted)] mt-1.5">
-                        Select the Bifrost model route used for compliance analysis.
+                        Select the Bifrost model route used by the general SkyShield Assistant.
+                        The SCSEM Updater uses deployment-managed
+                        <code className="mx-1">BIFROST_SCSEM_MODEL</code>
+                        and <code>BIFROST_API_KEY</code> settings so a browser change cannot
+                        silently alter canonical-template analysis provenance.
                     </p>
                 </div>
 
@@ -146,7 +150,7 @@ export function LLMSettings() {
                     <p className="text-xs text-[var(--sky-text-muted)] mt-1.5">
                         {hasApiKey
                             ? "Leave blank to keep the current key. Enter a new key to replace it."
-                            : "Falls back to BIFROST_API_KEY on the server if not set here."}
+                            : "Used by the general Assistant and falls back to the server BIFROST_API_KEY. This form does not configure SCSEM Updater evidence analysis."}
                     </p>
                     {legacyKeyIgnored && (
                         <p className="text-xs text-amber-300 mt-1.5">

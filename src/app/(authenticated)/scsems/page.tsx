@@ -1,9 +1,10 @@
-import { auth } from "@/lib/auth";
+import { notFound } from "next/navigation";
 import { SCSEMUpdater } from "@/components/scsem-updater";
+import { requireScsemSteward } from "@/lib/scsem-steward-auth";
 
 export default async function SCSEMUpdaterPage() {
-  const session = await auth();
-  if (!session?.user) return null;
+  const access = await requireScsemSteward();
+  if (!access.ok) notFound();
 
   return <SCSEMUpdater />;
 }

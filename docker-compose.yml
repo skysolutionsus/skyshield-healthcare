@@ -4,13 +4,18 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/irs_skyshield?schema=public
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-change-me-in-production}
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL must be explicitly set for the Compose database}
+      - AUTH_SECRET=${NEXTAUTH_SECRET:?NEXTAUTH_SECRET must be explicitly set to a strong generated value}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:?NEXTAUTH_SECRET must be explicitly set to a strong generated value}
       - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
-      - BIFROST_API_KEY=${BIFROST_API_KEY:-sk-bf-placeholder}
-      - BIFROST_BASE_URL=${BIFROST_BASE_URL:-http://192.168.16.104:8080/v1}
-      - BIFROST_MODEL=${BIFROST_MODEL:-azure/claude-sonnet-4-6}
-      - BIFROST_EMBEDDING_MODEL=${BIFROST_EMBEDDING_MODEL:-azure/text-embedding-ada-002}
+      - BIFROST_API_KEY=${BIFROST_API_KEY:-}
+      - BIFROST_BASE_URL=${BIFROST_BASE_URL:-}
+      - BIFROST_MODEL=${BIFROST_MODEL:-}
+      - BIFROST_TITLE_MODEL=${BIFROST_TITLE_MODEL:-}
+      - BIFROST_SCSEM_MODEL=${BIFROST_SCSEM_MODEL:-}
+      - BIFROST_EMBEDDING_MODEL=${BIFROST_EMBEDDING_MODEL:-}
+      - CIS_LICENSE_XML_PATH=${CIS_LICENSE_XML_PATH:-}
+      - CIS_LICENSE_XML_BASE64=${CIS_LICENSE_XML_BASE64:-}
       - SKYSHIELD_RUNTIME_DATA_DIR=/var/lib/skyshield
     volumes:
       - skyshield_runtime_data:/var/lib/skyshield
@@ -22,15 +27,13 @@ services:
   db:
     image: pgvector/pgvector:pg16
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=irs_skyshield
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be explicitly set to a strong generated value}
+      - POSTGRES_DB=${POSTGRES_DB:-irs_skyshield}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5

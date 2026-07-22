@@ -1,6 +1,14 @@
 import * as XLSX from 'xlsx';
 import * as fs from 'fs';
 import * as path from 'path';
+import { createHash } from 'node:crypto';
+import {
+    matchSCSEMColumnHeader,
+    scsemColumnHeaderSignature,
+    scsemWorkbookSheetNamesSignature,
+} from '@/lib/scsem-column-schema';
+
+XLSX.set_fs(fs);
 
 export interface ParsedSheet {
     sheetName: string;
@@ -99,11 +107,18 @@ function meaningfulWorksheetRange(ws: XLSX.WorkSheet): XLSX.Range | undefined {
 
         const cell = ws[address] as XLSX.CellObject | undefined;
         if (!cell) continue;
+        const decoded = XLSX.utils.decode_cell(address);
+        // Some IRS sheets populate every remaining Excel header column through
+        // XFD with generated labels such as Column16370. They are placeholders,
+        // not SCSEM data, and including them would expand every parsed row to
+        // 16,384 entries.
+        const generatedPlaceholderHeader = decoded.r < 5 &&
+            typeof cell.v === 'string' && /^column\s*\d+$/i.test(cell.v.trim());
+        if (generatedPlaceholderHeader) continue;
         const hasValue = cell.v !== undefined && cell.v !== null && cell.v !== '';
         const hasFormula = typeof cell.f === 'string' && cell.f.length > 0;
         if (!hasValue && !hasFormula) continue;
 
-        const decoded = XLSX.utils.decode_cell(address);
         maxRow = Math.max(maxRow, decoded.r);
         maxCol = Math.max(maxCol, decoded.c);
     }
@@ -164,78 +179,43 @@ function parseChangeDate(val: any): Date | null {
 }
 
 /**
- * Known column name → field name mapping for test case sheets.
- * Keys are lowercase substrings to match; values are ParsedControl field names.
- */
-const COLUMN_MAP: Record<string, keyof ParsedControl> = {
-    'test id': 'testId',
-    'nist id': 'nistId',
-    'nist control': 'nistControlName',
-    'test method': 'testMethod',
-    'section title': 'sectionTitle',
-    'description': 'description',
-    'test procedure': 'testProcedures',
-    'expected result': 'expectedResults',
-    'actual result': 'actualResults',
-    'status': 'status',
-    'finding statement': 'findingStatement',
-    'notes': 'notesEvidence',
-    'evidence': 'notesEvidence',
-    'criticality': 'criticality',
-    'issue code mapping': 'issueCode',
-    'issue code description': 'issueCodeDescription',
-    'issue code': 'issueCode',
-    'cis benchmark': 'cisBenchmarkRef',
-    'recommendation': 'recommendationNum',
-    'rationale': 'rationale',
-    'impact': 'impact',
-    'remediation procedure': 'remediationProcedure',
-    'remediation statement': 'remediationStatement',
-    'cap request': 'capRequestStatement',
-    'risk rating': 'riskRating',
-};
-
-/**
- * Match a column header to a known field
- */
-function matchColumnHeader(header: string): keyof ParsedControl | null {
-    const lower = header.toLowerCase().trim();
-    if (!lower || lower.startsWith('column')) return null;
-
-    // Try exact-ish matches first (longer patterns first for specificity)
-    const sortedKeys = Object.keys(COLUMN_MAP).sort((a, b) => b.length - a.length);
-    for (const pattern of sortedKeys) {
-        if (lower.includes(pattern)) {
-            return COLUMN_MAP[pattern];
-        }
-    }
-    return null;
-}
-
-/**
  * Parse a "Test Cases" sheet into structured control records using dynamic header detection
  */
-function parseTestCaseSheet(ws: XLSX.WorkSheet, existingRows?: any[][]): ParsedControl[] {
+function parseTestCaseSheet(
+    ws: XLSX.WorkSheet,
+    existingRows?: any[][],
+    schemaContext?: {
+        workbookSha256: string;
+        sheetName: string;
+        workbookSheetNamesSignature: string;
+    }
+): ParsedControl[] {
     const data = existingRows || worksheetRows(ws);
     const controls: ParsedControl[] = [];
 
     // Find the header row (look for "Test ID" somewhere in first 5 rows)
     let headerRow = -1;
-    let columnMapping: Map<number, keyof ParsedControl> = new Map();
-    let unmappedHeaders: Map<number, string> = new Map();
+    const columnMapping: Map<number, keyof ParsedControl> = new Map();
+    const unmappedHeaders: Map<number, string> = new Map();
 
     for (let i = 0; i < Math.min(5, data.length); i++) {
         const row = data[i] as any[];
         const firstCell = cellStr(row[0]);
         if (firstCell && firstCell.toLowerCase().includes('test id')) {
             headerRow = i;
+            const headerSignature = scsemColumnHeaderSignature(row);
 
             // Build column mapping from headers
             for (let j = 0; j < row.length; j++) {
                 const header = cellStr(row[j]);
                 if (!header) continue;
 
-                const field = matchColumnHeader(header);
+                const field = matchSCSEMColumnHeader(header, schemaContext ? {
+                    ...schemaContext,
+                    headerRow: i,
+                    columnIndex: j,
+                    headerSignature,
+                } : undefined);
                 if (field) {
                     // Don't overwrite if already mapped (first match wins for duplicates)
                     if (![...columnMapping.values()].includes(field)) {
@@ -407,13 +387,23 @@ function parseDashboardMetadata(ws: XLSX.WorkSheet, existingRows?: any[][]): Par
  * Parse a complete SCSEM XLSX file into structured data
  */
 export function parseSCSEMFile(filePath: string): ParsedSCSEM {
-    const fullPath = path.isAbsolute(filePath) ? filePath : path.join(process.cwd(), filePath);
+    const fullPath = path.isAbsolute(filePath)
+        ? filePath
+        : path.join(/* turbopackIgnore: true */ process.cwd(), filePath);
 
     if (!fs.existsSync(fullPath)) {
         throw new Error(`SCSEM file not found: ${fullPath}`);
     }
 
-    const wb = XLSX.readFile(fullPath);
+    // Current IRS workbooks can contain hundreds of thousands of empty styled
+    // rows (one RHEL tab declares all 1,048,576 Excel rows). SCSEM control
+    // tables are far smaller; bounding the XML reader prevents those empty row
+    // records from exhausting server memory while retaining original row
+    // coordinates for every supported template.
+    const sourceBuffer = fs.readFileSync(fullPath);
+    const workbookSha256 = createHash('sha256').update(sourceBuffer).digest('hex');
+    const wb = XLSX.read(sourceBuffer, { sheetRows: 10_000 });
+    const workbookSheetNamesSignature = scsemWorkbookSheetNamesSignature(wb.SheetNames);
     const sheets: ParsedSheet[] = [];
     let totalControls = 0;
     let metadata: ParsedSCSEM['metadata'] = { subject: null, version: null, effectiveDate: null };
@@ -421,7 +411,7 @@ export function parseSCSEMFile(filePath: string): ParsedSCSEM {
     for (let idx = 0; idx < wb.SheetNames.length; idx++) {
         const sheetName = wb.SheetNames[idx];
         const ws = wb.Sheets[sheetName];
-        let sheetType = classifySheet(sheetName);
+        const sheetType = classifySheet(sheetName);
 
         // Always capture raw data for every sheet so nothing is lost
         const allRows = worksheetRows(ws);
@@ -439,7 +429,11 @@ export function parseSCSEMFile(filePath: string): ParsedSCSEM {
         if (sheetType === 'dashboard') {
             metadata = parseDashboardMetadata(ws, allRows);
         } else if (sheetType === 'test_cases') {
-            parsed.controls = parseTestCaseSheet(ws, allRows);
+            parsed.controls = parseTestCaseSheet(ws, allRows, {
+                workbookSha256,
+                sheetName,
+                workbookSheetNamesSignature,
+            });
             totalControls += parsed.controls.length;
         } else if (sheetType === 'changelog') {
             parsed.changeLogEntries = parseChangeLogSheet(ws, allRows);
@@ -450,7 +444,11 @@ export function parseSCSEMFile(filePath: string): ParsedSCSEM {
                 const firstCell = cellStr(allRows[r]?.[0]);
                 if (firstCell && firstCell.toLowerCase().includes('test id')) {
                     parsed.sheetType = 'test_cases';
-                    parsed.controls = parseTestCaseSheet(ws, allRows);
+                    parsed.controls = parseTestCaseSheet(ws, allRows, {
+                        workbookSha256,
+                        sheetName,
+                        workbookSheetNamesSignature,
+                    });
                     totalControls += parsed.controls.length;
                     break;
                 }

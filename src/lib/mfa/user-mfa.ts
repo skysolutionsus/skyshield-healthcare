@@ -1,28 +1,30 @@
 import { db } from "@/lib/db";
 import { decryptMfaSecret } from "@/lib/mfa/secrets";
 import { findMatchingRecoveryCode } from "@/lib/mfa/recovery-codes";
-import { normalizeTotpCode, verifyTotpCode } from "@/lib/mfa/totp";
+import { matchTotpCounter, normalizeTotpCode } from "@/lib/mfa/totp";
 
-export type MfaVerificationMethod = "totp" | "recovery_code";
+export type SuccessfulMfaVerification =
+  | { ok: true; method: "totp"; totpCounter: number }
+  | { ok: true; method: "recovery_code"; recoveryCodeId: string };
+export type MfaVerificationResult = SuccessfulMfaVerification | { ok: false };
 
 export async function verifyMfaForUser({
   userId,
   secretEncrypted,
   token,
-  consumeRecoveryCode = true,
 }: {
   userId: string;
   secretEncrypted: string | null;
   token: string;
-  consumeRecoveryCode?: boolean;
-}): Promise<{ ok: boolean; method?: MfaVerificationMethod }> {
+}): Promise<MfaVerificationResult> {
   const trimmedToken = token.trim();
   if (!trimmedToken) return { ok: false };
 
   if (secretEncrypted && /^\d{6}$/.test(normalizeTotpCode(trimmedToken))) {
     const secret = decryptMfaSecret(secretEncrypted);
-    if (verifyTotpCode({ secret, code: trimmedToken })) {
-      return { ok: true, method: "totp" };
+    const totpCounter = matchTotpCounter({ secret, code: trimmedToken });
+    if (totpCounter !== null) {
+      return { ok: true, method: "totp", totpCounter };
     }
   }
 
@@ -39,12 +41,12 @@ export async function verifyMfaForUser({
     return { ok: false };
   }
 
-  if (consumeRecoveryCode) {
-    await db.mfaRecoveryCode.update({
-      where: { id: matchingCodeId },
-      data: { usedAt: new Date() },
-    });
-  }
-
-  return { ok: true, method: "recovery_code" };
+  // Verification deliberately does not consume the row. The caller must use
+  // recoveryCodeId in a conditional usedAt:null update inside the same
+  // transaction as the protected action and its audit record.
+  return {
+    ok: true,
+    method: "recovery_code",
+    recoveryCodeId: matchingCodeId,
+  };
 }

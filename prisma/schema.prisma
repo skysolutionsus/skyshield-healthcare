@@ -46,47 +46,56 @@ enum UpdateReviewStatus {
 }
 
 model Organization {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  logo      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                       String   @id @default(cuid())
+  name                     String
+  slug                     String   @unique
+  logo                     String?
+  canManageCanonicalScsems Boolean  @default(false)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 
-  users              User[]
-  incidents          Incident[]
-  auditLogs          AuditLog[]
-  invitations        Invitation[]
+  users               User[]
+  incidents           Incident[]
+  auditLogs           AuditLog[]
+  invitations         Invitation[]
+  passwordResetTokens PasswordResetToken[]
 }
 
 model User {
-  id             String    @id @default(cuid())
-  email          String    @unique
-  name           String
-  passwordHash   String
-  role           Role      @default(VIEWER)
-  organizationId String
-  lastLogin      DateTime?
-  mfaEnabled     Boolean   @default(false)
-  mfaSecretEncrypted String?
+  id                        String    @id @default(cuid())
+  email                     String    @unique
+  name                      String
+  passwordHash              String
+  role                      Role      @default(VIEWER)
+  organizationId            String
+  lastLogin                 DateTime?
+  mfaEnabled                Boolean   @default(false)
+  mfaSecretEncrypted        String?
   mfaPendingSecretEncrypted String?
   mfaPendingSecretCreatedAt DateTime?
-  mfaEnabledAt   DateTime?
-  mfaLastUsedAt  DateTime?
-  active         Boolean   @default(true)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  mfaEnabledAt              DateTime?
+  mfaLastUsedAt             DateTime?
+  mfaLastUsedTotpCounter    Int?
+  credentialVersion         Int       @default(0)
+  failedLoginAttempts       Int       @default(0)
+  lastFailedLoginAt         DateTime?
+  loginLockedUntil          DateTime?
+  active                    Boolean   @default(true)
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
 
-  organization       Organization        @relation(fields: [organizationId], references: [id])
-  conversations      Conversation[]
-  incidents          Incident[]          @relation("AssignedIncidents")
-  createdIncidents   Incident[]          @relation("CreatedIncidents")
-  incidentActivities IncidentActivity[]
-  auditLogs          AuditLog[]
-  mfaRecoveryCodes   MfaRecoveryCode[]
-  reportedFalsePositives  FalsePositiveReport[] @relation("ReportedFalsePositives")
-  reviewedFalsePositives  FalsePositiveReport[] @relation("ReviewedFalsePositives")
-  importedKnowledgeDocuments KnowledgeDocument[] @relation("ImportedKnowledgeDocuments")
+  organization               Organization          @relation(fields: [organizationId], references: [id])
+  conversations              Conversation[]
+  incidents                  Incident[]            @relation("AssignedIncidents")
+  createdIncidents           Incident[]            @relation("CreatedIncidents")
+  incidentActivities         IncidentActivity[]
+  auditLogs                  AuditLog[]
+  mfaRecoveryCodes           MfaRecoveryCode[]
+  passwordResetTokens        PasswordResetToken[]  @relation("PasswordResetTarget")
+  createdPasswordResetTokens PasswordResetToken[]  @relation("PasswordResetCreator")
+  reportedFalsePositives     FalsePositiveReport[] @relation("ReportedFalsePositives")
+  reviewedFalsePositives     FalsePositiveReport[] @relation("ReviewedFalsePositives")
+  importedKnowledgeDocuments KnowledgeDocument[]   @relation("ImportedKnowledgeDocuments")
 }
 
 model MfaRecoveryCode {
@@ -114,6 +123,24 @@ model Invitation {
   organization Organization @relation(fields: [organizationId], references: [id])
 }
 
+model PasswordResetToken {
+  id              String    @id @default(cuid())
+  userId          String
+  organizationId  String
+  createdByUserId String?
+  tokenDigest     String    @unique
+  expiresAt       DateTime
+  usedAt          DateTime?
+  createdAt       DateTime  @default(now())
+
+  user         User         @relation("PasswordResetTarget", fields: [userId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("PasswordResetCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, usedAt, expiresAt])
+  @@index([organizationId, usedAt, expiresAt])
+}
+
 model Conversation {
   id         String   @id @default(cuid())
   userId     String
@@ -129,29 +156,29 @@ model Conversation {
 model Message {
   id             String   @id @default(cuid())
   conversationId String
-  role           String   // 'user' or 'assistant'
+  role           String // 'user' or 'assistant'
   content        String
-  citations      Json?    // Array of {section, page, text}
+  citations      Json? // Array of {section, page, text}
   createdAt      DateTime @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 }
 
 model SCSEMTemplate {
-  id            String   @id @default(cuid())
-  name          String
-  category      String
-  version       String?
-  effectiveDate String?
-  cisVersion    String?
-  cisTechnology String?
-  filePath      String
-  controlCount  Int      @default(0)
+  id                      String    @id @default(cuid())
+  name                    String
+  category                String
+  version                 String?
+  effectiveDate           String?
+  cisVersion              String?
+  cisTechnology           String?
+  filePath                String
+  controlCount            Int       @default(0)
   lastCisBenchmarkVersion String?
   lastPub1075Version      String?
   lastSyncedAt            DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
   updateReviews SCSEMUpdateReview[]
   sheets        SCSEMSheet[]
@@ -162,49 +189,49 @@ model SCSEMSheet {
   id         String   @id @default(cuid())
   templateId String
   sheetName  String
-  sheetType  String   // "test_cases" | "dashboard" | "results" | "instructions" | "changelog" | "appendix" | "other"
+  sheetType  String // "test_cases" | "dashboard" | "results" | "instructions" | "changelog" | "appendix" | "other"
   sheetIndex Int
   rawData    Json?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  template SCSEMTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  template SCSEMTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
   controls SCSEMControl[]
 }
 
 model SCSEMControl {
-  id                    String   @id @default(cuid())
-  sheetId               String
-  rowIndex              Int
-  testId                String
-  nistId                String?
-  nistControlName       String?
-  testMethod            String?
-  sectionTitle          String?
-  description           String?
-  testProcedures        String?
-  expectedResults       String?
-  actualResults         String?
-  status                String?
-  findingStatement      String?
-  notesEvidence         String?
-  criticality           String?
-  issueCode             String?
-  issueCodeDescription  String?
-  cisBenchmarkRef       String?
-  recommendationNum     String?
-  rationale             String?
-  impact                String?
-  remediationProcedure  String?
-  remediationStatement  String?
-  capRequestStatement   String?
-  riskRating            String?
-  extraColumns          Json?
-  lastSyncedAt          DateTime?
-  lastSyncedVersion     String?
-  updateHighlight       Boolean  @default(false)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                   String    @id @default(cuid())
+  sheetId              String
+  rowIndex             Int
+  testId               String
+  nistId               String?
+  nistControlName      String?
+  testMethod           String?
+  sectionTitle         String?
+  description          String?
+  testProcedures       String?
+  expectedResults      String?
+  actualResults        String?
+  status               String?
+  findingStatement     String?
+  notesEvidence        String?
+  criticality          String?
+  issueCode            String?
+  issueCodeDescription String?
+  cisBenchmarkRef      String?
+  recommendationNum    String?
+  rationale            String?
+  impact               String?
+  remediationProcedure String?
+  remediationStatement String?
+  capRequestStatement  String?
+  riskRating           String?
+  extraColumns         Json?
+  lastSyncedAt         DateTime?
+  lastSyncedVersion    String?
+  updateHighlight      Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   sheet SCSEMSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
 }
@@ -216,7 +243,7 @@ model SCSEMChangeLog {
   changeDate  DateTime
   description String
   changedBy   String?
-  source      String   // "xlsx_import" | "cis_sync" | "manual"
+  source      String // "xlsx_import" | "cis_sync" | "manual"
   createdAt   DateTime @default(now())
 
   template SCSEMTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
@@ -232,7 +259,7 @@ model SCSEMUpdateReview {
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
 
-  template  SCSEMTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  template  SCSEMTemplate        @relation(fields: [templateId], references: [id], onDelete: Cascade)
   benchmark CISBenchmarkVersion? @relation(fields: [benchmarkId], references: [id], onDelete: Cascade)
 }
 
@@ -248,17 +275,17 @@ model Incident {
   createdById     String
   affectedSystems String?
   remediationPlan String?
-  relatedSections Json?            // Related Pub 1075 sections
+  relatedSections Json? // Related Pub 1075 sections
   dateDiscovered  DateTime         @default(now())
   dateOccurred    DateTime?
   resolvedAt      DateTime?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
-  organization        Organization       @relation(fields: [organizationId], references: [id])
-  assignedTo          User?               @relation("AssignedIncidents", fields: [assignedToId], references: [id])
-  createdBy           User                @relation("CreatedIncidents", fields: [createdById], references: [id])
-  activities          IncidentActivity[]
+  organization         Organization          @relation(fields: [organizationId], references: [id])
+  assignedTo           User?                 @relation("AssignedIncidents", fields: [assignedToId], references: [id])
+  createdBy            User                  @relation("CreatedIncidents", fields: [createdById], references: [id])
+  activities           IncidentActivity[]
   falsePositiveReports FalsePositiveReport[]
 }
 
@@ -291,23 +318,23 @@ model AuditLog {
 }
 
 model CISBenchmarkVersion {
-  id             String   @id @default(cuid())
-  technology     String
-  currentVersion String
-  releaseDate    DateTime
-  changesSummary String
-  workbenchId    Int?
-  benchmarkTitle String?
+  id                String    @id @default(cuid())
+  technology        String
+  currentVersion    String
+  releaseDate       DateTime
+  changesSummary    String
+  workbenchId       Int?
+  benchmarkTitle    String?
   benchmarkFileName String?
   benchmarkFilePath String?
-  benchmarkSha256 String?
-  downloadedAt   DateTime?
-  sourceUrl      String?
-  metadata       Json?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  benchmarkSha256   String?
+  downloadedAt      DateTime?
+  sourceUrl         String?
+  metadata          Json?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  updateReviews  SCSEMUpdateReview[]
+  updateReviews SCSEMUpdateReview[]
 }
 
 model SystemSetting {
@@ -342,7 +369,7 @@ model KnowledgeDocument {
 }
 
 model KnowledgeChunk {
-  id           String   @id @default(cuid())
+  id           String                       @id @default(cuid())
   documentId   String
   chunkIndex   Int
   content      String
@@ -351,11 +378,11 @@ model KnowledgeChunk {
   section      String?
   heading      String?
   metadata     Json?
-  tokenCount   Int      @default(0)
+  tokenCount   Int                          @default(0)
   contentHash  String
   embedding    Unsupported("vector(1536)")?
-  searchVector Unsupported("tsvector")? @default(dbgenerated())
-  createdAt    DateTime @default(now())
+  searchVector Unsupported("tsvector")?     @default(dbgenerated())
+  createdAt    DateTime                     @default(now())
 
   document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
 

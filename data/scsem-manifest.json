@@ -1,0 +1,964 @@
+{
+  "schemaVersion": 1,
+  "sourcePageUrl": "https://www.irs.gov/privacy-disclosure/computer-security-compliance-references-and-related-topics-scsem-updates",
+  "sourcePageReviewedAt": "2026-06-27",
+  "snapshotAcquiredAt": "2026-07-21",
+  "sourcePolicy": "individual_xlsx_links",
+  "conflictingPackageAudit": {
+    "sourceUrl": "https://www.irs.gov/pub/safeguard/SCSEM-Package-02182026-Current.zip",
+    "auditedAt": "2026-07-21",
+    "httpLastModified": "2026-04-03T17:56:18Z",
+    "sha256": "f491a560ed3de0369526240f46661badcd569d8f3f6935f37faee4afb1c781d6",
+    "sizeBytes": 13258698,
+    "status": "excluded_conflicting_snapshot",
+    "workbookCount": 60,
+    "totalControls": 11252,
+    "pairedWorkbookCount": 57,
+    "pairedControlCount": 10470,
+    "allPairedRawHashesDiffer": true,
+    "allPairedDirectCoreModifiedLater": true,
+    "packageOnly": [
+      { "subject": "SQL Server", "version": "5.0", "controls": 243 },
+      { "subject": "Oracle Solaris", "version": "3.4", "controls": 486 },
+      { "subject": "NGINX Web Server", "version": "1.0", "controls": 53 }
+    ],
+    "directOnly": [
+      { "subject": "Microsoft Windows Server 2012", "version": "3.6", "controls": 273 }
+    ]
+  },
+  "expectedWorkbookCount": 58,
+  "workbooks": [
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-acf2.xlsx",
+      "sha256": "500d0541967340d1a87da62c6ef6d79f2416a6899a1bdbc7259911c5528b8662",
+      "sizeBytes": 150938,
+      "fileName": "safeguards-scsem-acf2.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-acf2.xlsx",
+      "category": "Mainframe",
+      "subject": "zOS-ACF2",
+      "version": "3.8",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 87,
+      "testCaseSheets": [
+        "zOS_ACF2"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-aix7-v3-0-03312025.xlsx",
+      "sha256": "dce856e0f534bbd9207f47c7510e927a90dc13348378f0575317a49e100dbfe3",
+      "sizeBytes": 246287,
+      "fileName": "safeguards-scsem-aix7-v3-0-03312025.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-aix7-v3-0-03312025.xlsx",
+      "category": "UNIX-Linux",
+      "subject": "AIX",
+      "version": "3.0",
+      "effectiveDate": "March 31, 2025",
+      "totalControls": 218,
+      "testCaseSheets": [
+        "Gen Test Cases",
+        "AIX7 Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-amazon-linux-2023-v1-0.xlsx",
+      "sha256": "dfcb4946c5353b474bc35a6722a15fb308029faf748000bdcaceaa8e6463fcfa",
+      "sizeBytes": 243932,
+      "fileName": "safeguards-scsem-amazon-linux-2023-v1-0.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-amazon-linux-2023-v1-0.xlsx",
+      "category": "UNIX-Linux",
+      "subject": "Amazon Linux 2023",
+      "version": "1.0",
+      "effectiveDate": "September 30, 2025",
+      "totalControls": 191,
+      "testCaseSheets": [
+        "Common System Test Cases",
+        "Amazon Linux 23 Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-apacheo-tomcat.xlsx",
+      "sha256": "c02ea824df26ef1cb652dba5f005ff6fc0f2cd827253f2366eb4bb4508c62c6d",
+      "sizeBytes": 158058,
+      "fileName": "safeguards-scsem-apacheo-tomcat.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-apacheo-tomcat.xlsx",
+      "category": "Application",
+      "subject": "Application Server",
+      "version": "3.0",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 90,
+      "testCaseSheets": [
+        "Gen Test Cases",
+        "Tomcat9",
+        "Tomcat10"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-apache24-iis-10-webserver-v6-1.xlsx",
+      "sha256": "ba7e19cc8a79e37c4040457fc467ab0711734165a5a120e0415a8a7ec4531e09",
+      "sizeBytes": 241032,
+      "fileName": "safeguards-scsem-apache24-iis-10-webserver-v6-1.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-apache24-iis-10-webserver-v6-1.xlsx",
+      "category": "Web",
+      "subject": "Web Server",
+      "version": "6.1",
+      "effectiveDate": "1/26/2025",
+      "totalControls": 119,
+      "testCaseSheets": [
+        "General Test Cases",
+        "Apache2.4",
+        "IIS10"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-apple-ios-ipad-os-v1-0-02212025.xlsx",
+      "sha256": "5a628c9286a98dfa527482f05d618abb1052510e11919d22f7c423afd4e3ec4b",
+      "sizeBytes": 136082,
+      "fileName": "safeguards-scsem-apple-ios-ipad-os-v1-0-02212025.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-apple-ios-ipad-os-v1-0-02212025.xlsx",
+      "category": "Others",
+      "subject": "Apple iOS/iPadOS",
+      "version": "1",
+      "effectiveDate": "February 21, 2025",
+      "totalControls": 66,
+      "testCaseSheets": [
+        "Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-application-v4-1.xlsx",
+      "sha256": "4553b3aa46ae4986084a39a5dccc0aabefb8cefa5d930de6717c94c156002217",
+      "sizeBytes": 155796,
+      "fileName": "safeguards-scsem-application-v4-1.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-application-v4-1.xlsx",
+      "category": "Application",
+      "subject": "Generic Application",
+      "version": "4.1",
+      "effectiveDate": "1/26/2026",
+      "totalControls": 86,
+      "testCaseSheets": [
+        "General App Test Cases",
+        "Web App Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-check-point-firewall-v1-0-02202025.xlsx",
+      "sha256": "26c788823f7e196f1315314c438a980c84d1ec4635e23d7fc69f64b8eb7533d6",
+      "sizeBytes": 170874,
+      "fileName": "safeguards-scsem-check-point-firewall-v1-0-02202025.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-check-point-firewall-v1-0-02202025.xlsx",
+      "category": "Network",
+      "subject": "Check Point Firewall",
+      "version": "1.0",
+      "effectiveDate": "2/28/2025",
+      "totalControls": 93,
+      "testCaseSheets": [
+        "Check Point Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-cisco-asa-firewall-v1-1-02202025.xlsx",
+      "sha256": "9680954f5f16bdc6e192abcf7a30ced3489cbebcfe7837b0dda6b5bf4e0b026a",
+      "sizeBytes": 192348,
+      "fileName": "safeguards-scsem-cisco-asa-firewall-v1-1-02202025.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-cisco-asa-firewall-v1-1-02202025.xlsx",
+      "category": "Network",
+      "subject": "Cisco ASA Firewall",
+      "version": "1.1",
+      "effectiveDate": "2/28/2025",
+      "totalControls": 114,
+      "testCaseSheets": [
+        "ASA Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguard-cloud-scsem-v7-0-01152025.xlsx",
+      "sha256": "a4c51058369d81b04dd2cbe2b5446ce2509c8985798b4f3dbcc4dd9bcea823a8",
+      "sizeBytes": 480122,
+      "fileName": "safeguard-cloud-scsem-v7-0-01152025.xlsx",
+      "file": "data/scsems/current/safeguard-cloud-scsem-v7-0-01152025.xlsx",
+      "category": "Others",
+      "subject": null,
+      "version": "7.0",
+      "effectiveDate": "October 25, 2024",
+      "totalControls": 295,
+      "testCaseSheets": [
+        "Gen Test Cases",
+        "AWS Foundations",
+        "Office 365",
+        "Azure",
+        "Google"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/Safeguards-SCSEM%20Containers-v2--06262025.xlsx",
+      "sha256": "e56a102d9491786d344780dbb86bba2b86aac007a30158674e9b199ade781975",
+      "sizeBytes": 261185,
+      "fileName": "Safeguards-SCSEM Containers-v2--06262025.xlsx",
+      "file": "data/scsems/current/Safeguards-SCSEM Containers-v2--06262025.xlsx",
+      "category": "Containers",
+      "subject": "Containers",
+      "version": "2.0",
+      "effectiveDate": "June 30, 2025",
+      "totalControls": 246,
+      "testCaseSheets": [
+        "Gen Test Cases",
+        "Kubernetes",
+        "Docker",
+        "RedHat OpenShift"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-data-warehouse.xlsx",
+      "sha256": "0746d73ce6df6cf5935b43da471367ed24c43624c7a4f131d854be3ff15606e9",
+      "sizeBytes": 111660,
+      "fileName": "safeguards-scsem-data-warehouse.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-data-warehouse.xlsx",
+      "category": "Database",
+      "subject": "Data Warehouse",
+      "version": "2.8",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 30,
+      "testCaseSheets": [
+        "Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-db2-luw-zos.xlsx",
+      "sha256": "3575ab43155555f586bab27e57211fe9ef85f59f508fa26731ef4bb4b2008297",
+      "sizeBytes": 240246,
+      "fileName": "safeguards-scsem-db2-luw-zos.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-db2-luw-zos.xlsx",
+      "category": "Database",
+      "subject": "DB2 for Linux, Unix, and Windows",
+      "version": "1.2",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 305,
+      "testCaseSheets": [
+        "Gen Test Cases",
+        "DB2 v11 Test Cases",
+        "DB2 v13 for z_OS Test Cases "
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-debian.xlsx",
+      "sha256": "299ea982bcba40cd0d17b993e3dd060ec3da27311bc1dc243e3f0f70f198a9a9",
+      "sizeBytes": 395687,
+      "fileName": "safeguards-scsem-debian.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-debian.xlsx",
+      "category": "UNIX-Linux",
+      "subject": "Debian (Linux)",
+      "version": "2.0",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 615,
+      "testCaseSheets": [
+        "Gen Test Cases",
+        "Debian 9",
+        "Debian 10",
+        "Debian 11"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/Safeguards-SCSEM-Fortigate-v10-120124.xlsx",
+      "sha256": "d731ebafb4b9464368e09244a3c0ef7b8ff8a0211c2d50c9f27f467f71172c06",
+      "sizeBytes": 160211,
+      "fileName": "Safeguards-SCSEM-Fortigate-v10-120124.xlsx",
+      "file": "data/scsems/current/Safeguards-SCSEM-Fortigate-v10-120124.xlsx",
+      "category": "Network",
+      "subject": "Fortinet Fortigate Firewall",
+      "version": "1.0",
+      "effectiveDate": "12/31/2024",
+      "totalControls": 78,
+      "testCaseSheets": [
+        "Fortigate Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-generic-db.xlsx",
+      "sha256": "11993ebeac852743941197620d542c5f3a9f6bef7aade6f3b7adc83408ca88d7",
+      "sizeBytes": 112905,
+      "fileName": "safeguards-scsem-generic-db.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-generic-db.xlsx",
+      "category": "Database",
+      "subject": "Generic Database",
+      "version": "2.9",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 27,
+      "testCaseSheets": [
+        "Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/Safeguards-SCSEM%20Generic-Firewall-v7_0-02202025.xlsx",
+      "sha256": "658d726e6fadb25ceb98f15602e8109a670040ea91d5014ffcd175a2393e8ea1",
+      "sizeBytes": 2821424,
+      "fileName": "Safeguards-SCSEM Generic-Firewall-v7_0-02202025.xlsx",
+      "file": "data/scsems/current/Safeguards-SCSEM Generic-Firewall-v7_0-02202025.xlsx",
+      "category": "Network",
+      "subject": "Firewall",
+      "version": "7.0",
+      "effectiveDate": "2/28/2025",
+      "totalControls": 55,
+      "testCaseSheets": [
+        "Gen Firewall Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-generic-unix-linux.xlsx",
+      "sha256": "4a8171c90775bff42ba816fb5f6fd757474e46e51dfaca064e050ec49ca07a8a",
+      "sizeBytes": 179933,
+      "fileName": "safeguards-scsem-generic-unix-linux.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-generic-unix-linux.xlsx",
+      "category": "UNIX-Linux",
+      "subject": "Unix/Linux",
+      "version": "1.15",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 268,
+      "testCaseSheets": [
+        "Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-generic-vdi.xlsx",
+      "sha256": "335225ce07617d00aa131d8840a881021b84e27076c16b2ca5bfb90bef0e5569",
+      "sizeBytes": 114606,
+      "fileName": "safeguards-scsem-generic-vdi.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-generic-vdi.xlsx",
+      "category": "Virtualization",
+      "subject": "Generic VDI Environment",
+      "version": "1.8",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 27,
+      "testCaseSheets": [
+        "Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-generic-web-server.xlsx",
+      "sha256": "bbce4c778fb672d0e8a9ca948b8dbbb267b49d82baf32404df661a96fd207c7f",
+      "sizeBytes": 124696,
+      "fileName": "safeguards-scsem-generic-web-server.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-generic-web-server.xlsx",
+      "category": "Web",
+      "subject": "Generic Web Server (Non-Apache 2.4 and non-IIS Web Servers)",
+      "version": "2.9",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 38,
+      "testCaseSheets": [
+        "Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-gentax.xlsx",
+      "sha256": "0f1018dfe66d6c3d859b0686a86a43588ca98ce4dec8df484908c85254e99c9e",
+      "sizeBytes": 158330,
+      "fileName": "safeguards-scsem-gentax.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-gentax.xlsx",
+      "category": "Application",
+      "subject": "Fast Enterprises GenTax Application",
+      "version": "4.4",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 131,
+      "testCaseSheets": [
+        "GenTax 8 and 9",
+        "GenTax 10 and 11",
+        "FAST Application 12"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-hpux11i.xlsx",
+      "sha256": "6cecf61c875c3ca673ed50d38779b42bbf2635fa827c6d551ee5293ba3649aa4",
+      "sizeBytes": 119248,
+      "fileName": "safeguards-scsem-hpux11i.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-hpux11i.xlsx",
+      "category": "UNIX-Linux",
+      "subject": "HP-UX 11i",
+      "version": "1.8",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 62,
+      "testCaseSheets": [
+        "Gen Test Cases",
+        "HP-UX 11i Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-ibmi-os.xlsx",
+      "sha256": "38e82f478296713e3098b496414670df7d65f4ec7fdf978b2bef6812542da712",
+      "sizeBytes": 160252,
+      "fileName": "safeguards-scsem-ibmi-os.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-ibmi-os.xlsx",
+      "category": "Mainframe",
+      "subject": "IBM i Operating System (replaces i5OS)",
+      "version": "1.5",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 80,
+      "testCaseSheets": [
+        "IBMi Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-macosx.xlsx",
+      "sha256": "71e7f2f298d9fcaabf9a0fc9ef76e00c22b7a82fb2c35972690e6ae4b19abae7",
+      "sizeBytes": 515733,
+      "fileName": "safeguards-scsem-macosx.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-macosx.xlsx",
+      "category": "MacOS",
+      "subject": "Macintosh OS X 10.15, 11.0, 12.0, and 13.0.",
+      "version": "8.0",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 300,
+      "testCaseSheets": [
+        "OSX 10.15",
+        "OSX 11.0",
+        "OSX 12.0",
+        "OSX 13.0"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/Safeguards-SCSEM-MOT-v6-1.xlsx",
+      "sha256": "064f76de388b5d015e5d1d4d4fcea3f7beaf846d66afb9edc4bb9d2f45a42e3c",
+      "sizeBytes": 195308,
+      "fileName": "Safeguards-SCSEM-MOT-v6-1.xlsx",
+      "file": "data/scsems/current/Safeguards-SCSEM-MOT-v6-1.xlsx",
+      "category": "MOT",
+      "subject": "Management, Operational and Technical Controls",
+      "version": "6.1",
+      "effectiveDate": "2/18/2026",
+      "totalControls": 121,
+      "testCaseSheets": [
+        "MOT",
+        "Tumbleweed-Axway",
+        "Web Portal",
+        "IVR"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-mongodb.xlsx",
+      "sha256": "8cbc7928bb01533bb0fe6d928049fc25254ed010796dfc88b6e8ae93b8f9848a",
+      "sizeBytes": 132099,
+      "fileName": "safeguards-scsem-mongodb.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-mongodb.xlsx",
+      "category": "Database",
+      "subject": "MongoDB",
+      "version": "2.5",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 36,
+      "testCaseSheets": [
+        "Gen Test Cases",
+        "MongoDB 3.6"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-mysql.xlsx",
+      "sha256": "a38e9da08fb6a76c6a89b4f3e188b089543f71b633dcf06ba76e06a629c21fef",
+      "sizeBytes": 192624,
+      "fileName": "safeguards-scsem-mysql.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-mysql.xlsx",
+      "category": "Database",
+      "subject": "MySQL 5.6,  5.7, and 8.0",
+      "version": "2.4",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 137,
+      "testCaseSheets": [
+        "Gen Test Cases",
+        "MySQL 5.7",
+        "MySQL 8.0"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-network-assessment-v4-0.xlsx",
+      "sha256": "376a64a06bf0de5a5c46a6cd806ad624a6d041b3d8c35032fffb0869c3854a9b",
+      "sizeBytes": 98290,
+      "fileName": "safeguards-scsem-network-assessment-v4-0.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-network-assessment-v4-0.xlsx",
+      "category": "Network",
+      "subject": "Network Assessment",
+      "version": "4.0",
+      "effectiveDate": "December 31, 2025",
+      "totalControls": 51,
+      "testCaseSheets": [
+        "Network Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-printer.xlsx",
+      "sha256": "f7485ed79a6d914fcd6d106661fc2894c12da676aa1a2907e09fef3563dfc0e5",
+      "sizeBytes": 128744,
+      "fileName": "safeguards-scsem-printer.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-printer.xlsx",
+      "category": "Others",
+      "subject": "Printing",
+      "version": "4.4",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 43,
+      "testCaseSheets": [
+        "Gen Test Cases",
+        "HVP Application"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-generic-os.xlsx",
+      "sha256": "3b6eef52cbf472c4e20cd8d90a7b060229104a947fbfd73b192e140042f7dbc2",
+      "sizeBytes": 113756,
+      "fileName": "safeguards-scsem-generic-os.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-generic-os.xlsx",
+      "category": "Others",
+      "subject": "Generic Operating System",
+      "version": "2.9",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 41,
+      "testCaseSheets": [
+        "Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-oracle.xlsx",
+      "sha256": "aed0e5f86a998c6acaa8db7405ddb03bf89c9f0f2baa529e3fdfc1ecf2b02b59",
+      "sizeBytes": 192132,
+      "fileName": "safeguards-scsem-oracle.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-oracle.xlsx",
+      "category": "Database",
+      "subject": "Oracle 12c, 18c, and 19c",
+      "version": "4.4",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 273,
+      "testCaseSheets": [
+        "Gen Test Cases",
+        "Oracle 12 RDBMS Test Cases",
+        "Oracle 18 RDBMS Test Cases",
+        "Oracle 19 RDBMS Test Cases",
+        "UNIX or Linux Host Test Cases",
+        "Windows Host Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-oel-v5-0-03312025.xlsx",
+      "sha256": "7ea2be7512d025b1b65c8db067334eaf4ebfaf858ef58221226e546431bb6379",
+      "sizeBytes": 608370,
+      "fileName": "safeguards-scsem-oel-v5-0-03312025.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-oel-v5-0-03312025.xlsx",
+      "category": "UNIX-Linux",
+      "subject": "Oracle Linux (Oracle Enterprise Linux)",
+      "version": "5.0",
+      "effectiveDate": "March 31, 2025",
+      "totalControls": 713,
+      "testCaseSheets": [
+        "Gen Test Cases",
+        "OEL 7 Test Cases",
+        "OEL 8 Test Cases",
+        "OEL 9 Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-etpm.xlsx",
+      "sha256": "9039ac9a31779fdc31d6d9cbe821a4d1ab3186f715cfc04175d8fed5760fb167",
+      "sizeBytes": 123441,
+      "fileName": "safeguards-scsem-etpm.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-etpm.xlsx",
+      "category": "Application",
+      "subject": null,
+      "version": "2.8",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 44,
+      "testCaseSheets": [
+        "Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/Safeguards-SCSEM%20Oracle-Solaris-v4_0_0%20-%2005222025.xlsx",
+      "sha256": "49db7ceaa69c57ed6c647672dcb3a12639c520471b2fce791f5f87c7a47adc0e",
+      "sizeBytes": 269028,
+      "fileName": "Safeguards-SCSEM Oracle-Solaris-v4_0_0 - 05222025.xlsx",
+      "file": "data/scsems/current/Safeguards-SCSEM Oracle-Solaris-v4_0_0 - 05222025.xlsx",
+      "category": "UNIX-Linux",
+      "subject": "Oracle Solaris 10, 11.4",
+      "version": "4.0",
+      "effectiveDate": "June 30, 2025",
+      "totalControls": 221,
+      "testCaseSheets": [
+        "Gen Test Cases",
+        "Solaris 10 Test Cases",
+        "Solaris 11.4 Test Cases "
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-palo-alto-firewall-v1.xlsx",
+      "sha256": "414fdf8e76d4c3bde67095bc6e7902df5aad3e8aa807825d3abbc29f09c95e5b",
+      "sizeBytes": 298656,
+      "fileName": "safeguards-scsem-palo-alto-firewall-v1.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-palo-alto-firewall-v1.xlsx",
+      "category": "Network",
+      "subject": "Palo Alto Firewall",
+      "version": "1.0",
+      "effectiveDate": "10/08/2024",
+      "totalControls": 239,
+      "testCaseSheets": [
+        "PaloAlto10",
+        "PaloAlto11"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/Safeguards-SCSEM%20Red%20Hat%20Enterprise%20Linux%20%28RHEL%29-v7_02182025.xlsx",
+      "sha256": "37f1d170120a4e54d3f0480d8ccab299ea409e9e2a73859d5e0b6dcfada3c051",
+      "sizeBytes": 3872336,
+      "fileName": "Safeguards-SCSEM Red Hat Enterprise Linux (RHEL)-v7_02182025.xlsx",
+      "file": "data/scsems/current/Safeguards-SCSEM Red Hat Enterprise Linux (RHEL)-v7_02182025.xlsx",
+      "category": "UNIX-Linux",
+      "subject": "Red Hat Linux",
+      "version": "7.0",
+      "effectiveDate": "2/28/2025",
+      "totalControls": 685,
+      "testCaseSheets": [
+        "Gen Test Cases",
+        "RHEL 7 Test Cases",
+        "RHEL 8 Test Cases",
+        "RHEL 9 Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-racf.xlsx",
+      "sha256": "ce8fdddbcd0bc72b5cef5c89946b0c4d681d72a7dec24d53cf6b183e2c7e134a",
+      "sizeBytes": 148659,
+      "fileName": "safeguards-scsem-racf.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-racf.xlsx",
+      "category": "Mainframe",
+      "subject": "RACF",
+      "version": "3.5",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 101,
+      "testCaseSheets": [
+        "Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-rocky.xlsx",
+      "sha256": "acfd41815ab72d3eb67bc1a724b17daaa478f2465f918bffd1ea4f4ac5c84d91",
+      "sizeBytes": 240261,
+      "fileName": "safeguards-scsem-rocky.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-rocky.xlsx",
+      "category": "UNIX-Linux",
+      "subject": "Rocky Rocky Linux",
+      "version": "1.0",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 211,
+      "testCaseSheets": [
+        "Gen Test Cases",
+        "Rocky 9 Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-rsi-revenue-premier.xlsx",
+      "sha256": "1d10a031ef5771df565eabef6b96c99410b947e612f4ed4c97c8d5d8ecff00d8",
+      "sizeBytes": 151489,
+      "fileName": "safeguards-scsem-rsi-revenue-premier.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-rsi-revenue-premier.xlsx",
+      "category": "Application",
+      "subject": null,
+      "version": "3.7",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 133,
+      "testCaseSheets": [
+        "RSI",
+        "RPTP",
+        "ITP"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-microsoft-sql-server-scem-v60-08252024.xlsx",
+      "sha256": "a862a9b71b572782236331df9ea8158d70a273a7029a305941099f58cf34a260",
+      "sizeBytes": 232334,
+      "fileName": "safeguards-microsoft-sql-server-scem-v60-08252024.xlsx",
+      "file": "data/scsems/current/safeguards-microsoft-sql-server-scem-v60-08252024.xlsx",
+      "category": "Database",
+      "subject": "SQL Server",
+      "version": "6.0",
+      "effectiveDate": "August 25, 2024",
+      "totalControls": 196,
+      "testCaseSheets": [
+        "Gen Test Cases",
+        "SQL 2016 Test Cases",
+        "SQL 2017 Test Cases",
+        "SQL 2019 Test Cases",
+        "SQL 2022 Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-san.xlsx",
+      "sha256": "e868666306dafbc43ac681ef417c3d90528841d785535893fc93e2423dacc304",
+      "sizeBytes": 136491,
+      "fileName": "safeguards-scsem-san.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-san.xlsx",
+      "category": "Network",
+      "subject": "Storage Area Network",
+      "version": "3.3",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 38,
+      "testCaseSheets": [
+        "Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-suse-linux-v5-0-03312025.xlsx",
+      "sha256": "da689bdd8f3f04d36552062d36144e2350063f649bd1f0703f51762a16ebf333",
+      "sizeBytes": 427445,
+      "fileName": "safeguards-scsem-suse-linux-v5-0-03312025.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-suse-linux-v5-0-03312025.xlsx",
+      "category": "UNIX-Linux",
+      "subject": "SUSE Linux Enterprise Server 12, 15",
+      "version": "5.0",
+      "effectiveDate": "3/31/2025",
+      "totalControls": 414,
+      "testCaseSheets": [
+        "Gen Test Cases",
+        "SUSE12 Test Cases",
+        "SUSE15 Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-switch-router-v7-0.xlsx",
+      "sha256": "c1f05b3c7999980edbc5e9e00a299620906ddc61e1506e39c97a8681a50ee9bd",
+      "sizeBytes": 262703,
+      "fileName": "safeguards-scsem-switch-router-v7-0.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-switch-router-v7-0.xlsx",
+      "category": "Network",
+      "subject": "Switch Router (SR)",
+      "version": "7.0",
+      "effectiveDate": "December 31, 2025",
+      "totalControls": 241,
+      "testCaseSheets": [
+        "Gen Test Cases",
+        "IOS 15.0M Test Cases",
+        "IOS 16.0M Test Cases ",
+        "IOS 17.0M Test Cases  ",
+        "NX-OS Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-teradata.xlsx",
+      "sha256": "929adf46c5154accffae44c1c52b492074596f039e342fb8fdde924a54bdfc78",
+      "sizeBytes": 120322,
+      "fileName": "safeguards-scsem-teradata.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-teradata.xlsx",
+      "category": "Application",
+      "subject": null,
+      "version": "3.7",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 41,
+      "testCaseSheets": [
+        "Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-top-secret.xlsx",
+      "sha256": "66b006303f046d3bd02cd81cbacb4211c67ab6ed96940324f6d853f36db55248",
+      "sizeBytes": 143380,
+      "fileName": "safeguards-scsem-top-secret.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-top-secret.xlsx",
+      "category": "Mainframe",
+      "subject": "CA-Top Secret",
+      "version": "3.5",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 104,
+      "testCaseSheets": [
+        "Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-unisys.xlsx",
+      "sha256": "0f30b89bae46506738d364883b6882540dc26541e4b48bcfe86bcdf1b94e90a5",
+      "sizeBytes": 119407,
+      "fileName": "safeguards-scsem-unisys.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-unisys.xlsx",
+      "category": "Mainframe",
+      "subject": "UNISYS",
+      "version": "3.8",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 60,
+      "testCaseSheets": [
+        "Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-vmwareesxi-v5.xlsx",
+      "sha256": "5f4be6ee77378f7e17fdd68a156f4da3a43724b31a9731b63634175daf9e6d2d",
+      "sizeBytes": 327262,
+      "fileName": "safeguards-scsem-vmwareesxi-v5.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-vmwareesxi-v5.xlsx",
+      "category": "Virtualization",
+      "subject": null,
+      "version": "5.0",
+      "effectiveDate": "September 12, 2024",
+      "totalControls": 184,
+      "testCaseSheets": [
+        "ESXI7.0 Test Cases",
+        "ESXi8.0 Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-voip-network.xlsx",
+      "sha256": "01393f9735d24a27480837c5b97367208e0a7e59bb4b735f40330fb81ad1609e",
+      "sizeBytes": 132222,
+      "fileName": "safeguards-scsem-voip-network.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-voip-network.xlsx",
+      "category": "Network",
+      "subject": "Voice Over Internet Protocol Network",
+      "version": "2.9",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 29,
+      "testCaseSheets": [
+        "Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-vpn-v3-0.xlsx",
+      "sha256": "412f6f515c582d28bdcb0d6412d9aa1ac3f206eee09b6c03a16ce27e18e6f261",
+      "sizeBytes": 151429,
+      "fileName": "safeguards-scsem-vpn-v3-0.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-vpn-v3-0.xlsx",
+      "category": "Network",
+      "subject": "Virtual Private Network",
+      "version": "3.0",
+      "effectiveDate": "December 30, 2025",
+      "totalControls": 90,
+      "testCaseSheets": [
+        "Remote Access VPN",
+        "Site to Site VPN"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguard-microsoft-windows-10-scsem-v60-08122024.xlsx",
+      "sha256": "8c4ad7ed2445f76d4f78b0aa80ee6e071c51e514735e02baedfa347107c7a783",
+      "sizeBytes": 278371,
+      "fileName": "safeguard-microsoft-windows-10-scsem-v60-08122024.xlsx",
+      "file": "data/scsems/current/safeguard-microsoft-windows-10-scsem-v60-08122024.xlsx",
+      "category": "Windows",
+      "subject": "Windows 10",
+      "version": "6.0",
+      "effectiveDate": "August 12, 2024",
+      "totalControls": 367,
+      "testCaseSheets": [
+        "Windows 10"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-microsoft-windows-11-v3-01-03312025.xlsx",
+      "sha256": "1ed7d8f0979adbfb3dc3af015aa230ecf4a3fd2e184da52ca6184ab3f2aa6f28",
+      "sizeBytes": 317699,
+      "fileName": "safeguards-scsem-microsoft-windows-11-v3-01-03312025.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-microsoft-windows-11-v3-01-03312025.xlsx",
+      "category": "Windows",
+      "subject": "Windows 11",
+      "version": "3.0",
+      "effectiveDate": "3/31/2025",
+      "totalControls": 390,
+      "testCaseSheets": [
+        "Win11"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-win-server2012.xlsx",
+      "sha256": "346793ee22e18b3b5ba26640a660c30d7d12a94432c26ee993397c07fc495772",
+      "sizeBytes": 245632,
+      "fileName": "safeguards-scsem-win-server2012.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-win-server2012.xlsx",
+      "category": "Windows",
+      "subject": "Microsoft Server 2012",
+      "version": "3.6",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 273,
+      "testCaseSheets": [
+        "Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-win-server2012r2.xlsx",
+      "sha256": "1950a49eebca735a0f5800807f71836ca337daea055b1a634f4934d6b1153582",
+      "sizeBytes": 250466,
+      "fileName": "safeguards-scsem-win-server2012r2.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-win-server2012r2.xlsx",
+      "category": "Windows",
+      "subject": "Microsoft Server 2012R2",
+      "version": "3.6",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 277,
+      "testCaseSheets": [
+        "Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguard-microsoft-windows-server-2016-scsem-v30-08122024.xlsx",
+      "sha256": "f13e1d3c6074fb66291a560997a6bf74e70727f007be0e5d698b2e795aac4b1f",
+      "sizeBytes": 325332,
+      "fileName": "safeguard-microsoft-windows-server-2016-scsem-v30-08122024.xlsx",
+      "file": "data/scsems/current/safeguard-microsoft-windows-server-2016-scsem-v30-08122024.xlsx",
+      "category": "Windows",
+      "subject": "Microsoft Server 2016",
+      "version": "3.0",
+      "effectiveDate": "August 12, 2024",
+      "totalControls": 318,
+      "testCaseSheets": [
+        "Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-win-server2019-v2-point-0-10242024.xlsx",
+      "sha256": "e43942b8c598aec075f8d8aa937f31b26179118fa618c8a3e74c61c31cd2192a",
+      "sizeBytes": 341591,
+      "fileName": "safeguards-scsem-win-server2019-v2-point-0-10242024.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-win-server2019-v2-point-0-10242024.xlsx",
+      "category": "Windows",
+      "subject": "Microsoft Server 2019",
+      "version": "2.0",
+      "effectiveDate": "July 01, 2024",
+      "totalControls": 325,
+      "testCaseSheets": [
+        "Test Cases Server 2019"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguard-microsoft-windows-server-2022-scsem-v20-08122024.xlsx",
+      "sha256": "305e7157181c99ca12c2be3dc65b44ded6b823aa6bb580774a0e3c381c8183df",
+      "sizeBytes": 396835,
+      "fileName": "safeguard-microsoft-windows-server-2022-scsem-v20-08122024.xlsx",
+      "file": "data/scsems/current/safeguard-microsoft-windows-server-2022-scsem-v20-08122024.xlsx",
+      "category": "Windows",
+      "subject": "Microsoft Server 2022",
+      "version": "2.0",
+      "effectiveDate": "August 12, 2024",
+      "totalControls": 329,
+      "testCaseSheets": [
+        "Test Cases Server 2022"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-windows-server-2025-v1-0.xlsx",
+      "sha256": "a139c9d0ce80a08f36cd18e188de54c2491f1a143ae34b15da65f9cd336b6a45",
+      "sizeBytes": 370397,
+      "fileName": "safeguards-scsem-windows-server-2025-v1-0.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-windows-server-2025-v1-0.xlsx",
+      "category": "Windows",
+      "subject": "Microsoft Server 2025",
+      "version": "1.0",
+      "effectiveDate": "September 30, 2025",
+      "totalControls": 360,
+      "testCaseSheets": [
+        "Common System Test Cases",
+        "Test Cases Server 2025"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-wireless-networking.xlsx",
+      "sha256": "10952ff5c5a76a8da6e3b5af675b5da5651b97e5fde9fcb127f964c95ab00615",
+      "sizeBytes": 124611,
+      "fileName": "safeguards-scsem-wireless-networking.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-wireless-networking.xlsx",
+      "category": "Network",
+      "subject": "Wireless Networking",
+      "version": "2.9",
+      "effectiveDate": "September 30, 2023",
+      "totalControls": 37,
+      "testCaseSheets": [
+        "Test Cases"
+      ]
+    }
+  ]
+}

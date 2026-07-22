@@ -1,15 +1,17 @@
 # IRS SkyShield — Product Specification
 
 ## Overview
-IRS SkyShield is an AI-powered web application that helps IRS Office of Safeguards compliance workers, agencies, and organizations achieve and maintain compliance with **IRS Publication 1075** (Tax Information Security Guidelines). Instead of manually searching a 216-page document, users get instant, cited, authoritative guidance from an AI agent backed by the full Publication 1075 text.
+IRS SkyShield is an internal application for authorized IRS Office of Safeguards personnel. It supports cited Publication 1075 research, canonical Safeguards Computer Security Evaluation Matrix (SCSEM) template stewardship, incident operations, and auditability.
+
+The SCSEM Updater maintains the canonical template source that may later be published for agencies to use as guidance. Agencies do not submit implementations, control evidence, findings, or assessment results through this workflow. SkyShield does not assess or certify an agency, certify a technology, or publish an official SCSEM release. It produces source-attributed candidate changes and candidate workbooks for authorized human review and a separately governed Office of Safeguards release process.
 
 ## Core Value Proposition
 - **Instant Pub 1075 guidance** — ask questions in plain English, get cited answers with section references
-- **SCSEM management** — browse, search, and track 58 technology-specific compliance matrices
+- **Canonical SCSEM stewardship** — verify the pinned IRS source set, compare standards evidence, review candidate template changes, and export candidate workbooks without collecting agency assessment data
 - **Incident tracking** — log and manage FTI/PII exposure incidents with remediation workflows
 - **FTI/PII guardrails** — the app itself rejects any FTI/PII input, creating incident reports if users attempt to submit sensitive data
 - **Web search integration** — cross-reference Pub 1075 requirements with real-world technologies (CrowdStrike, Windows, etc.)
-- **CIS Benchmark tracking** — monitor when CIS benchmarks update and flag SCSEM deltas
+- **CIS Benchmark/CIS-STIG evidence tracking** — retain CIS WorkBench identity, version, profile, release metadata, license-authorized retrieval, and hashes; flag candidate deltas and unresolved applicability for reviewer disposition
 
 ## Architecture
 
@@ -18,14 +20,16 @@ IRS SkyShield is an AI-powered web application that helps IRS Office of Safeguar
 - **UI:** Tailwind CSS + shadcn/ui components
 - **Database:** PostgreSQL (for multi-tenant data, audit logs, incidents)
 - **ORM:** Prisma
-- **Auth:** NextAuth.js v5 with role-based access (Admin, Compliance Officer, Auditor, Viewer)
+- **Auth:** NextAuth.js v5 with role-based access; canonical SCSEM stewardship is restricted to explicitly authorized Admin and Computer Security Review users in a steward-enabled organization
 - **AI:** Claude Sonnet 4.6 via Bifrost chat completions on Microsoft Foundry
 - **Search:** Brave Search API or similar for web augmentation
 - **Deployment:** Docker → Coolify on Hetzner VPS
 
 ### Multi-Tenant Architecture
-- Organizations sign up and get isolated workspaces
+- Organizations have isolated workspaces for the broader platform
 - Users belong to organizations with role-based permissions
+- Organization membership alone does not grant SCSEM access. Canonical template maintenance requires an explicit steward-organization flag plus an authorized role.
+- The SCSEM workflow is not an agency-facing assessment workspace; its organization boundary identifies the authorized Office of Safeguards stewardship group and scopes each updater session to its creator.
 - All actions are audit-logged (who, what, when, from where)
 - Data isolation between organizations
 
@@ -67,30 +71,45 @@ The heart of the app. A chat interface where compliance workers ask questions an
 Clean, simple overview. Think Vercel Dashboard — minimal, functional.
 
 **Widgets:**
-- **Compliance Score** — overall organization compliance percentage based on completed SCSEM assessments
+- **SCSEM Source Set** — pinned official template count, manifest retrieval date, and source-integrity status
+- **Candidate Review Queue** — pending/approved/rejected template proposals and incomplete-source sessions
 - **Open Incidents** — count + severity breakdown (Critical/High/Medium/Low)
 - **Recent Activity** — audit log feed (last 20 actions)
-- **SCSEM Status** — pie chart showing assessed vs unassessed technologies
-- **Upcoming Deadlines** — safeguards review dates, corrective action deadlines
-- **Quick Actions** — "Ask Agent", "Report Incident", "Start SCSEM Assessment"
+- **SCSEM Status** — source freshness, candidate drafts, and unresolved CIS Benchmark/CIS-STIG applicability (never agency compliance status)
+- **Upcoming Deadlines** — internal template review/release dates and incident deadlines
+- **Quick Actions** — "Ask Agent", "Report Incident", "Open SCSEM Updater"
 
-### 3. SCSEM Management
-Browse, assess, and track all 58 SCSEM templates.
+### 3. Canonical SCSEM Template Stewardship
+Maintain the current IRS-published SCSEM template set and prepare candidate workbooks for release review. This feature is for Office of Safeguards template owners, not agencies performing control assessments.
 
 **Features:**
-- **SCSEM Library** — organized by category (Application, Database, Network, Windows, UNIX/Linux, etc.)
-- **Assessment Workflow** — for each SCSEM:
-  - View all controls/requirements
-  - Mark each control as: Compliant / Non-Compliant / Not Applicable / In Progress
-  - Add notes, evidence links, responsible party
-  - Track remediation status for non-compliant items
-  - Calculate compliance percentage
-- **CIS Benchmark Tracking:**
-  - Store current CIS Benchmark version for each SCSEM technology
-  - Periodically check (or manually trigger) CIS website for updates
-  - When a new CIS Benchmark version is detected, flag the corresponding SCSEM as "Review Needed"
-  - Show diff summary of what changed
-- **Export** — export assessment results as Excel/PDF for safeguards reviews
+- **Pinned official source set** — each accepted IRS SCSEM from the page's individual XLSX links is represented in a manifest with its official URL, filename, technology/category, version/effective date when available, retrieval metadata, and SHA-256 hash. Unrecognized or modified uploads are not silently promoted to canonical input. A concurrently linked package archive that differs from those individual downloads is recorded as a reconciliation source, not silently allowlisted as equivalent canonical bytes.
+- **Template-content workflow** — parse controls, formulas, sheets, styles, validation rules, and change-log structure; propose changes only to approved canonical template-content fields. Agency response/assessment fields are outside the workflow and must not be imported, inferred, carried forward, or intentionally modified.
+- **Standards evidence:**
+  - Pin the Publication 1075 source used for governing policy evidence.
+  - Pin the NIST SP 800-53 Rev. 5 snapshot used for secondary control mapping.
+  - Record CIS SecureSuite WorkBench ID, benchmark/version/profile, license-authorized retrieval, release metadata, and content hash for CIS Benchmark and CIS-published STIG profile workbooks ("CIS-STIG").
+  - Do not represent CIS-STIG retrieval as independent validation against the authoritative DISA STIG library or DISA release history; that validation is not implemented and remains an external reviewer responsibility.
+  - Treat source availability, title similarity, and automated overlap as evidence—not as an applicability decision. An authorized reviewer must confirm technology generation, profile, scope, source authority, and licensing/permitted use.
+- **Candidate change review:**
+  - Show the exact target sheet/control/field, current value, proposed value, rationale, source evidence, and confidence.
+  - Allow authorized reviewers to edit permitted proposal fields, approve or reject for the candidate draft, batch review, and undo.
+  - Keep machine rationale and source identity immutable in the review UI.
+  - Mark a session `analysis_incomplete` when required source, AI, or direct applicability coverage is unresolved. Other successful comparisons do not turn that state into a "complete review."
+- **Candidate export:**
+  - Apply only reviewer-approved template-content changes to the verified canonical base while preserving workbook structure, formulas, styles, validation, filters, and sheet layout.
+  - Never carry forward actual results, agency status, notes/evidence, agency remediation/CAP text, or other agency-entered assessment-response content.
+  - Treat standard finding text, criticality, issue-code mappings, and risk formulas as template-owned control metadata. Require reviewer-approved standard finding text when the selected sheet has a unique Finding Statement column, while preserving layouts that do not contain that column. Require a reviewer-selected code that exists uniquely in the verified workbook's `Issue Code Table`; derive its mapping text from that table and never clone another control's issue code as a default.
+  - Return unchanged original bytes when no approved change or official structural rebase is required.
+  - Label exports from incomplete sessions as working drafts.
+  - Treat every export as a candidate XLSX requiring native Excel inspection and separate Office of Safeguards quality-control and release approval.
+
+**Explicit non-goals:**
+- Agency system/control submission or evidence collection
+- Agency compliance scoring, findings management, attestation, or certification
+- Automatic CIS Benchmark/CIS-STIG applicability decisions
+- Independent DISA STIG ingestion or release validation
+- Automatic publication or designation of an official SCSEM release
 
 ### 4. Incident Management
 Track and manage FTI/PII incidents.
@@ -124,7 +143,7 @@ Every action in the system is logged. Non-deletable.
 **Logged Events:**
 - User login/logout (with IP, user agent)
 - AI agent queries (question asked, NOT the full response to save space)
-- SCSEM assessment changes
+- SCSEM source verification, candidate analysis, proposal review/undo, incomplete-source disposition, and candidate export events
 - Incident creation/updates
 - User management changes
 - Configuration changes
@@ -138,19 +157,20 @@ Every action in the system is logged. Non-deletable.
 
 ### 6. User Management (Admin)
 - Invite users by email
-- Assign roles: Admin, Compliance Officer, Auditor, Viewer
+- Assign roles: Admin, Computer Security Review, Compliance Officer, Auditor, Viewer
 - Role permissions:
-  - **Admin:** Full access, user management, org settings
-  - **Compliance Officer:** Full access except user management
-  - **Auditor:** Read-only access to everything, can add comments
-  - **Viewer:** Dashboard + read-only SCSEM/incidents
+  - **Admin:** User and organization administration; canonical SCSEM access only when the user's organization is explicitly steward-enabled
+  - **Computer Security Review:** Canonical SCSEM stewardship only when the user's organization is explicitly steward-enabled
+  - **Compliance Officer:** Broader platform workflows permitted by policy, but no canonical SCSEM page or API access
+  - **Auditor:** Read-only access permitted by broader platform policy, but no canonical SCSEM page or API access
+  - **Viewer:** Limited dashboard/incidents access, but no canonical SCSEM page or API access
 - Deactivate/remove users
 - View user activity
 
 ### 7. Organization Settings
 - Organization name, logo
 - Notification preferences
-- SCSEM assessment schedule
+- Steward-organization authorization and internal SCSEM review/release schedule
 - Custom incident categories
 - API key management (for future integrations)
 
@@ -158,7 +178,7 @@ Every action in the system is logged. Non-deletable.
 
 ```
 Organization
-  - id, name, slug, logo, createdAt
+  - id, name, slug, logo, canManageCanonicalScsems, createdAt
 
 User
   - id, email, name, role, organizationId, lastLogin, createdAt
@@ -172,11 +192,17 @@ Message
 SCSEMTemplate
   - id, name, category, version, effectiveDate, cisVersion, filePath
 
-SCSEMAssessment
-  - id, templateId, organizationId, assessedBy, status, complianceScore, createdAt
+SCSEMSheet / SCSEMControl / SCSEMChangeLog
+  - parsed canonical template content and source release history
 
-SCSEMControlResult
-  - id, assessmentId, controlId, status (compliant/non-compliant/na/in-progress), notes, evidence, assignedTo
+SCSEMUpdateReview
+  - id, templateId, benchmarkId, status, suggestedChanges, reviewedBy, reviewedAt
+
+SCSEMUpdaterSession (runtime, steward- and creator-scoped)
+  - id, originalFileName, uploadedSha256, sourceManifestEntry, status, changes[], history[], audit
+
+SCSEMSourceManifest (repository data)
+  - officialUrl, fileName, technology, category, version/effectiveDate, retrievedAt, sha256
 
 Incident
   - id, organizationId, title, description, type, severity, status, assignedTo, createdAt, resolvedAt
@@ -202,7 +228,7 @@ CISBenchmarkVersion
 
 ## Branding
 - **Name:** IRS SkyShield  
-- **Tagline:** "AI-Powered Publication 1075 Compliance"
+- **Tagline:** "AI-Assisted Safeguards Research & SCSEM Stewardship"
 - **Colors:** Deep navy (#1a237e), accent blue (#42a5f5), white, subtle grays
 - **Logo:** Shield icon with a subtle AI/circuit motif (can be placeholder for now)
 - **No "Sky Solutions" or "Galang AI" branding** — this is a neutral product
@@ -216,6 +242,8 @@ CISBenchmarkVersion
 - CSRF tokens on all forms
 - Content Security Policy headers
 - No FTI/PII stored in the application EVER
+- CIS credentials and licensed artifacts are provisioned and retained only through approved operational controls, never source control
+- Candidate SCSEM exports are visibly non-release artifacts until separate Office of Safeguards quality-control and publication approval is recorded
 
 ## Environment Variables Needed
 ```
@@ -232,7 +260,8 @@ BRAVE_SEARCH_API_KEY=... (for web search, if available)
 ## File Structure
 ```
 /data/pub1075/          — Publication 1075 full text (for AI context)
-/data/scsems/           — All 58 SCSEM xlsx files organized by category
+/data/scsem-manifest.json — Pinned official IRS SCSEM source metadata and hashes
+/data/scsems/current/   — Flat, hash-pinned corpus of all 58 current IRS SCSEM XLSX files
 /src/app/               — Next.js App Router pages
 /src/components/        — Shared UI components
 /src/lib/               — Utilities, AI client, PII detection, etc.
@@ -252,7 +281,7 @@ Focus on getting these working:
 2. ✅ Auth (NextAuth with credentials provider + invite system)
 3. ✅ AI Agent chat interface with full Pub 1075 context
 4. ✅ FTI/PII detection guardrails on all AI inputs
-5. ✅ SCSEM library browser (read-only, organized by category)
+5. ✅ Steward-only SCSEM source verification, candidate update review, and candidate XLSX export
 6. ✅ Basic incident tracker (CRUD)
 7. ✅ Audit logging middleware
 8. ✅ Dashboard with key metrics
@@ -260,7 +289,7 @@ Focus on getting these working:
 10. ✅ Database schema + seed data
 
 ## Out of Scope (Phase 2+)
-- CIS Benchmark auto-checking (manual for now)
+- Automatic CIS Benchmark/CIS-STIG applicability decisions, independent DISA STIG release validation, and automatic SCSEM publication (human review and release governance remain mandatory)
 - Email notifications
 - PDF export
 - API for external integrations

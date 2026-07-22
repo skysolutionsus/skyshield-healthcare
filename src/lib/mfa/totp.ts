@@ -44,8 +44,27 @@ export function verifyTotpCode({
   now?: number;
   window?: number;
 }): boolean {
+  return matchTotpCounter({ secret, code, now, window }) !== null;
+}
+
+/**
+ * Return the exact moving-factor counter matched by a TOTP. Callers performing
+ * a security-sensitive action must atomically require this counter to be newer
+ * than the user's persisted last-used counter before committing the action.
+ */
+export function matchTotpCounter({
+  secret,
+  code,
+  now = Date.now(),
+  window = 1,
+}: {
+  secret: string;
+  code: string;
+  now?: number;
+  window?: number;
+}): number | null {
   const normalized = normalizeTotpCode(code);
-  if (!/^\d{6}$/.test(normalized)) return false;
+  if (!/^\d{6}$/.test(normalized)) return null;
 
   const counter = Math.floor(now / 1000 / TOTP_PERIOD_SECONDS);
   for (let offset = -window; offset <= window; offset++) {
@@ -54,11 +73,11 @@ export function verifyTotpCode({
 
     const candidate = generateTotpCode(secret, candidateCounter);
     if (timingSafeEqual(candidate, normalized)) {
-      return true;
+      return candidateCounter;
     }
   }
 
-  return false;
+  return null;
 }
 
 function generateTotpCode(secret: string, counter: number): string {

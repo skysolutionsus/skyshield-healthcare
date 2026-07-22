@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { createHash } from "crypto";
 import { parseSCSEMFile, type ParsedSCSEM } from "@/lib/xlsx-parser";
+import { officialSCSEMManifest } from "@/lib/scsem-official-manifest";
 
 export type OfficialSCSEMReference = {
     family: "rhel" | "esxi" | "cloud" | "amazon-linux";
@@ -20,40 +21,51 @@ export type OfficialSCSEMReference = {
 
 type ReferenceDefinition = Pick<OfficialSCSEMReference,
     "family" | "filePath" | "sourceUrl" | "irsEffectiveDate"> & {
+    expectedSha256: string;
     matches: (evidence: string) => boolean;
 };
 
-const IRS_SCSEM_PAGE = "https://www.irs.gov/privacy-disclosure/computer-security-compliance-references-and-related-topics-scsem-updates";
+const manifest = officialSCSEMManifest();
+const IRS_SCSEM_PAGE = manifest.sourcePageUrl;
+
+function referenceDefinition(
+    family: OfficialSCSEMReference["family"],
+    fileName: string,
+    matches: (evidence: string) => boolean
+): ReferenceDefinition {
+    const entry = manifest.workbooks.find((candidate) => candidate.fileName === fileName);
+    if (!entry) throw new Error(`Pinned IRS SCSEM reference is missing: ${fileName}`);
+    return {
+        family,
+        filePath: entry.file,
+        sourceUrl: entry.sourceUrl,
+        irsEffectiveDate: entry.effectiveDate || manifest.snapshotAcquiredAt,
+        expectedSha256: entry.sha256,
+        matches,
+    };
+}
 
 const REFERENCES: ReferenceDefinition[] = [
-    {
-        family: "amazon-linux",
-        filePath: "data/scsems/UNIX-Linux/Safeguards-SCSEM Amazon Linux 2023-v1_0.xlsx",
-        sourceUrl: "https://www.irs.gov/pub/safeguard/safeguards-scsem-amazon-linux-2023-v1-0.xlsx",
-        irsEffectiveDate: "2026-03-13",
-        matches: (evidence) => /\b(?:amazon linux|al2023|amzl23)\b/i.test(evidence),
-    },
-    {
-        family: "rhel",
-        filePath: "data/scsems/UNIX-Linux/Safeguards-SCSEM Red Hat Enterprise Linux (RHEL)-v7_02182025.xlsx",
-        sourceUrl: "https://www.irs.gov/pub/safeguard/Safeguards-SCSEM%20Red%20Hat%20Enterprise%20Linux%20%28RHEL%29-v7_02182025.xlsx",
-        irsEffectiveDate: "2025-08-15",
-        matches: (evidence) => /\b(?:red hat enterprise linux|red hat linux|rhel)\b/i.test(evidence),
-    },
-    {
-        family: "esxi",
-        filePath: "data/scsems/Virtulization/Safeguards-SCSEM VMWare-ESXi-v5_0-0918024.xlsx",
-        sourceUrl: "https://www.irs.gov/pub/safeguard/safeguards-scsem-vmwareesxi-v5.xlsx",
-        irsEffectiveDate: "2025-01-01",
-        matches: (evidence) => /\b(?:vmware\s+)?esxi\b/i.test(evidence),
-    },
-    {
-        family: "cloud",
-        filePath: "data/scsems/Others/Safeguards-SCSEM Cloud-v7_0-11152024.xlsx",
-        sourceUrl: "https://www.irs.gov/pub/safeguard/safeguard-cloud-scsem-v7-0-01152025.xlsx",
-        irsEffectiveDate: "2025-01-15",
-        matches: (evidence) => /\bcloud computing\b|\baws foundations\b/i.test(evidence),
-    },
+    referenceDefinition(
+        "amazon-linux",
+        "safeguards-scsem-amazon-linux-2023-v1-0.xlsx",
+        (evidence) => /\b(?:amazon linux|al2023|amzl23)\b/i.test(evidence)
+    ),
+    referenceDefinition(
+        "rhel",
+        "Safeguards-SCSEM Red Hat Enterprise Linux (RHEL)-v7_02182025.xlsx",
+        (evidence) => /\b(?:red hat enterprise linux|red hat linux|rhel)\b/i.test(evidence)
+    ),
+    referenceDefinition(
+        "esxi",
+        "safeguards-scsem-vmwareesxi-v5.xlsx",
+        (evidence) => /\b(?:vmware\s+)?esxi\b/i.test(evidence)
+    ),
+    referenceDefinition(
+        "cloud",
+        "safeguard-cloud-scsem-v7-0-01152025.xlsx",
+        (evidence) => /\bcloud computing\b|\baws foundations\b/i.test(evidence)
+    ),
 ];
 
 const parsedReferenceCache = new Map<string, ParsedSCSEM>();
@@ -120,9 +132,18 @@ function sha256(filePath: string): string {
 }
 
 export function resolveOfficialReferencePath(reference: Pick<OfficialSCSEMReference, "filePath">): string {
-    return path.isAbsolute(reference.filePath)
-        ? reference.filePath
-        : path.join(process.cwd(), reference.filePath);
+    const entry = manifest.workbooks.find((candidate) => candidate.file === reference.filePath);
+    if (!entry) {
+        throw new Error("Official SCSEM reference is not present in the pinned manifest.");
+    }
+
+    const fileName = path.basename(entry.file);
+    const expectedManifestPath = path.posix.join("data", "scsems", "current", fileName);
+    if (fileName !== entry.fileName || entry.file !== expectedManifestPath) {
+        throw new Error("Pinned IRS SCSEM reference contains an invalid workbook path.");
+    }
+
+    return path.join(process.cwd(), "data", "scsems", "current", fileName);
 }
 
 export function evaluateOfficialSCSEMReference(
@@ -139,11 +160,31 @@ export function evaluateOfficialSCSEMReference(
     const definition = REFERENCES.find((candidate) => candidate.matches(evidence));
     if (!definition) return null;
 
+    // An exact current manifest workbook is already its own authoritative
+    // baseline. Incidental product names must never rebase it onto another
+    // current technology template. Legacy/unrecognized older inputs retain the
+    // deliberate same-family upgrade path exercised by the rebase regression.
+    const admittedCurrentSource = uploadedSha256
+        ? manifest.workbooks.find((candidate) => candidate.sha256 === uploadedSha256)
+        : undefined;
+    if (
+        admittedCurrentSource &&
+        admittedCurrentSource.sha256 !== definition.expectedSha256
+    ) {
+        return null;
+    }
+
     const absolutePath = resolveOfficialReferencePath(definition);
     if (!fs.existsSync(absolutePath)) return null;
     const reference = parsedReferenceCache.get(absolutePath) || parseSCSEMFile(absolutePath);
     parsedReferenceCache.set(absolutePath, reference);
     const referenceSha256 = sha256(absolutePath);
+    if (referenceSha256 !== definition.expectedSha256) {
+        throw new Error(
+            `Pinned IRS SCSEM reference hash mismatch for ${definition.filePath}. ` +
+            "Refresh it only through the reviewed manifest acquisition workflow."
+        );
+    }
     const sameWorkbookBytes = Boolean(uploadedSha256 && uploadedSha256 === referenceSha256);
     const referenceSheets = testCaseSheets(reference);
     const uploadedSheetKeys = new Set(uploadedSheets.map(normalizedSheetName));

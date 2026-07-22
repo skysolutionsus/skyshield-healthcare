@@ -5,6 +5,9 @@ import { createHash } from "crypto";
 import type { CISBenchmark, CISExcelFile } from "@/lib/cis-api";
 import type { ParsedControl } from "@/lib/xlsx-parser";
 import { runtimeDataDir, storedPathForRuntimeFile } from "@/lib/runtime-storage";
+import { atomicCreateBufferFileSync } from "@/lib/atomic-file";
+
+XLSX.set_fs(fs);
 
 export interface CISBenchmarkSnapshot {
     workbenchId: number;
@@ -463,8 +466,16 @@ export function rankCISBenchmarkCandidatesForTechnology(
         const candidateProduct = identifyCISProduct(titleText);
         const rejectionReasons: string[] = [];
         const isStig = /\bSTIG\b/i.test(titleText);
+        const publicationStatus = (benchmark.benchmarkStatus?.status || "").trim().toLowerCase();
 
         if (!excel) rejectionReasons.push("no CIS Excel workbook is available");
+        if (publicationStatus !== "accepted") {
+            rejectionReasons.push(
+                publicationStatus
+                    ? `benchmark publication status is ${publicationStatus}, not accepted`
+                    : "benchmark publication status is missing"
+            );
+        }
         if (kind === "benchmark" && EXCLUDED_TITLE_PATTERNS.some((pattern) => pattern.test(titleText))) {
             rejectionReasons.push(isStig ? "STIG benchmark requested separately" : "excluded benchmark variant");
         }
@@ -526,11 +537,6 @@ export function rankCISBenchmarkCandidatesForTechnology(
             if (scoreDiff !== 0) return scoreDiff;
         }
 
-        const acceptedScore =
-            Number((b.benchmark.benchmarkStatus?.status || "").toLowerCase() === "accepted") -
-            Number((a.benchmark.benchmarkStatus?.status || "").toLowerCase() === "accepted");
-        if (acceptedScore !== 0) return acceptedScore;
-
         // With a family-only query, product generation is the primary version
         // axis. This is what makes a generic ESXi query prefer ESXi 8 over an
         // ESXi 7 document that happens to have a larger benchmark revision.
@@ -591,37 +597,86 @@ export function saveCISBenchmarkSnapshot(
     workbookBuffer: Buffer
 ): CISBenchmarkSnapshot {
     const hash = sha256(workbookBuffer);
-    const fileName = safePathPart(excel.excelFileName || `cis-${benchmark.workbenchId}.xlsx`);
-    const snapshotDir = path.join(runtimeDataDir("cis-benchmarks"), String(benchmark.workbenchId));
+    const fileName = safePathPart(
+        excel.excelFileName || `cis-${benchmark.workbenchId}.xlsx`
+    ) || `cis-${benchmark.workbenchId}.xlsx`;
+    const snapshotDir = path.join(
+        runtimeDataDir("cis-benchmarks"),
+        String(benchmark.workbenchId),
+        hash
+    );
     const filePath = path.join(snapshotDir, fileName);
+    const storedFilePath = storedPathForRuntimeFile(filePath);
+    const metadataPath = path.join(snapshotDir, `${fileName}.metadata.json`);
     const downloadedAt = new Date();
 
-    fs.mkdirSync(snapshotDir, { recursive: true });
-    fs.writeFileSync(filePath, workbookBuffer);
+    fs.mkdirSync(snapshotDir, { recursive: true, mode: 0o700 });
+    atomicCreateBufferFileSync(filePath, workbookBuffer, { mode: 0o600 });
+    const persistedWorkbook = fs.readFileSync(filePath);
+    if (
+        sha256(persistedWorkbook) !== hash ||
+        (fs.statSync(filePath).mode & 0o077) !== 0
+    ) {
+        throw new Error("Stored CIS benchmark evidence failed integrity validation.");
+    }
 
-    const metadata: CISBenchmarkSnapshot = {
+    const proposedMetadata: CISBenchmarkSnapshot = {
         workbenchId: Number(benchmark.workbenchId),
         benchmarkTitle: benchmark.benchmarkTitle,
         benchmarkVersion: benchmark.benchmarkVersion,
         releaseDate: parseCISDate(benchmark.benchmarkStatus?.statusDate),
         excelTitle: excel.excelTitle,
         excelFileName: excel.excelFileName,
-        filePath: storedPathForRuntimeFile(filePath),
+        filePath: storedFilePath,
         sha256: hash,
         downloadedAt,
     };
 
-    fs.writeFileSync(
-        path.join(snapshotDir, `${fileName}.metadata.json`),
-        JSON.stringify({
-            ...metadata,
+    atomicCreateBufferFileSync(
+        metadataPath,
+        Buffer.from(JSON.stringify({
+            ...proposedMetadata,
             downloadedAt: downloadedAt.toISOString(),
-            releaseDate: metadata.releaseDate.toISOString(),
-        }, null, 2),
-        "utf-8"
+            releaseDate: proposedMetadata.releaseDate.toISOString(),
+        }, null, 2), "utf8"),
+        { mode: 0o600 }
     );
 
-    return metadata;
+    let storedMetadata: Record<string, unknown>;
+    try {
+        storedMetadata = JSON.parse(fs.readFileSync(metadataPath, "utf8")) as Record<string, unknown>;
+    } catch {
+        throw new Error("Stored CIS benchmark evidence metadata failed integrity validation.");
+    }
+    const storedDownloadedAt = new Date(String(storedMetadata.downloadedAt || ""));
+    const storedReleaseDate = new Date(String(storedMetadata.releaseDate || ""));
+    if (
+        storedMetadata.workbenchId !== proposedMetadata.workbenchId ||
+        storedMetadata.benchmarkTitle !== proposedMetadata.benchmarkTitle ||
+        storedMetadata.benchmarkVersion !== proposedMetadata.benchmarkVersion ||
+        storedMetadata.excelTitle !== proposedMetadata.excelTitle ||
+        storedMetadata.excelFileName !== proposedMetadata.excelFileName ||
+        storedMetadata.filePath !== storedFilePath ||
+        storedMetadata.sha256 !== hash ||
+        storedReleaseDate.getTime() !== proposedMetadata.releaseDate.getTime() ||
+        Number.isNaN(storedDownloadedAt.getTime()) ||
+        Number.isNaN(storedReleaseDate.getTime()) ||
+        (fs.statSync(metadataPath).mode & 0o077) !== 0
+    ) {
+        throw new Error("Stored CIS benchmark evidence metadata failed integrity validation.");
+    }
+
+    return {
+        workbenchId: proposedMetadata.workbenchId,
+        benchmarkTitle: String(storedMetadata.benchmarkTitle || ""),
+        benchmarkVersion: String(storedMetadata.benchmarkVersion || ""),
+        releaseDate: storedReleaseDate,
+        excelTitle: String(storedMetadata.excelTitle || ""),
+        excelFileName: String(storedMetadata.excelFileName || ""),
+        filePath: storedFilePath,
+        sha256: hash,
+        downloadedAt: storedDownloadedAt,
+    };
 }
 
 export function parseCISBenchmarkExcel(bufferOrPath: Buffer | string): CISBenchmarkRecommendation[] {

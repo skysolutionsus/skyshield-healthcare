@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { randomUUID } from "node:crypto";
 
 export interface AuditLogParams {
   organizationId: string;
@@ -28,6 +29,39 @@ export function truncateAuditText(value: string | null | undefined, maxChars = 8
 }
 
 /**
+ * Generate the cross-store identifier used to reconcile a durable audit
+ * intent with the file-backed SCSEM session mutation that follows it.
+ */
+export function createAuditOperationId(): string {
+  return randomUUID();
+}
+
+async function persistAudit(params: AuditLogParams): Promise<void> {
+  await db.auditLog.create({
+    data: {
+      organizationId: params.organizationId,
+      userId: params.userId ?? null,
+      action: params.action,
+      resourceType: params.resourceType ?? null,
+      resourceId: params.resourceId ?? null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      metadata: (params.metadata ?? undefined) as any,
+      ipAddress: params.ipAddress ?? null,
+      userAgent: params.userAgent ?? null,
+    },
+  });
+}
+
+/**
+ * Persist a fail-closed audit record. Callers must not perform the protected
+ * action if this promise rejects. This is intentionally separate from the
+ * application's normal best-effort audit helper below.
+ */
+export async function logAuditStrict(params: AuditLogParams): Promise<void> {
+  await persistAudit(params);
+}
+
+/**
  * Write an entry to the AuditLog table.
  *
  * Every significant action in the application should call this function.
@@ -40,19 +74,7 @@ export function truncateAuditText(value: string | null | undefined, maxChars = 8
  */
 export async function logAudit(params: AuditLogParams): Promise<void> {
   try {
-    await db.auditLog.create({
-      data: {
-        organizationId: params.organizationId,
-        userId: params.userId ?? null,
-        action: params.action,
-        resourceType: params.resourceType ?? null,
-        resourceId: params.resourceId ?? null,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        metadata: (params.metadata ?? undefined) as any,
-        ipAddress: params.ipAddress ?? null,
-        userAgent: params.userAgent ?? null,
-      },
-    });
+    await persistAudit(params);
   } catch (error) {
     // Never throw — audit failures must not break the primary workflow.
     console.error("[AuditLog] Failed to write audit log entry:", error, {

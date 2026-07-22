@@ -19,7 +19,7 @@ import {
   ChevronDown,
   Database,
 } from "lucide-react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { SkyLogo } from "@/components/sky-logo";
 import { NotificationsMenu } from "@/components/notifications-menu";
@@ -44,6 +44,7 @@ interface AppShellProps {
     name?: string | null;
     email?: string | null;
     role?: string;
+    canManageCanonicalScsems: boolean;
   };
 }
 
@@ -90,25 +91,26 @@ export function AppShell({ children, user }: AppShellProps) {
   const allNavItems = [
     ...(isAdmin ? adminNavigation : limitedNavigation),
     ...adminNavItems,
-  ];
+  ].filter(
+    (item) => item.href !== "/scsems" || user.canManageCanonicalScsems
+  );
 
-  // Check view-as status on mount
-  const checkViewAs = useCallback(async () => {
-    if (!isAdmin) return;
-    try {
-      const res = await fetch("/api/settings/view-as");
-      if (res.ok) {
-        const data = await res.json();
-        setViewAsUser(data.viewingAs || null);
-      }
-    } catch {
-      // ignore
-    }
-  }, [isAdmin]);
-
+  // Check view-as status on mount.
   useEffect(() => {
-    checkViewAs();
-  }, [checkViewAs]);
+    if (!isAdmin) return;
+
+    const controller = new AbortController();
+    void fetch("/api/settings/view-as", { signal: controller.signal })
+      .then(async (res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setViewAsUser(data.viewingAs || null);
+      })
+      .catch(() => {
+        // Ignore network and cancellation errors.
+      });
+
+    return () => controller.abort();
+  }, [isAdmin]);
 
   // Load org users for view-as dropdown
   useEffect(() => {

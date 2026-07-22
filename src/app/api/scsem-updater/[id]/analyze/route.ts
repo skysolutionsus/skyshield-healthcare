@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { auditRequestContext, logAudit, truncateAuditText } from "@/lib/audit";
+import { auditRequestContext } from "@/lib/audit";
 import {
     fetchAllBenchmarkExcelFiles,
     fetchAllBenchmarks,
@@ -20,16 +19,30 @@ import {
 } from "@/lib/scsem-benchmark-resolver";
 import {
     addIdsToChanges,
+    assertSCSEMUpdaterRevision,
+    SCSEM_ANALYSIS_LEASE_TIMEOUT_MS,
+    claimSCSEMAnalysisLease,
+    clearSCSEMAnalysisLease,
+    createSCSEMAnalysisOperationId,
+    isSCSEMAnalysisLeaseOwnedBy,
     readSCSEMUpdaterSessionForUser,
-    resolveUpdaterPath,
+    requireSCSEMUpdaterExpectedRevision,
+    scsemUpdaterMutationErrorDetails,
+    scsemUpdaterRevisionETag,
     writeSCSEMUpdaterSession,
     type SCSEMUpdaterAuditSource,
 } from "@/lib/scsem-updater-store";
 import { parseSCSEMFile, type ParsedSCSEM } from "@/lib/xlsx-parser";
+import { evaluateOfficialSCSEMReference } from "@/lib/scsem-official-reference";
 import {
-    evaluateOfficialSCSEMReference,
-    resolveOfficialReferencePath,
-} from "@/lib/scsem-official-reference";
+    assertOfficialSCSEMReferenceIntegrity,
+    assertSCSEMUpdaterSourceIntegrity,
+} from "@/lib/scsem-source-integrity";
+import {
+    scsemAnalysisFailureDetails,
+} from "@/lib/scsem-analysis-failure";
+import { clientSafeSCSEMUpdaterSession } from "@/lib/scsem-updater-client-session";
+import { scsemBenchmarkLookupFailureDetails } from "@/lib/scsem-benchmark-failure";
 import {
     buildComparisonCandidates,
     buildControlSummary,
@@ -46,15 +59,26 @@ import {
     normalizeNistControlId,
     type ComplianceEvidence,
 } from "@/lib/compliance-evidence";
-import { generateBifrostText, getConfiguredBifrostModel } from "@/lib/ai/bifrost";
+import {
+    generateBifrostText,
+    getConfiguredBifrostModel,
+    hasConfiguredBifrostApiKey,
+} from "@/lib/ai/bifrost";
+import { requireScsemSteward } from "@/lib/scsem-steward-auth";
+import {
+    buildSCSEMAnalysisCoverage,
+    missingCompliancePromptEvidenceControlIds,
+    type SCSEMSupplementalComparison,
+    type SCSEMSupplementalComparisonMode,
+} from "@/lib/scsem-analysis-coverage";
 
 export const runtime = "nodejs";
 
 const UPDATER_CANDIDATE_LIMITS = {
-    maxUpdateCandidates: 25,
-    maxNewControlCandidates: 15,
+    maxUpdateCandidates: 5000,
+    maxNewControlCandidates: 5000,
 };
-const MAX_UPDATER_CHANGES = 25;
+const MAX_UPDATER_CHANGES = 5000;
 const AI_CONTROL_LIMIT = Number(process.env.SCSEM_UPDATER_AI_CONTROL_LIMIT || 500);
 const AI_PROMPT_CHAR_LIMIT = Number(process.env.SCSEM_UPDATER_AI_PROMPT_CHAR_LIMIT || 90000);
 const AI_TIMEOUT_MS = Number(process.env.SCSEM_UPDATER_AI_TIMEOUT_MS || 25000);
@@ -70,31 +94,18 @@ const COMPLIANCE_BATCH_CONCURRENCY = Math.max(
     1,
     Math.min(Number(process.env.SCSEM_UPDATER_COMPLIANCE_BATCH_CONCURRENCY || 4), 4)
 );
-const MAX_COMPLIANCE_BATCHES = Math.max(
-    1,
-    Math.min(Number(process.env.SCSEM_UPDATER_COMPLIANCE_MAX_BATCHES || 6), 12)
-);
 const COMPLIANCE_BATCH_UNIQUE_CONTROL_LIMIT = Math.max(
     4,
     Math.min(Number(process.env.SCSEM_UPDATER_COMPLIANCE_BATCH_UNIQUE_CONTROLS || 11), 12)
 );
 const MAX_COMPLIANCE_CHANGES_PER_BATCH = 6;
-
-function changePreview(changes: any[]) {
-    return changes.slice(0, 25).map((change) => ({
-        id: change.id,
-        action: change.action,
-        testId: change.testId,
-        targetSheet: change.targetSheet,
-        field: change.field,
-        status: change.status,
-        confidence: change.confidence,
-        currentValue: truncateAuditText(change.currentValue, 1200),
-        proposedValue: truncateAuditText(change.proposedValue, 2400),
-        reason: truncateAuditText(change.reason, 1600),
-        sourceEvidence: change.sourceEvidence || null,
-    }));
-}
+const COMPLIANCE_CONTROL_EVIDENCE_LIMIT = Math.min(
+    COMPLIANCE_BATCH_CHAR_LIMIT,
+    Math.max(
+        9000,
+        Math.floor(Math.max(24000, AI_PROMPT_CHAR_LIMIT - 12000) * 0.46)
+    )
+);
 
 function controlsFromParsedSCSEM(parsed: ParsedSCSEM): SCSEMControlEvidence[] {
     return parsed.sheets
@@ -192,7 +203,11 @@ type AnalysisAdjacentCandidate = {
 };
 
 function sourceLabel(source: ResolvedBenchmarkSource): string {
-    return `${source.kind} WB ${source.downloaded.snapshot.workbenchId} ${source.downloaded.snapshot.benchmarkTitle} (${source.selectedProfile.profile})`;
+    return `${benchmarkKindLabel(source.kind)} WB ${source.downloaded.snapshot.workbenchId} ${source.downloaded.snapshot.benchmarkTitle} (${source.selectedProfile.profile})`;
+}
+
+function benchmarkKindLabel(kind: ResolvedBenchmarkKind): "CIS" | "CIS-STIG" {
+    return kind === "CIS" ? "CIS" : "CIS-STIG";
 }
 
 function sourceEvidence(
@@ -206,13 +221,133 @@ function sourceEvidence(
         sourceRelationship: candidate.sourceRelationship || "direct",
         cisRecommendation: candidate.sourceKind === "CIS" ? candidate.recommendation.recommendation : null,
         cisProfile: candidate.sourceKind === "CIS" ? candidate.sourceProfile : null,
-        stigRecommendation: candidate.sourceKind === "STIG" ? candidate.recommendation.recommendation : null,
-        stigProfile: candidate.sourceKind === "STIG" ? candidate.sourceProfile : null,
+        stigRecommendation: candidate.sourceKind === "CIS_STIG" ? candidate.recommendation.recommendation : null,
+        stigProfile: candidate.sourceKind === "CIS_STIG" ? candidate.sourceProfile : null,
         sourceWorkbenchId: candidate.sourceWorkbenchId,
         sourceBenchmarkTitle: candidate.sourceBenchmarkTitle,
         pub1075Version,
         nistVersion: nistVersion || null,
     };
+}
+
+type BenchmarkEvidenceCandidate =
+    | AnalysisUpdateCandidate
+    | AnalysisNewCandidate
+    | AnalysisAdjacentCandidate;
+
+function bindBenchmarkChangesToResolvedEvidence(
+    changes: any[],
+    controls: SCSEMControlEvidence[],
+    candidates: BenchmarkEvidenceCandidate[],
+    pub1075Version: string,
+    nistVersion: string
+): any[] {
+    const knownSheets = new Set(
+        controls.map((control) => control.sourceSheet).filter((value): value is string => Boolean(value))
+    );
+
+    return changes.flatMap((change) => {
+        if (!change || typeof change !== "object") return [];
+        const evidence = change.sourceEvidence && typeof change.sourceEvidence === "object"
+            ? change.sourceEvidence as Record<string, unknown>
+            : {};
+        const requestedWorkbenchId = Number(evidence.sourceWorkbenchId);
+        const requestedRecommendation = String(
+            evidence.cisRecommendation ||
+            evidence.stigRecommendation ||
+            change.newControl?.recommendationNum ||
+            ""
+        ).trim();
+        if (!Number.isSafeInteger(requestedWorkbenchId) || requestedWorkbenchId <= 0 || !requestedRecommendation) {
+            return [];
+        }
+
+        const requestedSheet = typeof change.targetSheet === "string" && change.targetSheet.trim()
+            ? change.targetSheet.trim()
+            : null;
+        const action = change.action === "addControl" ? "addControl" : "updateField";
+        let resolvedControl: SCSEMControlEvidence | null = null;
+        if (action === "updateField") {
+            const matchingControls = controls.filter((control) =>
+                control.testId === change.testId &&
+                (!requestedSheet || control.sourceSheet === requestedSheet)
+            );
+            if (matchingControls.length !== 1) return [];
+            resolvedControl = matchingControls[0];
+        } else if (!requestedSheet || !knownSheets.has(requestedSheet)) {
+            return [];
+        }
+
+        const matches = candidates.filter((candidate) => {
+            if (candidate.sourceWorkbenchId !== requestedWorkbenchId) return false;
+            if (candidate.recommendation.recommendation !== requestedRecommendation) return false;
+            if (action === "updateField" && "control" in candidate) {
+                return candidate.control.testId === resolvedControl?.testId &&
+                    candidate.control.sourceSheet === resolvedControl?.sourceSheet;
+            }
+            if (action === "addControl" && "targetSheet" in candidate && candidate.targetSheet) {
+                return candidate.targetSheet === requestedSheet;
+            }
+            return true;
+        });
+        if (matches.length !== 1) return [];
+        const candidate = matches[0];
+        const relationship = candidate.sourceRelationship || "direct";
+        const kind = benchmarkKindLabel(candidate.sourceKind);
+        const canonicalEvidence = {
+            ...sourceEvidence(candidate, pub1075Version, nistVersion),
+            evidenceTier: relationship === "adjacent" ? "adjacent" : "direct",
+            sourceRelationship: relationship,
+            sourceSheet: resolvedControl?.sourceSheet || requestedSheet,
+            ...(relationship === "adjacent" && "adjacentRationale" in candidate
+                ? { applicabilityRationale: candidate.adjacentRationale }
+                : {}),
+        };
+        const canonicalReason =
+            `Reviewer-gated ${relationship} ${kind} proposal using ${candidate.sourceBenchmarkTitle}, ` +
+            `recommendation ${candidate.recommendation.recommendation}, profile ${candidate.sourceProfile}, ` +
+            `CIS WorkBench ID ${candidate.sourceWorkbenchId}. Verify applicability and permitted use before approval; ` +
+            "model-generated wording is not itself evidence.";
+
+        if (action === "updateField" && resolvedControl) {
+            const field = String(change.field || "");
+            return [{
+                ...change,
+                action,
+                testId: resolvedControl.testId,
+                targetSheet: resolvedControl.sourceSheet,
+                currentValue: String(
+                    (resolvedControl as unknown as Record<string, unknown>)[field] || ""
+                ),
+                reason: canonicalReason,
+                confidence: "needs_review",
+                sourceEvidence: canonicalEvidence,
+            }];
+        }
+
+        return [{
+            ...change,
+            action: "addControl",
+            testId:
+                `NEW-${kind}-${candidate.sourceWorkbenchId}-` +
+                safeRecommendationId(candidate.recommendation.recommendation),
+            targetSheet: requestedSheet,
+            field: "newControl",
+            currentValue: "Not present in current SCSEM",
+            reason: canonicalReason,
+            confidence: "needs_review",
+            newControl: {
+                ...(change.newControl || {}),
+                // Issue-code mapping is IRS template metadata. It must be an
+                // explicit reviewer selection from the uploaded workbook's
+                // catalog, never model output.
+                issueCode: null,
+                cisBenchmarkRef: candidate.recommendation.section,
+                recommendationNum: candidate.recommendation.recommendation,
+            },
+            sourceEvidence: canonicalEvidence,
+        }];
+    });
 }
 
 function safeRecommendationId(value: string): string {
@@ -530,9 +665,11 @@ function buildFallbackPayload({
     const fallbackNewControls = [...newControlCandidates];
 
     const changes: any[] = [];
+    let examinedCandidateCount = 0;
 
     for (const candidate of fallbackUpdates) {
-        if (changes.length >= 15) break;
+        if (changes.length >= MAX_UPDATER_CHANGES) break;
+        examinedCandidateCount++;
         const selectedField = chooseFallbackField(candidate.control, candidate.recommendation);
         if (!selectedField) continue;
 
@@ -543,7 +680,7 @@ function buildFallbackPayload({
             field: selectedField.field,
             currentValue: selectedField.currentValue.slice(0, 1200),
             proposedValue: selectedField.proposedValue,
-            reason: `${candidate.sourceKind} ${candidate.recommendation.recommendation} (${candidate.sourceProfile}, WB ${candidate.sourceWorkbenchId}) materially differs from the uploaded SCSEM row. The updater selected ${selectedField.field} because the benchmark provides supplemental hardening evidence after applying ${pub1075.version} first and NIST ${pub1075.nist?.version || "SP 800-53"} only where Pub 1075 has no control section.`,
+            reason: `${benchmarkKindLabel(candidate.sourceKind)} ${candidate.recommendation.recommendation} (${candidate.sourceProfile}, WB ${candidate.sourceWorkbenchId}) materially differs from the uploaded SCSEM row. The updater selected ${selectedField.field} because the benchmark provides supplemental hardening evidence after applying ${pub1075.version} first and NIST ${pub1075.nist?.version || "SP 800-53"} only where Pub 1075 has no control section.`,
             confidence: "needs_review",
             sourceEvidence: sourceEvidence(candidate, pub1075.version, pub1075.nist?.version),
         });
@@ -551,15 +688,16 @@ function buildFallbackPayload({
 
     for (const candidate of fallbackNewControls) {
         if (changes.length >= MAX_UPDATER_CHANGES) break;
+        examinedCandidateCount++;
         const recommendation = candidate.recommendation;
         changes.push({
             action: "addControl",
-            testId: `NEW-${candidate.sourceKind}-${candidate.sourceWorkbenchId}-${safeRecommendationId(recommendation.recommendation)}`,
+            testId: `NEW-${benchmarkKindLabel(candidate.sourceKind)}-${candidate.sourceWorkbenchId}-${safeRecommendationId(recommendation.recommendation)}`,
             targetSheet: candidate.targetSheet,
             field: "newControl",
             currentValue: "Not present in current SCSEM",
-            proposedValue: `${candidate.sourceKind} ${recommendation.recommendation}: ${recommendation.title}`,
-            reason: `${candidate.sourceKind} ${recommendation.recommendation} appears in ${candidate.sourceBenchmarkTitle} (${candidate.sourceProfile}, WB ${candidate.sourceWorkbenchId}) but was not mapped in the uploaded SCSEM. It is a reviewer-gated supplemental hardening candidate after applying ${pub1075.version} first and NIST ${pub1075.nist?.version || "SP 800-53"} only as fallback.`,
+            proposedValue: `${benchmarkKindLabel(candidate.sourceKind)} ${recommendation.recommendation}: ${recommendation.title}`,
+            reason: `${benchmarkKindLabel(candidate.sourceKind)} ${recommendation.recommendation} appears in ${candidate.sourceBenchmarkTitle} (${candidate.sourceProfile}, WB ${candidate.sourceWorkbenchId}) but was not mapped in the uploaded SCSEM. It is a reviewer-gated supplemental hardening candidate after applying ${pub1075.version} first and NIST ${pub1075.nist?.version || "SP 800-53"} only as fallback.`,
             confidence: "needs_review",
             newControl: {
                 nistId: null,
@@ -569,7 +707,10 @@ function buildFallbackPayload({
                 description: recommendation.description,
                 testProcedures: recommendation.audit,
                 expectedResults: recommendation.defaultValue || recommendation.audit,
+                findingStatement:
+                    `The expected result was not met for ${recommendation.title}.`,
                 criticality: "Moderate",
+                issueCode: null,
                 cisBenchmarkRef: recommendation.section,
                 recommendationNum: recommendation.recommendation,
                 rationale: recommendation.rationale,
@@ -583,6 +724,7 @@ function buildFallbackPayload({
     return {
         summary: `Generated deterministic supplemental hardening items for ${technology}${fallbackReason ? ` because ${fallbackReason}` : ""}. Each item is marked needs_review and follows the ${pub1075.version}-first, NIST-fallback source hierarchy.`,
         changes,
+        examinedCandidateCount,
     };
 }
 
@@ -628,7 +770,7 @@ function partitionComplianceControls(controls: SCSEMControlEvidence[]): SCSEMCon
         if (
             current.length > 0 &&
             (current.length >= COMPLIANCE_BATCH_CONTROL_LIMIT ||
-                currentChars + estimatedChars > COMPLIANCE_BATCH_CHAR_LIMIT ||
+                currentChars + estimatedChars > COMPLIANCE_CONTROL_EVIDENCE_LIMIT ||
                 (wouldAddControlFamily &&
                     currentControlFamilies.size >= COMPLIANCE_BATCH_UNIQUE_CONTROL_LIMIT))
         ) {
@@ -643,7 +785,7 @@ function partitionComplianceControls(controls: SCSEMControlEvidence[]): SCSEMCon
     }
 
     if (current.length > 0) batches.push(current);
-    return batches.slice(0, MAX_COMPLIANCE_BATCHES);
+    return batches;
 }
 
 async function mapWithConcurrency<T, R>(
@@ -672,27 +814,42 @@ function annotateComplianceChanges(
     controls: SCSEMControlEvidence[],
     evidence: ComplianceEvidence
 ): any[] {
-    const pubIds = new Set(evidence.pub1075.controlIds);
-    const nistIds = new Set(evidence.nist.controlIds);
+    const pubIds = new Set(evidence.pub1075.excerptedControlIds);
+    const nistIds = new Set(evidence.nist.excerptedControlIds);
 
-    return changes.map((change) => {
-        const matches = controls.filter((control) => control.testId === change.testId);
+    return changes.flatMap((change) => {
+        const requestedSheet = typeof change.targetSheet === "string" && change.targetSheet.trim()
+            ? change.targetSheet.trim()
+            : null;
+        const matches = controls.filter((control) =>
+            control.testId === change.testId &&
+            (!requestedSheet || control.sourceSheet === requestedSheet)
+        );
+        if (matches.length !== 1) return [];
         const control = matches[0];
         const controlId = normalizeNistControlId(control?.nistId);
         const usesPub1075 = Boolean(controlId && pubIds.has(controlId));
         const usesNistFallback = Boolean(controlId && !usesPub1075 && nistIds.has(controlId));
+        if (!controlId || (!usesPub1075 && !usesNistFallback)) return [];
+        const complianceSource = usesPub1075
+            ? "IRS Publication 1075"
+            : "NIST SP 800-53 fallback";
 
         return {
             ...change,
-            targetSheet: change.targetSheet || (matches.length === 1 ? control?.sourceSheet : undefined),
+            targetSheet: control.sourceSheet,
+            currentValue: String(
+                (control as unknown as Record<string, unknown>)[String(change.field || "")] || ""
+            ),
+            reason:
+                `Reviewer-gated draft for ${control.sourceSheet || "the resolved sheet"}!${control.testId} ` +
+                `using the exact ${complianceSource} mapping ${controlId}. Compare the proposed replacement ` +
+                "with the pinned source excerpt before approval; model-generated wording is not itself evidence.",
+            confidence: "needs_review",
             sourceEvidence: {
-                ...(change.sourceEvidence || {}),
                 evidenceTier: "compliance",
-                complianceSource: usesPub1075
-                    ? "IRS Publication 1075"
-                    : usesNistFallback
-                        ? "NIST SP 800-53 fallback"
-                        : "Compliance evidence",
+                complianceSource,
+                sourceSheet: control.sourceSheet,
                 pub1075Version: evidence.pub1075.version,
                 nistVersion: evidence.nist.version,
                 pub1075ControlId: usesPub1075 ? controlId : null,
@@ -709,8 +866,8 @@ function deterministicComplianceGapChanges(
     evidence: ComplianceEvidence,
     maxChanges = 2
 ): any[] {
-    const pubIds = new Set(evidence.pub1075.controlIds);
-    const nistIds = new Set(evidence.nist.controlIds);
+    const pubIds = new Set(evidence.pub1075.excerptedControlIds);
+    const nistIds = new Set(evidence.nist.excerptedControlIds);
     const pubBlocks = evidence.pub1075.excerpts.split(/\n\n---\n\n/).filter(Boolean);
     const nistBlocks = evidence.nist.excerpts.split(/\n\n---\n\n/).filter(Boolean);
     const changes: any[] = [];
@@ -837,12 +994,18 @@ async function buildCompliancePayload({
     pub1075: ComplianceEvidence;
 }) {
     const batches = partitionComplianceControls(controls);
+    const nistMappedRowCount = controls.filter((control) =>
+        Boolean(normalizeNistControlId(control.nistId))
+    ).length;
     if (batches.length === 0) {
         return {
             summary: `Compliance review found no normalized NIST control identifiers in the ${technology} SCSEM rows, so Pub 1075 and NIST evidence could not be mapped safely.`,
             changes: [],
             batchCount: 0,
             completedBatchCount: 0,
+            reviewedRowCount: 0,
+            nistMappedRowCount: 0,
+            unmappedRowCount: controls.length,
         };
     }
 
@@ -851,11 +1014,10 @@ async function buildCompliancePayload({
         COMPLIANCE_BATCH_CONCURRENCY,
         async (batch, batchIndex) => {
             const promptBudget = Math.max(24000, AI_PROMPT_CHAR_LIMIT - 12000);
-            const controlEvidenceBudget = Math.min(
-                COMPLIANCE_BATCH_CHAR_LIMIT,
-                Math.max(9000, Math.floor(promptBudget * 0.46))
+            const controlEvidence = buildComplianceControlEvidence(
+                batch,
+                COMPLIANCE_CONTROL_EVIDENCE_LIMIT
             );
-            const controlEvidence = buildComplianceControlEvidence(batch, controlEvidenceBudget);
             const complianceEvidence = extractComplianceEvidence(
                 batch.map((control) => control.nistId),
                 {
@@ -865,10 +1027,17 @@ async function buildCompliancePayload({
                     ),
                 }
             );
-            if (!complianceEvidence.excerpts) {
+            const missingPromptEvidence = missingCompliancePromptEvidenceControlIds({
+                requestedControlIds: complianceEvidence.requestedControlIds,
+                pub1075ExcerptedControlIds: complianceEvidence.pub1075.excerptedControlIds,
+                nistExcerptedControlIds: complianceEvidence.nist.excerptedControlIds,
+            });
+            if (!complianceEvidence.excerpts || missingPromptEvidence.length > 0) {
                 return {
-                    summary: `Batch ${batchIndex + 1} had no mappable Pub 1075 or NIST SP 800-53 evidence.`,
-                    changes: [],
+                    summary: missingPromptEvidence.length > 0
+                        ? `Batch ${batchIndex + 1} omitted prompt evidence for ${missingPromptEvidence.length} mapped control identifier(s) and was marked incomplete.`
+                        : `Batch ${batchIndex + 1} had no mappable Pub 1075 or NIST SP 800-53 evidence.`,
+                    changes: deterministicComplianceGapChanges(batch, complianceEvidence),
                     analyzed: false,
                 };
             }
@@ -882,7 +1051,7 @@ Decision policy:
 - Propose an update only when the current row is materially incomplete, materially weaker, or materially inconsistent with the applicable compliance excerpt for the same control.
 - Do not propose formatting-only, grammar-only, casing-only, numbering-only, or equivalent-wording changes.
 - Do not rewrite a row merely because the authority uses different phrasing.
-- Do not invent product-specific benchmark requirements. CIS and STIG are assessed separately as supplemental hardening evidence.
+- Do not invent product-specific benchmark requirements. CIS Benchmark and CIS-STIG workbooks from CIS WorkBench are assessed separately as supplemental hardening evidence.
 - Propose updateField changes only. Missing-control analysis requires workbook-wide applicability evidence and is outside this bounded row batch.
 - Mark confidence "needs_review" unless the gap is direct and unambiguous.
 
@@ -900,8 +1069,8 @@ Compliance sources:
 - IRS Publication 1075 local source: ${complianceEvidence.pub1075.sourcePath}
 - NIST SP 800-53 fallback version: ${complianceEvidence.nist.version}
 - NIST fallback local source: ${complianceEvidence.nist.sourcePath}
-- Pub 1075-covered IDs: ${complianceEvidence.pub1075.controlIds.join(", ") || "None"}
-- NIST-fallback IDs: ${complianceEvidence.nist.controlIds.join(", ") || "None"}
+- Pub 1075-covered IDs with excerpts in this prompt: ${complianceEvidence.pub1075.excerptedControlIds.join(", ") || "None"}
+- NIST-fallback IDs with excerpts in this prompt: ${complianceEvidence.nist.excerptedControlIds.join(", ") || "None"}
 
 SCSEM ROWS FOR COMPLIANCE REVIEW:
 ${controlEvidence || "No SCSEM row text was available."}
@@ -953,6 +1122,14 @@ Rules:
                 };
             }
 
+            if (!hasConfiguredBifrostApiKey(process.env.BIFROST_API_KEY)) {
+                return {
+                    summary: `Batch ${batchIndex + 1} was scanned deterministically, but AI comparison was unavailable because no approved model credential was configured.`,
+                    changes: deterministicComplianceGapChanges(batch, complianceEvidence),
+                    analyzed: false,
+                };
+            }
+
             const abortController = new AbortController();
             const timeout = setTimeout(() => abortController.abort(), AI_TIMEOUT_MS);
             try {
@@ -992,17 +1169,20 @@ Rules:
     const changes = dedupeProposedChanges(batchResults.flatMap((result) => result.changes));
     const coverage = [
         `${batches.length} bounded batch(es)`,
-        `${reviewedRowCount} highest-priority row(s) distributed across version/provider tabs`,
+        `${reviewedRowCount} NIST-mapped row(s) distributed across version/provider tabs`,
         `${completedBatchCount} completed with AI reasoning`,
         `${complianceOverview.pub1075.controlIds.length} control ID(s) mapped to Pub 1075`,
         `${complianceOverview.nist.controlIds.length} control ID(s) mapped to NIST fallback`,
     ].join(", ");
 
     return {
-        summary: `Primary compliance review for ${technology}: ${coverage}. Generated ${changes.length} reviewer-gated proposal(s) before supplemental CIS/STIG hardening review.`,
+        summary: `Primary compliance review for ${technology}: ${coverage}. Generated ${changes.length} reviewer-gated proposal(s) before supplemental CIS Benchmark/CIS-STIG hardening review.`,
         changes,
         batchCount: batches.length,
         completedBatchCount,
+        reviewedRowCount,
+        nistMappedRowCount,
+        unmappedRowCount: controls.length - nistMappedRowCount,
     };
 }
 
@@ -1025,7 +1205,7 @@ async function buildAdjacentSourcePayload({
 }) {
     const controlEvidence = buildPub1075ControlEvidence(controls, 18000);
     const adjacentEvidence = buildAdjacentBenchmarkEvidence(adjacentCandidates, 24000);
-    const prompt = `You are an IRS Safeguards SCSEM update analyst. This uploaded workbook has no direct CIS SecureSuite or STIG benchmark Excel source. Perform an adjacent-source review using the uploaded SCSEM row text, IRS Publication 1075 excerpts, and explicitly labeled adjacent CIS/STIG benchmark patterns below.
+    const prompt = `You are an IRS Safeguards SCSEM update analyst. This uploaded workbook has no direct CIS Benchmark or CIS-STIG workbook from CIS WorkBench. Perform an adjacent-source review using the uploaded SCSEM row text, IRS Publication 1075 excerpts, and explicitly labeled adjacent CIS Benchmark/CIS-STIG patterns below.
 
 Decision policy:
 - IRS Publication 1075 is the first and governing compliance source.
@@ -1084,8 +1264,8 @@ Return ONLY valid JSON:
         "sourceRelationship": "adjacent",
         "cisRecommendation": "CIS recommendation number if CIS adjacent evidence applies, otherwise null",
         "cisProfile": "selected CIS profile if CIS adjacent evidence applies, otherwise null",
-        "stigRecommendation": "STIG recommendation number if STIG adjacent evidence applies, otherwise null",
-        "stigProfile": "selected STIG profile if STIG adjacent evidence applies, otherwise null",
+        "stigRecommendation": "CIS-STIG recommendation number if adjacent CIS-STIG evidence applies, otherwise null",
+        "stigProfile": "selected CIS-STIG profile if adjacent CIS-STIG evidence applies, otherwise null",
         "sourceWorkbenchId": "WorkBench ID from the adjacent evidence source",
         "sourceBenchmarkTitle": "adjacent benchmark title",
         "adjacentSourceCategory": "category from the adjacent source summary",
@@ -1111,8 +1291,10 @@ Return ONLY valid JSON:
         "description": "SCSEM-ready generic description without vendor-specific commands",
         "testProcedures": "SCSEM-ready generic audit/test procedure without vendor-specific commands",
         "expectedResults": "SCSEM-ready generic expected result",
+        "findingStatement": "SCSEM-ready standard failure condition grounded only in the supplied evidence; do not describe an observed agency result",
         "criticality": "Critical|Significant|Moderate|Limited|Informational",
-        "cisBenchmarkRef": "Adjacent CIS/STIG section number",
+        "issueCode": null,
+        "cisBenchmarkRef": "Adjacent CIS Benchmark or CIS-STIG section number",
         "recommendationNum": "Adjacent recommendation number",
         "rationale": "SCSEM-ready rationale",
         "impact": "SCSEM-ready impact",
@@ -1137,10 +1319,12 @@ Rules:
 - For updateField, only use Test IDs listed in SCSEM ROWS FOR REVIEW.
 - Do not include a change unless a human reviewer could trace it to both Pub 1075/control intent and an adjacent hardening pattern.
 - Do not claim any adjacent benchmark is a direct equivalent for ${technology}.
+- Treat newControl.findingStatement as canonical template text describing the failed control condition, never as an observed agency response.
+- Leave newControl.issueCode null. A reviewer must select an exact code from the uploaded workbook's IRS Issue Code Table before approval; never invent or infer a code outside that table.
 - Do not include markdown fences.`;
 
     const emptyPayload = {
-        summary: `No direct CIS or STIG benchmark source was found for ${technology}. Adjacent benchmark sources were selected for reviewer-only reasoning, but no adjacent-source changes were generated without AI reasoning.`,
+        summary: `No direct CIS Benchmark or CIS-STIG source was found in CIS WorkBench for ${technology}. Adjacent benchmark sources were selected for reviewer-only reasoning, but no adjacent-source changes were generated without AI reasoning.`,
         changes: [],
     };
 
@@ -1184,28 +1368,78 @@ export async function POST(
 ) {
     const { id } = await params;
     let user: { id: string; organizationId: string } | null = null;
+    let analysisOperationId: string | null = null;
 
     try {
-        const session = await auth();
-        if (!session?.user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
-        user = session.user as unknown as { id: string; organizationId: string };
+        const access = await requireScsemSteward();
+        if (!access.ok) return access.response;
+        user = access.user;
 
+        const expectedRevision = requireSCSEMUpdaterExpectedRevision(request);
         const updaterSession = readSCSEMUpdaterSessionForUser(id, user);
-        updaterSession.status = "analyzing";
-        updaterSession.error = undefined;
-        writeSCSEMUpdaterSession(updaterSession);
+        assertSCSEMUpdaterRevision(updaterSession, expectedRevision);
+        const previousStatus = updaterSession.status;
+        const leaseClaim = claimSCSEMAnalysisLease(
+            updaterSession,
+            createSCSEMAnalysisOperationId()
+        );
+        if (leaseClaim.outcome === "already_running") {
+            return NextResponse.json({
+                error: "Analysis is already running for this SCSEM updater session.",
+                code: "SCSEM_ANALYSIS_ALREADY_RUNNING",
+                retryAfterMs: leaseClaim.retryAfterMs,
+                analysisLeaseExpiresAt: leaseClaim.lease.expiresAt,
+            }, {
+                status: 409,
+                headers: {
+                    "Retry-After": String(Math.max(1, Math.ceil(leaseClaim.retryAfterMs / 1000))),
+                },
+            });
+        }
+        const verifiedUpload = assertSCSEMUpdaterSourceIntegrity(updaterSession);
+        analysisOperationId = leaseClaim.lease.operationId;
+        await writeSCSEMUpdaterSession(updaterSession, expectedRevision, {
+            action: leaseClaim.outcome === "reclaimed"
+                ? "SCSEM_UPDATER_ANALYZE_RESTART"
+                : "SCSEM_UPDATER_ANALYZE_START",
+            analysisOperationId: leaseClaim.lease.operationId,
+            affectedPayload: {
+                before: {
+                    status: previousStatus,
+                    analysisLease: leaseClaim.previousLease,
+                },
+                staleAbort: leaseClaim.outcome === "reclaimed"
+                    ? {
+                        operationId: leaseClaim.previousLease?.operationId || null,
+                        startedAt: leaseClaim.previousLease?.startedAt || null,
+                        expiresAt: leaseClaim.previousLease?.expiresAt || null,
+                        reason: "analysis_lease_expired",
+                    }
+                    : null,
+                after: {
+                    status: updaterSession.status,
+                    error: null,
+                    analysisLease: leaseClaim.lease,
+                    timeoutMs: SCSEM_ANALYSIS_LEASE_TIMEOUT_MS,
+                },
+                uploadedSourceSha256: verifiedUpload.sha256,
+                uploadedSourceSizeBytes: verifiedUpload.sizeBytes,
+            },
+            ...auditRequestContext(request),
+        });
 
-        const originalPath = resolveUpdaterPath(updaterSession.originalFilePath);
+        const originalPath = verifiedUpload.absolutePath;
         const uploadedParsed = parseSCSEMFile(originalPath);
         const officialReference = evaluateOfficialSCSEMReference(
             uploadedParsed,
             updaterSession.inferredTechnology,
             updaterSession.audit.uploadedSha256
         );
+        const verifiedBase = officialReference?.selectedAsBase
+            ? assertOfficialSCSEMReferenceIntegrity(officialReference)
+            : verifiedUpload;
         const parsed = officialReference?.selectedAsBase
-            ? parseSCSEMFile(resolveOfficialReferencePath(officialReference))
+            ? parseSCSEMFile(verifiedBase.absolutePath)
             : uploadedParsed;
         const controls = controlsFromParsedSCSEM(parsed);
         if (controls.length === 0) {
@@ -1236,6 +1470,7 @@ export async function POST(
 
         let cisToken = "";
         let benchmarkLookupError: string | undefined;
+        let benchmarkLookupErrorCode: string | undefined;
         let allBenchmarks: Awaited<ReturnType<typeof fetchAllBenchmarks>> = [];
         let allExcelFiles: Awaited<ReturnType<typeof fetchAllBenchmarkExcelFiles>> = [];
         const downloadedBenchmarks = new Map<number, DownloadedBenchmark>();
@@ -1258,8 +1493,10 @@ export async function POST(
             });
             resolvedSources = benchmarkResolution.sources;
             benchmarkResolutionDiagnostics = benchmarkResolution.diagnostics;
-        } catch (error: any) {
-            benchmarkLookupError = error?.message || "Unknown CIS benchmark lookup error";
+        } catch (error: unknown) {
+            const failure = scsemBenchmarkLookupFailureDetails(error, "direct");
+            benchmarkLookupError = failure.message;
+            benchmarkLookupErrorCode = failure.code;
             console.warn(
                 "SCSEM updater benchmark lookup failed; continuing with compliance-first analysis.",
                 error
@@ -1268,6 +1505,9 @@ export async function POST(
 
         const updateCandidates: AnalysisUpdateCandidate[] = [];
         const newControlCandidates: AnalysisNewCandidate[] = [];
+        let totalUpdateCandidateCount = 0;
+        let totalNewControlCandidateCount = 0;
+        let comparedDirectSourceCount = 0;
 
         for (const source of resolvedSources) {
             const scopedControls = controls.filter((control) =>
@@ -1280,6 +1520,9 @@ export async function POST(
                 source.selectedProfile.recommendations,
                 UPDATER_CANDIDATE_LIMITS
             );
+            totalUpdateCandidateCount += candidates.totalUpdateCandidates;
+            totalNewControlCandidateCount += candidates.totalNewControlCandidates;
+            comparedDirectSourceCount++;
             const label = sourceLabel(source);
 
             updateCandidates.push(...candidates.updateCandidates.map((candidate) => ({
@@ -1314,7 +1557,7 @@ export async function POST(
                 : controls.map((control) => control.nistId)
         );
         const cisSources = resolvedSources.filter((source) => source.kind === "CIS");
-        const stigSources = resolvedSources.filter((source) => source.kind === "STIG");
+        const stigSources = resolvedSources.filter((source) => source.kind === "CIS_STIG");
         let adjacentSources: ResolvedBenchmarkSource[] = [];
         if (resolvedSources.length === 0 && cisToken && !benchmarkLookupError) {
             try {
@@ -1327,8 +1570,10 @@ export async function POST(
                     downloadedBenchmarks,
                     excludeSources: resolvedSources,
                 });
-            } catch (error: any) {
-                benchmarkLookupError = error?.message || "Adjacent CIS/STIG benchmark lookup failed";
+            } catch (error: unknown) {
+                const failure = scsemBenchmarkLookupFailureDetails(error, "adjacent");
+                benchmarkLookupError = failure.message;
+                benchmarkLookupErrorCode = failure.code;
                 console.warn(
                     "SCSEM updater adjacent benchmark lookup failed; compliance results remain available.",
                     error
@@ -1360,9 +1605,14 @@ export async function POST(
             ...updaterSession.audit,
             pub1075Version: compliance.pub1075.version,
             pub1075SourcePath: compliance.pub1075.sourcePath,
+            pub1075SourceSha256: compliance.pub1075.sourceSha256,
             nistVersion: compliance.nist.version,
             nistSourcePath: compliance.nist.sourcePath,
             nistSourceUrl: compliance.nist.sourceUrl,
+            nistSourceCommit: compliance.nist.sourceCommit,
+            nistSourceSha256: compliance.nist.sourceSha256,
+            nistSnapshotSha256: compliance.nist.snapshotSha256,
+            nistAssessmentControlCount: compliance.nist.assessmentControlIds.length,
             complianceCoverage: {
                 requested: compliance.requestedControlIds.length,
                 pub1075: compliance.pub1075.controlIds.length,
@@ -1370,6 +1620,7 @@ export async function POST(
                 uncovered: compliance.uncoveredControlIds.length,
             },
             benchmarkLookupError,
+            benchmarkLookupErrorCode,
             benchmarkResolution: benchmarkResolutionDiagnostics.slice(0, 30).map((diagnostic) => ({
                 kind: diagnostic.kind,
                 query: diagnostic.query,
@@ -1405,36 +1656,67 @@ export async function POST(
                     adjacentCandidates,
                 })
                 : { summary: "", changes: [] };
+            const supplementalComparison: SCSEMSupplementalComparison = {
+                mode: "failed",
+                complete: false,
+                candidateOnly: true,
+                applicabilityStatus: "review_required",
+                directSourceCount: 0,
+                comparedDirectSourceCount: 0,
+                candidateCount: 0,
+                comparedCandidateCount: 0,
+                rawProposalCount: 0,
+                evidenceBoundProposalCount: 0,
+                reason: benchmarkLookupError
+                    ? "Direct-source lookup was unavailable."
+                    : "No direct workbook/profile passed source, generation, profile, and content validation.",
+            };
+            updaterSession.audit.supplementalComparison = supplementalComparison;
+            const analysisCoverage = buildSCSEMAnalysisCoverage({
+                totalRows: controls.length,
+                compliance: compliancePayload,
+                uncoveredControlIdCount: compliance.uncoveredControlIds.length,
+                benchmarkLookupError,
+                supplementalComparison,
+            });
+            updaterSession.audit.analysisCoverage = analysisCoverage;
+            const boundAdjacentChanges = bindBenchmarkChangesToResolvedEvidence(
+                adjacentPayload.changes || [],
+                controls,
+                adjacentCandidates,
+                pub1075.pub1075.version,
+                pub1075.nist.version
+            );
             const rawChanges = dedupeProposedChanges(addUnambiguousTargetSheets([
                 ...(compliancePayload.changes || []),
-                ...(adjacentPayload.changes || []),
+                ...boundAdjacentChanges,
             ], controls));
             const validChanges = addIdsToChanges(
                 validateChanges(rawChanges, controls, MAX_UPDATER_CHANGES)
             );
 
-            updaterSession.status = "review_ready";
+            const completedAnalysisLease = clearSCSEMAnalysisLease(
+                updaterSession,
+                analysisOperationId
+            );
+            updaterSession.status = analysisCoverage.complete ? "review_ready" : "analysis_incomplete";
             updaterSession.summary = [
                 compliancePayload.summary,
                 adjacentPayload.summary,
                 benchmarkLookupError
-                    ? `CIS/STIG lookup was unavailable (${benchmarkLookupError}); compliance results were still produced.`
-                    : `No direct CIS or STIG workbook/profile matched ${updaterSession.inferredTechnology}; compliance review still completed.`,
+                    ? `CIS Benchmark/CIS-STIG lookup was unavailable (${benchmarkLookupError}); this analysis is incomplete and cannot be released.`
+                    : `No direct CIS Benchmark or CIS-STIG workbook/profile matched ${updaterSession.inferredTechnology}; this analysis remains incomplete until an IRS reviewer records an applicability determination.`,
             ].filter(Boolean).join(" ");
             updaterSession.changes = validChanges;
             updaterSession.history.push({
                 at: new Date().toISOString(),
                 action: "analyze",
-                description: `Pub 1075-first/NIST-fallback compliance analysis completed without a direct CIS or STIG source and generated ${validChanges.length} proposed change(s) across ${compliancePayload.batchCount} bounded batch(es).`,
+                description: `Pub 1075-first/NIST-fallback compliance analysis completed without a direct CIS Benchmark or CIS-STIG source and generated ${validChanges.length} proposed change(s) across ${compliancePayload.batchCount} bounded batch(es).`,
             });
-            writeSCSEMUpdaterSession(updaterSession);
-            await logAudit({
-                organizationId: user.organizationId,
-                userId: user.id,
-                action: "SCSEM_UPDATER_ANALYZE",
-                resourceType: "scsem_updater_session",
-                resourceId: updaterSession.id,
-                metadata: {
+            await writeSCSEMUpdaterSession(updaterSession, updaterSession.revision, {
+                action: "SCSEM_UPDATER_ANALYZE_FINALIZE",
+                analysisOperationId: completedAnalysisLease.operationId,
+                affectedPayload: {
                     input: {
                         fileName: updaterSession.originalFileName,
                         inferredTechnology: updaterSession.inferredTechnology,
@@ -1444,9 +1726,11 @@ export async function POST(
                             .map((sheet) => sheet.sheetName),
                     },
                     output: {
+                        completedAnalysisLease,
+                        analysisLeaseCleared: true,
                         summary: updaterSession.summary,
                         changeCount: validChanges.length,
-                        changes: changePreview(validChanges),
+                        changes: validChanges,
                         candidateCounts: {
                             cisUpdates: 0,
                             cisNewControls: 0,
@@ -1459,21 +1743,49 @@ export async function POST(
                             complianceChanges: compliancePayload.changes.length,
                         },
                         benchmarkLookupError: benchmarkLookupError || null,
+                        benchmarkLookupErrorCode: benchmarkLookupErrorCode || null,
                         auditSources: updaterSession.audit,
                     },
                 },
                 ...auditRequestContext(request),
             });
-            return NextResponse.json({ session: updaterSession });
+            return NextResponse.json(
+                { session: clientSafeSCSEMUpdaterSession(updaterSession) },
+                { headers: { ETag: scsemUpdaterRevisionETag(updaterSession) } }
+            );
         }
 
         const cisUpdateCandidates = updateCandidates.filter((candidate) => candidate.sourceKind === "CIS");
-        const stigUpdateCandidates = updateCandidates.filter((candidate) => candidate.sourceKind === "STIG");
+        const stigUpdateCandidates = updateCandidates.filter((candidate) => candidate.sourceKind === "CIS_STIG");
         const cisNewControlCandidates = newControlCandidates.filter((candidate) => candidate.sourceKind === "CIS");
-        const stigNewControlCandidates = newControlCandidates.filter((candidate) => candidate.sourceKind === "STIG");
+        const stigNewControlCandidates = newControlCandidates.filter((candidate) => candidate.sourceKind === "CIS_STIG");
 
         if (updateCandidates.length === 0 && newControlCandidates.length === 0) {
             const compliancePayload = await compliancePayloadPromise;
+            const supplementalComparison: SCSEMSupplementalComparison = {
+                mode: "no_delta",
+                complete: totalUpdateCandidateCount === 0 && totalNewControlCandidateCount === 0,
+                candidateOnly: true,
+                applicabilityStatus: "review_required",
+                directSourceCount: resolvedSources.length,
+                comparedDirectSourceCount,
+                candidateCount: totalUpdateCandidateCount + totalNewControlCandidateCount,
+                comparedCandidateCount: 0,
+                rawProposalCount: 0,
+                evidenceBoundProposalCount: 0,
+                reason:
+                    "Validated direct source candidates produced no material field or missing-recommendation deltas; " +
+                    "the technical match remains candidate-only pending reviewer applicability confirmation.",
+            };
+            updaterSession.audit.supplementalComparison = supplementalComparison;
+            const analysisCoverage = buildSCSEMAnalysisCoverage({
+                totalRows: controls.length,
+                compliance: compliancePayload,
+                uncoveredControlIdCount: compliance.uncoveredControlIds.length,
+                benchmarkLookupError,
+                supplementalComparison,
+            });
+            updaterSession.audit.analysisCoverage = analysisCoverage;
             const validChanges = addIdsToChanges(validateChanges(
                 dedupeProposedChanges(addUnambiguousTargetSheets(
                     compliancePayload.changes || [],
@@ -1482,22 +1794,22 @@ export async function POST(
                 controls,
                 MAX_UPDATER_CHANGES
             ));
-            updaterSession.status = "review_ready";
-            updaterSession.summary = `${compliancePayload.summary} No supplemental CIS or STIG deltas were detected.`;
+            const completedAnalysisLease = clearSCSEMAnalysisLease(
+                updaterSession,
+                analysisOperationId
+            );
+            updaterSession.status = analysisCoverage.complete ? "review_ready" : "analysis_incomplete";
+            updaterSession.summary = `${compliancePayload.summary} No supplemental CIS Benchmark or CIS-STIG deltas were detected.${analysisCoverage.complete ? "" : " Analysis remains incomplete; see coverage blockers."}`;
             updaterSession.changes = validChanges;
             updaterSession.history.push({
                 at: new Date().toISOString(),
                 action: "analyze",
-                description: `Compliance analysis completed across ${compliancePayload.batchCount} bounded batch(es); no supplemental CIS/STIG deltas were detected. Generated ${validChanges.length} proposed change(s).`,
+                description: `Compliance analysis completed across ${compliancePayload.batchCount} bounded batch(es); no supplemental CIS Benchmark/CIS-STIG deltas were detected. Generated ${validChanges.length} proposed change(s).`,
             });
-            writeSCSEMUpdaterSession(updaterSession);
-            await logAudit({
-                organizationId: user.organizationId,
-                userId: user.id,
-                action: "SCSEM_UPDATER_ANALYZE",
-                resourceType: "scsem_updater_session",
-                resourceId: updaterSession.id,
-                metadata: {
+            await writeSCSEMUpdaterSession(updaterSession, updaterSession.revision, {
+                action: "SCSEM_UPDATER_ANALYZE_FINALIZE",
+                analysisOperationId: completedAnalysisLease.operationId,
+                affectedPayload: {
                     input: {
                         fileName: updaterSession.originalFileName,
                         inferredTechnology: updaterSession.inferredTechnology,
@@ -1507,9 +1819,11 @@ export async function POST(
                             .map((sheet) => sheet.sheetName),
                     },
                     output: {
+                        completedAnalysisLease,
+                        analysisLeaseCleared: true,
                         summary: updaterSession.summary,
                         changeCount: validChanges.length,
-                        changes: changePreview(validChanges),
+                        changes: validChanges,
                         candidateCounts: {
                             cisUpdates: cisUpdateCandidates.length,
                             cisNewControls: cisNewControlCandidates.length,
@@ -1524,7 +1838,10 @@ export async function POST(
                 },
                 ...auditRequestContext(request),
             });
-            return NextResponse.json({ session: updaterSession });
+            return NextResponse.json(
+                { session: clientSafeSCSEMUpdaterSession(updaterSession) },
+                { headers: { ETag: scsemUpdaterRevisionETag(updaterSession) } }
+            );
         }
 
         const cisUpdateEvidence = cisUpdateCandidates
@@ -1552,21 +1869,21 @@ export async function POST(
                 `  Excel SHA-256: ${source.downloaded.snapshot.sha256}`,
                 `  Matched existing recommendations: ${source.sharedRecommendationCount}/${source.sheetRecommendationCount}`,
             ].join("\n")).join("\n")
-            : `- No matching ${kind} Benchmark Excel workbook/profile was selected for this SCSEM technology.`;
+            : `- No matching ${benchmarkKindLabel(kind)} workbook/profile was selected for this SCSEM technology.`;
 
         const prompt = `You are an IRS Safeguards SCSEM update analyst. Propose human-reviewable SCSEM workbook changes using only the evidence below.
 
 Decision policy:
 - IRS Publication 1075 is the first and governing compliance source.
 - NIST SP 800-53 is fallback compliance evidence only for controls where no Pub 1075 section was found.
-- CIS Benchmark Excel rows and STIG rows are supplemental security-hardening evidence.
-- Pub 1075 always wins over NIST, CIS, or STIG for a covered control.
-- If a NIST fallback requirement is stricter than CIS or STIG and Pub 1075 has no section for that control, propose NIST-aligned text.
-- If CIS or STIG is stricter and does not conflict with the applicable Pub 1075 requirement or NIST fallback, propose the stricter CIS/STIG-aligned text.
-- If CIS and STIG differ, propose the stricter secure setting when clear; otherwise mark confidence "needs_review".
+- CIS Benchmark and CIS-STIG rows retrieved from CIS WorkBench are supplemental security-hardening evidence.
+- Pub 1075 always wins over NIST, CIS Benchmark, or CIS-STIG evidence for a covered control.
+- If a NIST fallback requirement is stricter than CIS Benchmark or CIS-STIG evidence and Pub 1075 has no section for that control, propose NIST-aligned text.
+- If CIS Benchmark or CIS-STIG evidence is stricter and does not conflict with the applicable Pub 1075 requirement or NIST fallback, propose the stricter aligned text.
+- If CIS Benchmark and CIS-STIG evidence differ, propose the stricter secure setting when clear; otherwise mark confidence "needs_review".
 - If strictness is ambiguous, include the item only when it is clearly useful for human review and mark confidence "needs_review".
 - Existing IRS SCSEM rows remain the base source of truth.
-- You may propose new SCSEM controls when the CIS or STIG row is missing from the uploaded SCSEM and appears security-relevant.
+- You may propose new SCSEM controls when a relevant CIS Benchmark or CIS-STIG row is missing from the uploaded SCSEM and appears security-relevant.
 - Explain each proposed update with enough detail for a human reviewer to decide quickly.
 
 Uploaded SCSEM:
@@ -1580,8 +1897,8 @@ Uploaded SCSEM:
 CIS Benchmark Sources:
 ${benchmarkSourceSummary(cisSources, "CIS")}
 
-STIG Benchmark Sources:
-${benchmarkSourceSummary(stigSources, "STIG")}
+CIS-STIG Sources from CIS WorkBench:
+${benchmarkSourceSummary(stigSources, "CIS_STIG")}
 
 Compliance sources:
 - IRS Publication 1075 version: ${pub1075.pub1075.version}
@@ -1595,10 +1912,10 @@ ${cisUpdateEvidence || "None"}
 POTENTIAL NEW CIS ROWS NOT PRESENT IN THE SCSEM:
 ${cisNewControlEvidence || "None"}
 
-CURRENT SCSEM ROWS MATCHED TO STIG CANDIDATES:
+CURRENT SCSEM ROWS MATCHED TO CIS-STIG CANDIDATES:
 ${stigUpdateEvidence || "None"}
 
-POTENTIAL NEW STIG ROWS NOT PRESENT IN THE SCSEM:
+POTENTIAL NEW CIS-STIG ROWS NOT PRESENT IN THE SCSEM:
 ${stigNewControlEvidence || "None"}
 
 COMPLIANCE EVIDENCE — PUB 1075 FIRST, NIST FALLBACK ONLY:
@@ -1615,13 +1932,13 @@ Return ONLY valid JSON:
       "field": "testProcedures|expectedResults|remediationProcedure|description|rationale|impact|sectionTitle|findingStatement",
       "currentValue": "brief current value summary",
       "proposedValue": "complete replacement text for that field",
-      "reason": "specific reason citing Pub 1075 first, NIST only when it is the supplied fallback, and any supplemental CIS/STIG evidence used",
+      "reason": "specific reason citing Pub 1075 first, NIST only when it is the supplied fallback, and any supplemental CIS Benchmark/CIS-STIG evidence used",
       "confidence": "high|medium|needs_review",
       "sourceEvidence": {
         "cisRecommendation": "CIS recommendation number if CIS evidence applies, otherwise null",
         "cisProfile": "selected CIS profile if CIS evidence applies, otherwise null",
-        "stigRecommendation": "STIG recommendation number if STIG evidence applies, otherwise null",
-        "stigProfile": "selected STIG profile if STIG evidence applies, otherwise null",
+        "stigRecommendation": "CIS-STIG recommendation number if CIS-STIG evidence applies, otherwise null",
+        "stigProfile": "selected CIS-STIG profile if CIS-STIG evidence applies, otherwise null",
         "sourceWorkbenchId": "WorkBench ID from the evidence source",
         "sourceBenchmarkTitle": "benchmark title from the evidence source",
         "pub1075Version": "${pub1075.pub1075.version}",
@@ -1630,7 +1947,7 @@ Return ONLY valid JSON:
     },
     {
       "action": "addControl",
-      "testId": "NEW-CIS-or-STIG-<recommendation>",
+      "testId": "NEW-CIS-or-CIS-STIG-<recommendation>",
       "targetSheet": "exact Target sheet named with this candidate",
       "field": "newControl",
       "currentValue": "Not present in current SCSEM",
@@ -1641,13 +1958,15 @@ Return ONLY valid JSON:
         "nistId": null,
         "nistControlName": "best fit if obvious, otherwise null",
         "testMethod": "Automated|Manual|Interview|Examine|Test",
-        "sectionTitle": "CIS or STIG recommendation title",
+        "sectionTitle": "CIS Benchmark or CIS-STIG recommendation title",
         "description": "SCSEM-ready description",
         "testProcedures": "SCSEM-ready audit/test procedure",
         "expectedResults": "SCSEM-ready expected result",
+        "findingStatement": "SCSEM-ready standard failure condition grounded only in the supplied evidence; do not describe an observed agency result",
         "criticality": "Critical|Significant|Moderate|Limited|Informational",
-        "cisBenchmarkRef": "CIS or STIG section number",
-        "recommendationNum": "CIS or STIG recommendation number",
+        "issueCode": null,
+        "cisBenchmarkRef": "CIS Benchmark or CIS-STIG section number",
+        "recommendationNum": "CIS Benchmark or CIS-STIG recommendation number",
         "rationale": "SCSEM-ready rationale",
         "impact": "SCSEM-ready impact",
         "remediationProcedure": "SCSEM-ready remediation"
@@ -1655,8 +1974,8 @@ Return ONLY valid JSON:
       "sourceEvidence": {
         "cisRecommendation": "CIS recommendation number if CIS evidence applies, otherwise null",
         "cisProfile": "selected CIS profile if CIS evidence applies, otherwise null",
-        "stigRecommendation": "STIG recommendation number if STIG evidence applies, otherwise null",
-        "stigProfile": "selected STIG profile if STIG evidence applies, otherwise null",
+        "stigRecommendation": "CIS-STIG recommendation number if CIS-STIG evidence applies, otherwise null",
+        "stigProfile": "selected CIS-STIG profile if CIS-STIG evidence applies, otherwise null",
         "sourceWorkbenchId": "WorkBench ID from the evidence source",
         "sourceBenchmarkTitle": "benchmark title from the evidence source",
         "pub1075Version": "${pub1075.pub1075.version}",
@@ -1668,23 +1987,40 @@ Return ONLY valid JSON:
 
 Rules:
 - Include up to ${MAX_UPDATER_CHANGES} total changes. Prioritize every cell-level delta that clearly needs human review, but do not create low-value wording churn.
-- For updateField, only use Test IDs from CURRENT SCSEM ROWS MATCHED TO CIS CANDIDATES or CURRENT SCSEM ROWS MATCHED TO STIG CANDIDATES.
-- For addControl, only use recommendation numbers from POTENTIAL NEW CIS ROWS or POTENTIAL NEW STIG ROWS.
+- For updateField, only use Test IDs from CURRENT SCSEM ROWS MATCHED TO CIS CANDIDATES or CURRENT SCSEM ROWS MATCHED TO CIS-STIG CANDIDATES.
+- For addControl, only use recommendation numbers from POTENTIAL NEW CIS ROWS or POTENTIAL NEW CIS-STIG ROWS.
 - Do not claim Pub 1075 or NIST says something unless the corresponding excerpt is present above.
 - Never use NIST fallback evidence for a control covered by a supplied Pub 1075 excerpt.
+- Treat newControl.findingStatement as canonical template text describing the failed control condition, never as an observed agency response.
+- Leave newControl.issueCode null. A reviewer must select an exact code from the uploaded workbook's IRS Issue Code Table before approval; never invent or infer a code outside that table.
 - Do not include markdown fences.`;
 
         let payload: any;
-        const shouldUseAI = controls.length <= AI_CONTROL_LIMIT && prompt.length <= AI_PROMPT_CHAR_LIMIT;
+        let comparisonMode: SCSEMSupplementalComparisonMode = "failed";
+        let comparisonReason = "Supplemental comparison did not start.";
+        const availableCandidateCount = updateCandidates.length + newControlCandidates.length;
+        const totalCandidateCount = totalUpdateCandidateCount + totalNewControlCandidateCount;
+        const aiWithinInteractiveLimits =
+            controls.length <= AI_CONTROL_LIMIT && prompt.length <= AI_PROMPT_CHAR_LIMIT;
+        const aiConfigured = hasConfiguredBifrostApiKey(process.env.BIFROST_API_KEY);
+        const deterministicFallback = (reason: string) => buildFallbackPayload({
+            technology: updaterSession.inferredTechnology,
+            pub1075,
+            fallbackReason: reason,
+            updateCandidates,
+            newControlCandidates,
+        });
 
-        if (!shouldUseAI) {
-            payload = buildFallbackPayload({
-                technology: updaterSession.inferredTechnology,
-                pub1075,
-                fallbackReason: `the uploaded workbook has ${controls.length} parsed controls, so the updater used deterministic benchmark diffs to keep the interactive request within deploy limits`,
-                updateCandidates,
-                newControlCandidates,
-            });
+        if (!aiWithinInteractiveLimits) {
+            comparisonMode = "deterministic_fallback";
+            comparisonReason =
+                `the ${controls.length}-row workbook or ${prompt.length}-character evidence set exceeded the bounded interactive AI limits`;
+            payload = deterministicFallback(comparisonReason);
+        } else if (!aiConfigured) {
+            comparisonMode = "deterministic_fallback";
+            comparisonReason =
+                "the supplemental AI provider was not configured, so the complete bounded candidate set was compared deterministically";
+            payload = deterministicFallback(comparisonReason);
         } else {
             const abortController = new AbortController();
             const timeout = setTimeout(() => abortController.abort(), AI_TIMEOUT_MS);
@@ -1694,30 +2030,100 @@ Rules:
                     model: getConfiguredBifrostModel("BIFROST_SCSEM_MODEL"),
                     maxTokens: 9000,
                     temperature: 0.15,
-                    system: "You generate precise JSON SCSEM recommendations using IRS Pub 1075 first, NIST SP 800-53 only as fallback, and CIS/STIG as supplemental hardening evidence.",
+                    system: "You generate precise JSON SCSEM recommendations using IRS Pub 1075 first, NIST SP 800-53 only as fallback, and CIS Benchmark/CIS-STIG workbooks from CIS WorkBench as supplemental hardening evidence.",
                     prompt,
                     signal: abortController.signal,
                 });
                 payload = parseJsonResponse(responseText);
+                if (!payload || typeof payload !== "object" || !Array.isArray(payload.changes)) {
+                    throw new Error("AI response did not contain a changes array.");
+                }
+                comparisonMode = "ai";
+                comparisonReason =
+                    "AI compared the complete bounded candidate evidence set; every emitted proposal still requires evidence binding and human review.";
             } catch (error) {
                 console.warn("SCSEM updater AI analysis failed; using deterministic fallback changes.", error);
-                payload = buildFallbackPayload({
-                    technology: updaterSession.inferredTechnology,
-                    pub1075,
-                    fallbackReason: error instanceof Error && error.name === "AbortError"
-                        ? "the AI analysis exceeded the interactive timeout"
-                        : "the AI response could not be used safely",
-                    updateCandidates,
-                    newControlCandidates,
-                });
+                comparisonMode = "deterministic_fallback";
+                comparisonReason = error instanceof Error && error.name === "AbortError"
+                    ? "the supplemental AI comparison exceeded the interactive timeout"
+                    : "the supplemental AI response could not be validated safely";
+                payload = deterministicFallback(comparisonReason);
             } finally {
                 clearTimeout(timeout);
             }
         }
+
+        let boundBenchmarkChanges = bindBenchmarkChangesToResolvedEvidence(
+            payload.changes,
+            controls,
+            [...updateCandidates, ...newControlCandidates],
+            pub1075.pub1075.version,
+            pub1075.nist.version
+        );
+        if (comparisonMode === "ai" && boundBenchmarkChanges.length !== payload.changes.length) {
+            comparisonMode = "deterministic_fallback";
+            comparisonReason =
+                "one or more AI proposals could not be rebound to exact WorkBench recommendation and SCSEM row evidence";
+            payload = deterministicFallback(comparisonReason);
+            boundBenchmarkChanges = bindBenchmarkChangesToResolvedEvidence(
+                payload.changes,
+                controls,
+                [...updateCandidates, ...newControlCandidates],
+                pub1075.pub1075.version,
+                pub1075.nist.version
+            );
+        }
+
+        const rawProposalCount = payload.changes.length;
+        const comparedCandidateCount = comparisonMode === "ai"
+            ? availableCandidateCount
+            : Number(payload.examinedCandidateCount || 0);
+        let comparisonComplete =
+            comparedCandidateCount === totalCandidateCount &&
+            boundBenchmarkChanges.length === rawProposalCount;
+        if (
+            comparisonMode === "deterministic_fallback" &&
+            totalCandidateCount > 0 &&
+            rawProposalCount === 0
+        ) {
+            comparisonMode = "failed";
+            comparisonReason = "The deterministic comparison produced no bindable result for a non-empty candidate set.";
+            comparisonComplete = false;
+        } else if (rawProposalCount > 0 && boundBenchmarkChanges.length === 0) {
+            comparisonMode = "failed";
+            comparisonReason = "No supplemental proposal could be rebound to exact source evidence.";
+            comparisonComplete = false;
+        } else if (!comparisonComplete) {
+            comparisonReason +=
+                ` Compared ${comparedCandidateCount} of ${totalCandidateCount} discovered candidate(s) and bound ` +
+                `${boundBenchmarkChanges.length} of ${rawProposalCount} emitted proposal(s).`;
+        }
+        const supplementalComparison: SCSEMSupplementalComparison = {
+            mode: comparisonMode,
+            complete: comparisonComplete,
+            candidateOnly: true,
+            applicabilityStatus: "review_required",
+            directSourceCount: resolvedSources.length,
+            comparedDirectSourceCount,
+            candidateCount: totalCandidateCount,
+            comparedCandidateCount,
+            rawProposalCount,
+            evidenceBoundProposalCount: boundBenchmarkChanges.length,
+            reason: comparisonReason,
+        };
+        updaterSession.audit.supplementalComparison = supplementalComparison;
         const compliancePayload = await compliancePayloadPromise;
+        const analysisCoverage = buildSCSEMAnalysisCoverage({
+            totalRows: controls.length,
+            compliance: compliancePayload,
+            uncoveredControlIdCount: compliance.uncoveredControlIds.length,
+            benchmarkLookupError,
+            supplementalComparison,
+        });
+        updaterSession.audit.analysisCoverage = analysisCoverage;
         const combinedChanges = dedupeProposedChanges(addUnambiguousTargetSheets([
             ...(compliancePayload.changes || []),
-            ...(payload.changes || []),
+            ...boundBenchmarkChanges,
         ],
             controls
         ));
@@ -1725,38 +2131,44 @@ Rules:
             validateChanges(combinedChanges, controls, MAX_UPDATER_CHANGES)
         );
 
-        updaterSession.status = "review_ready";
+        const completedAnalysisLease = clearSCSEMAnalysisLease(
+            updaterSession,
+            analysisOperationId
+        );
+        updaterSession.status = analysisCoverage.complete ? "review_ready" : "analysis_incomplete";
         updaterSession.summary = [
             compliancePayload.summary,
-            payload.summary || `Supplemental CIS/STIG review generated for ${updaterSession.inferredTechnology}.`,
+            payload.summary || `Supplemental CIS Benchmark/CIS-STIG review generated for ${updaterSession.inferredTechnology}.`,
+            analysisCoverage.complete ? null : "Analysis remains incomplete; see coverage blockers before treating this draft as release-ready.",
         ].filter(Boolean).join(" ");
         updaterSession.changes = validChanges;
         updaterSession.history.push({
             at: new Date().toISOString(),
             action: "analyze",
-            description: `Pub 1075-first/NIST-fallback analysis completed across ${compliancePayload.batchCount} bounded compliance batch(es), followed by supplemental CIS/STIG review, and generated ${validChanges.length} proposed change(s).`,
+            description:
+                `Pub 1075-first/NIST-fallback analysis ran across ${compliancePayload.batchCount} bounded compliance batch(es). ` +
+                `Supplemental CIS Benchmark/CIS-STIG mode ${comparisonMode} compared ${comparedCandidateCount}/${totalCandidateCount} ` +
+                `candidate(s), rebound ${boundBenchmarkChanges.length}/${rawProposalCount} proposal(s), and generated ` +
+                `${validChanges.length} total reviewer-gated change(s).`,
         });
-        writeSCSEMUpdaterSession(updaterSession);
-
-        await logAudit({
-            organizationId: user.organizationId,
-            userId: user.id,
-            action: "SCSEM_UPDATER_ANALYZE",
-            resourceType: "scsem_updater_session",
-            resourceId: updaterSession.id,
-            metadata: {
+        await writeSCSEMUpdaterSession(updaterSession, updaterSession.revision, {
+            action: "SCSEM_UPDATER_ANALYZE_FINALIZE",
+            analysisOperationId: completedAnalysisLease.operationId,
+            affectedPayload: {
                 input: {
                     fileName: updaterSession.originalFileName,
                     inferredTechnology: updaterSession.inferredTechnology,
                     parsedControls: controls.length,
                     scsemVersion: parsed.metadata.version,
                     effectiveDate: parsed.metadata.effectiveDate,
-                    aiUsed: shouldUseAI,
+                    aiUsed: comparisonMode === "ai",
                 },
                 output: {
+                    completedAnalysisLease,
+                    analysisLeaseCleared: true,
                     summary: updaterSession.summary,
                     changeCount: validChanges.length,
-                    changes: changePreview(validChanges),
+                    changes: validChanges,
                     candidateCounts: {
                         cisUpdates: cisUpdateCandidates.length,
                         cisNewControls: cisNewControlCandidates.length,
@@ -1772,24 +2184,54 @@ Rules:
             ...auditRequestContext(request),
         });
 
-        return NextResponse.json({ session: updaterSession });
-    } catch (error: any) {
+        return NextResponse.json(
+            { session: clientSafeSCSEMUpdaterSession(updaterSession) },
+            { headers: { ETag: scsemUpdaterRevisionETag(updaterSession) } }
+        );
+    } catch (error: unknown) {
         console.error("SCSEM updater analysis error:", error);
-        try {
-            const updaterSession = user
-                ? readSCSEMUpdaterSessionForUser(id, user)
-                : null;
-            if (!updaterSession) throw new Error("SCSEM updater session not found.");
-            updaterSession.status = "error";
-            updaterSession.error = error.message || "Failed to analyze uploaded SCSEM workbook.";
-            writeSCSEMUpdaterSession(updaterSession);
-        } catch {
-            // The session may not exist; the response below still carries the failure.
+        const mutationError = scsemUpdaterMutationErrorDetails(error);
+        const failure = scsemAnalysisFailureDetails(error);
+        if (!mutationError) {
+            try {
+                const updaterSession = user
+                    ? readSCSEMUpdaterSessionForUser(id, user)
+                    : null;
+                if (!updaterSession) throw new Error("SCSEM updater session not found.");
+                if (isSCSEMAnalysisLeaseOwnedBy(updaterSession, analysisOperationId)) {
+                    const previousStatus = updaterSession.status;
+                    const failedAnalysisLease = clearSCSEMAnalysisLease(
+                        updaterSession,
+                        analysisOperationId
+                    );
+                    updaterSession.status = "error";
+                    updaterSession.error = failure.persistedError;
+                    await writeSCSEMUpdaterSession(updaterSession, updaterSession.revision, {
+                        action: "SCSEM_UPDATER_ANALYZE_ERROR",
+                        analysisOperationId: failedAnalysisLease.operationId,
+                        affectedPayload: {
+                            before: {
+                                status: previousStatus,
+                                analysisLease: failedAnalysisLease,
+                            },
+                            after: {
+                                status: updaterSession.status,
+                                error: updaterSession.error,
+                                analysisLease: null,
+                            },
+                        },
+                        ...auditRequestContext(request),
+                    });
+                }
+            } catch {
+                // The session may not exist or may have advanced; never overwrite newer state.
+            }
         }
 
-        return NextResponse.json(
-            { error: error.message || "Failed to analyze uploaded SCSEM workbook." },
-            { status: 500 }
-        );
+        if (mutationError) {
+            return NextResponse.json(mutationError, { status: mutationError.status });
+        }
+
+        return NextResponse.json(failure.response, { status: failure.status });
     }
 }

@@ -1,42 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { logAudit } from "@/lib/audit";
-import { v4 as uuidv4 } from "uuid";
-import { hash } from "bcryptjs";
-import { generateTemporaryPassword } from "@/lib/passwords";
+import { auditRequestContext } from "@/lib/audit";
+import { requireCurrentAdmin } from "@/lib/current-admin-auth";
+import {
+  generatePasswordResetToken,
+  PASSWORD_RESET_TTL_MS,
+} from "@/lib/password-reset-security";
+import {
+  generateInvitationToken,
+  normalizeAccountEmail,
+  parseUserManagementRole,
+} from "@/lib/user-management-security";
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const access = await requireCurrentAdmin();
+    if (!access.ok) return access.response;
+    const admin = access.user;
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
-
-    const userInfo = session.user as unknown as {
-      id: string;
-      role: string;
-      organizationId: string;
-    };
-
-    if (userInfo.role !== "ADMIN") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    const body = await request.json();
+    const requestContext = auditRequestContext(request);
 
     if (body.action === "invite") {
-      const { email, role } = body;
-
+      const email = normalizeAccountEmail(body.email);
+      const role = parseUserManagementRole(body.role);
       if (!email || !role) {
         return NextResponse.json(
-          { error: "Email and role are required" },
+          { error: "A valid email and role are required" },
           { status: 400 }
         );
       }
 
-      // Check if user already exists
-      const existing = await db.user.findUnique({ where: { email } });
+      const existing = await db.user.findFirst({
+        where: { email: { equals: email, mode: "insensitive" } },
+        select: { id: true },
+      });
       if (existing) {
         return NextResponse.json(
           { error: "User with this email already exists" },
@@ -44,84 +44,61 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Create invitation
-      const token = uuidv4();
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiry
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      const { rawToken, tokenDigest } = generateInvitationToken();
+      const invitation = await db.$transaction(async (tx) => {
+        // A raw token is intentionally unrecoverable. Reissuing for the same
+        // email invalidates any older active link before publishing a new one.
+        const revoked = await tx.invitation.updateMany({
+          where: {
+            email: { equals: email, mode: "insensitive" },
+            organizationId: admin.organizationId,
+            used: false,
+            expiresAt: { gt: new Date() },
+          },
+          data: { used: true },
+        });
+        const created = await tx.invitation.create({
+          data: {
+            email,
+            role,
+            organizationId: admin.organizationId,
+            token: tokenDigest,
+            expiresAt,
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            organizationId: admin.organizationId,
+            userId: admin.id,
+            action: "USER_INVITE",
+            resourceType: "invitation",
+            resourceId: created.id,
+            metadata: {
+              email,
+              role,
+              expiresAt: expiresAt.toISOString(),
+              supersededActiveInvitations: revoked.count,
+            },
+            ipAddress: requestContext.ipAddress ?? null,
+            userAgent: requestContext.userAgent ?? null,
+          },
+        });
+        return created;
+      }, { isolationLevel: "Serializable" });
 
-      await db.invitation.create({
-        data: {
-          email,
-          role: role as "ADMIN" | "COMPUTER_SECURITY_REVIEW" | "COMPLIANCE_OFFICER" | "AUDITOR" | "VIEWER",
-          organizationId: userInfo.organizationId,
-          token,
-          expiresAt,
+      return NextResponse.json(
+        {
+          success: true,
+          token: rawToken,
+          invitationId: invitation.id,
+          expiresAt: expiresAt.toISOString(),
         },
-      });
-
-      await logAudit({
-        organizationId: userInfo.organizationId,
-        userId: userInfo.id,
-        action: "USER_INVITE",
-        resourceType: "invitation",
-        metadata: { email, role },
-        ipAddress:
-          request.headers.get("x-forwarded-for") || undefined,
-        userAgent: request.headers.get("user-agent") || undefined,
-      });
-
-      return NextResponse.json({ success: true, token });
+        { headers: { "Cache-Control": "private, no-store" } }
+      );
     }
 
-    if (body.action === "register") {
-      const { email, name, password, inviteToken } = body;
-
-      // Validate invitation
-      const invitation = await db.invitation.findUnique({
-        where: { token: inviteToken },
-      });
-
-      if (
-        !invitation ||
-        invitation.used ||
-        invitation.expiresAt < new Date()
-      ) {
-        return NextResponse.json(
-          { error: "Invalid or expired invitation" },
-          { status: 400 }
-        );
-      }
-
-      const passwordHash = await hash(password, 12);
-
-      const user = await db.user.create({
-        data: {
-          email,
-          name,
-          passwordHash,
-          role: invitation.role,
-          organizationId: invitation.organizationId,
-        },
-      });
-
-      await db.invitation.update({
-        where: { id: invitation.id },
-        data: { used: true },
-      });
-
-      await logAudit({
-        organizationId: invitation.organizationId,
-        userId: user.id,
-        action: "USER_CREATE",
-        resourceType: "user",
-        resourceId: user.id,
-        metadata: { email, role: invitation.role },
-      });
-
-      return NextResponse.json({ success: true });
-    }
-
-    if (body.action === "reset_password") {
+    if (body.action === "create_password_reset") {
       const { userId } = body;
       if (!userId || typeof userId !== "string") {
         return NextResponse.json(
@@ -129,48 +106,77 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      if (userId === userInfo.id) {
+      if (userId === admin.id) {
         return NextResponse.json(
           { error: "Use your account settings to change your own password" },
           { status: 400 }
         );
       }
 
-      const targetUser = await db.user.findFirst({
-        where: {
-          id: userId,
-          organizationId: userInfo.organizationId,
-        },
-        select: { id: true, email: true, name: true },
-      });
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + PASSWORD_RESET_TTL_MS);
+      const { rawToken, tokenDigest } = generatePasswordResetToken();
+      const resetToken = await db.$transaction(async (tx) => {
+        const targetUser = await tx.user.findFirst({
+          where: {
+            id: userId,
+            organizationId: admin.organizationId,
+            active: true,
+          },
+          select: { id: true, email: true, name: true },
+        });
+        if (!targetUser) return null;
 
-      if (!targetUser) {
+        const revoked = await tx.passwordResetToken.updateMany({
+          where: {
+            userId: targetUser.id,
+            organizationId: admin.organizationId,
+            usedAt: null,
+          },
+          data: { usedAt: now },
+        });
+        const created = await tx.passwordResetToken.create({
+          data: {
+            userId: targetUser.id,
+            organizationId: admin.organizationId,
+            createdByUserId: admin.id,
+            tokenDigest,
+            expiresAt,
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            organizationId: admin.organizationId,
+            userId: admin.id,
+            action: "USER_PASSWORD_RESET_LINK_CREATE",
+            resourceType: "password_reset_token",
+            resourceId: created.id,
+            metadata: {
+              targetUserId: targetUser.id,
+              email: targetUser.email,
+              name: targetUser.name,
+              expiresAt: expiresAt.toISOString(),
+              supersededResetLinks: revoked.count,
+            },
+            ipAddress: requestContext.ipAddress ?? null,
+            userAgent: requestContext.userAgent ?? null,
+          },
+        });
+        return created;
+      }, { isolationLevel: "Serializable" });
+      if (!resetToken) {
         return NextResponse.json({ error: "User not found" }, { status: 404 });
       }
 
-      const temporaryPassword = generateTemporaryPassword();
-      const passwordHash = await hash(temporaryPassword, 12);
-
-      await db.user.update({
-        where: { id: targetUser.id },
-        data: { passwordHash },
-      });
-
-      await logAudit({
-        organizationId: userInfo.organizationId,
-        userId: userInfo.id,
-        action: "USER_PASSWORD_RESET",
-        resourceType: "user",
-        resourceId: targetUser.id,
-        metadata: { email: targetUser.email, name: targetUser.name },
-        ipAddress: request.headers.get("x-forwarded-for") || undefined,
-        userAgent: request.headers.get("user-agent") || undefined,
-      });
-
-      return NextResponse.json({
-        success: true,
-        temporaryPassword,
-      });
+      return NextResponse.json(
+        {
+          success: true,
+          token: rawToken,
+          resetTokenId: resetToken.id,
+          expiresAt: expiresAt.toISOString(),
+        },
+        { headers: { "Cache-Control": "private, no-store" } }
+      );
     }
 
     if (body.action === "reset_mfa") {
@@ -181,7 +187,7 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      if (userId === userInfo.id) {
+      if (userId === admin.id) {
         return NextResponse.json(
           { error: "Use your MFA settings to reset your own MFA" },
           { status: 400 }
@@ -191,19 +197,28 @@ export async function POST(request: NextRequest) {
       const targetUser = await db.user.findFirst({
         where: {
           id: userId,
-          organizationId: userInfo.organizationId,
+          organizationId: admin.organizationId,
         },
-        select: { id: true, email: true, name: true },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          credentialVersion: true,
+        },
       });
 
       if (!targetUser) {
         return NextResponse.json({ error: "User not found" }, { status: 404 });
       }
 
-      await db.$transaction([
-        db.mfaRecoveryCode.deleteMany({ where: { userId: targetUser.id } }),
-        db.user.update({
-          where: { id: targetUser.id },
+      await db.$transaction(async (tx) => {
+        await tx.mfaRecoveryCode.deleteMany({ where: { userId: targetUser.id } });
+        const updated = await tx.user.updateMany({
+          where: {
+            id: targetUser.id,
+            organizationId: admin.organizationId,
+            credentialVersion: targetUser.credentialVersion,
+          },
           data: {
             mfaEnabled: false,
             mfaSecretEncrypted: null,
@@ -211,22 +226,35 @@ export async function POST(request: NextRequest) {
             mfaPendingSecretCreatedAt: null,
             mfaEnabledAt: null,
             mfaLastUsedAt: null,
+            mfaLastUsedTotpCounter: null,
+            credentialVersion: { increment: 1 },
           },
-        }),
-      ]);
+        });
+        if (updated.count !== 1) {
+          throw new Error("TARGET_SECURITY_STATE_CHANGED");
+        }
+        await tx.auditLog.create({
+          data: {
+            organizationId: admin.organizationId,
+            userId: admin.id,
+            action: "USER_MFA_RESET",
+            resourceType: "user",
+            resourceId: targetUser.id,
+            metadata: {
+              email: targetUser.email,
+              name: targetUser.name,
+              credentialVersion: targetUser.credentialVersion + 1,
+            },
+            ipAddress: requestContext.ipAddress ?? null,
+            userAgent: requestContext.userAgent ?? null,
+          },
+        });
+      }, { isolationLevel: "Serializable" });
 
-      await logAudit({
-        organizationId: userInfo.organizationId,
-        userId: userInfo.id,
-        action: "USER_MFA_RESET",
-        resourceType: "user",
-        resourceId: targetUser.id,
-        metadata: { email: targetUser.email, name: targetUser.name },
-        ipAddress: request.headers.get("x-forwarded-for") || undefined,
-        userAgent: request.headers.get("user-agent") || undefined,
-      });
-
-      return NextResponse.json({ success: true });
+      return NextResponse.json(
+        { success: true },
+        { headers: { "Cache-Control": "private, no-store" } }
+      );
     }
 
     return NextResponse.json(
@@ -244,17 +272,11 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const userInfo = session.user as unknown as {
-      organizationId: string;
-    };
+    const access = await requireCurrentAdmin();
+    if (!access.ok) return access.response;
 
     const users = await db.user.findMany({
-      where: { organizationId: userInfo.organizationId },
+      where: { organizationId: access.user.organizationId },
       select: {
         id: true,
         name: true,
@@ -268,7 +290,10 @@ export async function GET() {
       orderBy: { name: "asc" },
     });
 
-    return NextResponse.json({ users });
+    return NextResponse.json(
+      { users },
+      { headers: { "Cache-Control": "private, no-store" } }
+    );
   } catch (error) {
     console.error("Users GET error:", error);
     return NextResponse.json(

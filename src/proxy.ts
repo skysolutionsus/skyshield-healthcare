@@ -10,6 +10,10 @@ export default auth((req) => {
     pathname.startsWith("/login") ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/health") ||
+    pathname === "/api/register" ||
+    pathname === "/api/reset-password" ||
+    pathname === "/register" ||
+    pathname === "/reset-password" ||
     pathname === "/"
   ) {
     return NextResponse.next();
@@ -23,7 +27,14 @@ export default auth((req) => {
   }
 
   // Check auth for protected routes
-  if (!req.auth) {
+  const authUser = req.auth?.user as
+    | { sessionInvalid?: boolean }
+    | undefined;
+  if (!req.auth || authUser?.sessionInvalid) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const loginUrl = new URL("/login", req.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
@@ -33,15 +44,18 @@ export default auth((req) => {
   const mfaEnabled = Boolean(
     (req.auth.user as { mfaEnabled?: boolean } | undefined)?.mfaEnabled
   );
+  const mfaVerifiedAt = (
+    req.auth.user as { mfaVerifiedAt?: string | null } | undefined
+  )?.mfaVerifiedAt;
 
   if (
-    !mfaEnabled &&
+    (!mfaEnabled || !mfaVerifiedAt) &&
     !pathname.startsWith("/settings") &&
     !pathname.startsWith("/api/mfa")
   ) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json(
-        { error: "MFA enrollment required" },
+        { error: "MFA enrollment and verification required" },
         { status: 403 }
       );
     }

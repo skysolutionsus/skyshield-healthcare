@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { Bell, AlertTriangle, ShieldAlert, Info, X } from "lucide-react";
+import { Bell, X } from "lucide-react";
 
 interface Notification {
     id: string;
@@ -15,28 +15,10 @@ interface Notification {
     borderColor: string;
 }
 
-const defaultNotifications: Notification[] = [
-    {
-        id: "cis-api-info",
-        title: "CIS WorkBench API Connected",
-        description: "Authenticated via SecureSuite license.xml. 1,094 benchmarks available for syncing against your SCSEM templates.",
-        time: "System Notice",
-        icon: Info,
-        color: "text-blue-400",
-        bgColor: "bg-blue-500/10",
-        borderColor: "border-blue-500/20"
-    },
-    {
-        id: "scsem-import",
-        title: "SCSEM Data Imported",
-        description: "58 SCSEM templates with 7,467 controls imported from IRS XLSX files.",
-        time: "On first boot",
-        icon: ShieldAlert,
-        color: "text-emerald-400",
-        bgColor: "bg-emerald-500/10",
-        borderColor: "border-emerald-500/20"
-    },
-];
+// Runtime source status must come from verified server-side checks. Do not
+// present hard-coded connectivity, credential, benchmark, or corpus claims.
+const defaultNotifications: Notification[] = [];
+const subscribeToClient = () => () => {};
 
 export function NotificationsMenu() {
     const [isOpen, setIsOpen] = useState(false);
@@ -44,11 +26,7 @@ export function NotificationsMenu() {
     const menuRef = useRef<HTMLDivElement>(null);
     const buttonRef = useRef<HTMLButtonElement>(null);
     const [dropdownStyles, setDropdownStyles] = useState<{ top: number; left: number; maxHeight: number }>({ top: 0, left: 16, maxHeight: 400 });
-    const [mounted, setMounted] = useState(false);
-
-    useEffect(() => {
-        setMounted(true);
-    }, []);
+    const mounted = useSyncExternalStore(subscribeToClient, () => true, () => false);
 
     // Close when clicking outside
     useEffect(() => {

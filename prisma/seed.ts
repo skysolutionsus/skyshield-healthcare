@@ -2,20 +2,72 @@ import { PrismaClient } from "@prisma/client";
 import { hash } from "bcryptjs";
 import * as fs from "fs";
 import * as path from "path";
+import { strongPasswordValidationError } from "../src/lib/password-policy";
 
 const prisma = new PrismaClient();
+
+const ADMIN_USERS = [
+  { email: "james@skysolutions.com", name: "James Galang" },
+  { email: "jcambra@skysolutions.com", name: "Jared Cambra" },
+  { email: "mconklin@skysolutions.com", name: "Michael Conklin" },
+  { email: "nmatta@skysolutions.com", name: "Nitin Matta" },
+] as const;
+const REVIEW_USER = {
+  email: "folami.r.lofinmakinjr2@irs.gov",
+  name: "Folami Lofinmakin",
+} as const;
+const SEED_IDENTITIES = [...ADMIN_USERS, REVIEW_USER];
+
+function requiredSeedPasswords(): Map<string, string> {
+  const raw = process.env.SEED_USER_PASSWORDS_JSON?.trim();
+  if (!raw) {
+    throw new Error(
+      "SEED_USER_PASSWORDS_JSON must map every disposable seed identity to a distinct strong password."
+    );
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("SEED_USER_PASSWORDS_JSON must be valid JSON.");
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("SEED_USER_PASSWORDS_JSON must be a JSON object.");
+  }
+
+  const passwords = new Map<string, string>();
+  for (const identity of SEED_IDENTITIES) {
+    const password = (parsed as Record<string, unknown>)[identity.email];
+    const validationError = strongPasswordValidationError(password);
+    if (validationError) {
+      throw new Error(`Invalid seed password for ${identity.email}: ${validationError}`);
+    }
+    passwords.set(identity.email, password as string);
+  }
+  if (new Set(passwords.values()).size !== SEED_IDENTITIES.length) {
+    throw new Error("Every disposable seed identity must have a distinct password.");
+  }
+  return passwords;
+}
+
+// Validate every required secret before the seed performs any database writes.
+const seedPasswords = requiredSeedPasswords();
+const allowDestructiveReset =
+  process.env.SEED_ALLOW_DESTRUCTIVE_RESET?.trim().toLowerCase() === "true";
+const enableCanonicalScsemStewardship =
+  process.env.SEED_CAN_MANAGE_CANONICAL_SCSEMS?.trim().toLowerCase() === "true";
+
+if (!allowDestructiveReset) {
+  throw new Error(
+    "Refusing destructive database seed. Set SEED_ALLOW_DESTRUCTIVE_RESET=true only for an authorized disposable environment."
+  );
+}
 
 async function main() {
   console.log("Seeding database...");
 
   // Clean up ALL users that aren't in our current seed list
-  const keepEmails = [
-    "james@skysolutions.com",
-    "mconklin@skysolutions.com",
-    "jcambra@skysolutions.com",
-    "nmatta@skysolutions.com",
-    "folami.r.lofinmakinjr2@irs.gov",
-  ];
+  const keepEmails = SEED_IDENTITIES.map((identity) => identity.email);
 
   // Wipe dependent tables first to avoid FK constraint errors
   await prisma.auditLog.deleteMany({});
@@ -40,31 +92,32 @@ async function main() {
   if (existingOrg) {
     org = await prisma.organization.update({
       where: { id: existingOrg.id },
-      data: { name: "Sky Solutions", slug: "sky-solutions" },
+      data: {
+        name: "Sky Solutions",
+        slug: "sky-solutions",
+        canManageCanonicalScsems: enableCanonicalScsemStewardship,
+      },
     });
   } else {
     org = await prisma.organization.create({
-      data: { name: "Sky Solutions", slug: "sky-solutions" },
+      data: {
+        name: "Sky Solutions",
+        slug: "sky-solutions",
+        canManageCanonicalScsems: enableCanonicalScsemStewardship,
+      },
     });
   }
 
   console.log("Organization:", org.name);
 
-  const adminPassword = await hash("SkyShield2026!", 12);
-  const csrPassword = await hash("ComputerSecurity2026!", 12);
-  const adminUsers = [
-    { email: "james@skysolutions.com", name: "James Galang" },
-    { email: "jcambra@skysolutions.com", name: "Jared Cambra" },
-    { email: "mconklin@skysolutions.com", name: "Michael Conklin" },
-    { email: "nmatta@skysolutions.com", name: "Nitin Matta" },
-  ];
-
   const admins = [];
-  for (const user of adminUsers) {
+  for (const user of ADMIN_USERS) {
+    const passwordHash = await hash(seedPasswords.get(user.email) as string, 12);
     const adminUser = await prisma.user.upsert({
       where: { email: user.email },
       update: {
         name: user.name,
+        passwordHash,
         role: "ADMIN",
         organizationId: org.id,
         active: true,
@@ -72,7 +125,7 @@ async function main() {
       create: {
         email: user.email,
         name: user.name,
-        passwordHash: adminPassword,
+        passwordHash,
         role: "ADMIN",
         organizationId: org.id,
       },
@@ -82,18 +135,23 @@ async function main() {
   }
 
   const admin = admins[0];
+  const reviewPasswordHash = await hash(
+    seedPasswords.get(REVIEW_USER.email) as string,
+    12
+  );
   const complianceOfficer = await prisma.user.upsert({
-    where: { email: "folami.r.lofinmakinjr2@irs.gov" },
+    where: { email: REVIEW_USER.email },
     update: {
-      name: "Folami Lofinmakin",
+      name: REVIEW_USER.name,
+      passwordHash: reviewPasswordHash,
       role: "COMPUTER_SECURITY_REVIEW",
       organizationId: org.id,
       active: true,
     },
     create: {
-      email: "folami.r.lofinmakinjr2@irs.gov",
-      name: "Folami Lofinmakin",
-      passwordHash: csrPassword,
+      email: REVIEW_USER.email,
+      name: REVIEW_USER.name,
+      passwordHash: reviewPasswordHash,
       role: "COMPUTER_SECURITY_REVIEW",
       organizationId: org.id,
     },
@@ -105,6 +163,13 @@ async function main() {
   const scsemIndexPath = path.join(process.cwd(), "data", "scsem-index.json");
   if (fs.existsSync(scsemIndexPath)) {
     const scsemIndex = JSON.parse(fs.readFileSync(scsemIndexPath, "utf-8"));
+    const scsemIds = scsemIndex.map((scsem: { id?: unknown }) => scsem.id);
+    if (
+      scsemIds.some((id: unknown) => typeof id !== "string" || !id) ||
+      new Set(scsemIds).size !== scsemIndex.length
+    ) {
+      throw new Error("data/scsem-index.json must contain a unique pinned id for every SCSEM.");
+    }
 
     for (const scsem of scsemIndex) {
       let cisTech = null;
@@ -117,7 +182,7 @@ async function main() {
       else if (scsem.name.includes("Cisco")) cisTech = "Cisco Network Devices";
 
       await prisma.sCSEMTemplate.upsert({
-        where: { id: scsem.name.replace(/\s+/g, "-").toLowerCase() },
+        where: { id: scsem.id },
         update: {
           name: scsem.name,
           category: scsem.category,
@@ -125,7 +190,7 @@ async function main() {
           cisTechnology: cisTech,
         },
         create: {
-          id: scsem.name.replace(/\s+/g, "-").toLowerCase(),
+          id: scsem.id,
           name: scsem.name,
           category: scsem.category,
           filePath: scsem.file,
@@ -143,7 +208,7 @@ async function main() {
     let totalChangeLogsImported = 0;
 
     for (const scsem of scsemIndex) {
-      const templateId = scsem.name.replace(/\s+/g, "-").toLowerCase();
+      const templateId = scsem.id;
 
       try {
         const parsed = parseSCSEMFile(scsem.file);
@@ -346,8 +411,7 @@ async function main() {
 
   console.log("Created sample conversation");
   console.log("\nSeed complete! Login credentials:");
-  console.log("  Admins: James/Jared/Michael/Nitin / SkyShield2026!");
-  console.log("  Computer Security Review: folami.r.lofinmakinjr2@irs.gov / ComputerSecurity2026!");
+  console.log("  Admin and Computer Security Review credentials were injected from the environment.");
 }
 
 main()

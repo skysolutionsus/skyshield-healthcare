@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-07-21",
+  "pub1075": {
+    "version": "Rev. 11-2021",
+    "text": {
+      "path": "data/pub1075/p1075-full-text.md",
+      "size": 604338,
+      "sha256": "d66e31ac00113921397dc2109b61dc483871cf81683d98273d2175d02bdfd6e5"
+    },
+    "publication": {
+      "path": "data/pub1075/p1075.pdf",
+      "size": 1887333,
+      "sha256": "3aca5e1a4ab86b106a22e614e9305c6e76fddda12963b06dd2923ecfe3a45e28"
+    }
+  },
+  "nist": {
+    "version": "5.2.0",
+    "path": "data/nist/sp800-53-rev5-controls.json",
+    "size": 3584388,
+    "sha256": "798c8c4dbdadd5fa229aa094572953b0295f02e19c79c2f2e6703d344e833178",
+    "sourceCommit": "78650f02ad9321bb7b817846f8fbd4f2bcd620de",
+    "sourceUrl": "https://raw.githubusercontent.com/usnistgov/oscal-content/78650f02ad9321bb7b817846f8fbd4f2bcd620de/nist.gov/SP800-53/rev5/json/NIST_SP-800-53_rev5_catalog.json",
+    "sourceSha256": "01f37cf90ea99d92242c936cbfbdebcc338eef1f71454e2acac36cc56e9bc062"
+  }
+}

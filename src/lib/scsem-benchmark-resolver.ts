@@ -12,8 +12,9 @@ import {
     type DownloadedBenchmark,
 } from "@/lib/scsem-update-engine";
 import type { ParsedControl, ParsedSCSEM } from "@/lib/xlsx-parser";
+import { scsemBenchmarkCandidateFailureReason } from "@/lib/scsem-benchmark-failure";
 
-export type ResolvedBenchmarkKind = "CIS" | "STIG";
+export type ResolvedBenchmarkKind = "CIS" | "CIS_STIG";
 
 export interface ResolvedBenchmarkSource {
     kind: ResolvedBenchmarkKind;
@@ -312,7 +313,7 @@ function adjacentPlansForTechnology(technology: string, parsed: ParsedSCSEM): Ad
     ) {
         plans.push({
             category: "Network management-plane hardening patterns",
-            rationale: "No storage-array CIS/STIG workbook was found. Network device benchmarks are adjacent evidence for AAA, management access, logging, time sync, encryption, configuration backup, and administrative-plane controls that commonly apply to SAN/NAS management interfaces.",
+            rationale: "No storage-array CIS Benchmark or CIS-STIG workbook was found in CIS WorkBench. Network device benchmarks are adjacent evidence for AAA, management access, logging, time sync, encryption, configuration backup, and administrative-plane controls that commonly apply to SAN/NAS management interfaces.",
             queries: [
                 "Cisco NX-OS",
                 "Cisco IOS XE 17.x",
@@ -325,7 +326,7 @@ function adjacentPlansForTechnology(technology: string, parsed: ParsedSCSEM): Ad
     if (haystack.includes("generic web server") || haystack.includes("web server") || haystack.includes("webserver")) {
         plans.push({
             category: "Web platform hardening patterns",
-            rationale: "No single generic web-server CIS/STIG workbook exists. Apache HTTP Server, NGINX, IIS, and Tomcat benchmarks are adjacent evidence for TLS, request handling, authentication, directory exposure, logging, error handling, and management hardening patterns.",
+            rationale: "No single generic web-server CIS Benchmark or CIS-STIG workbook exists in CIS WorkBench. Apache HTTP Server, NGINX, IIS, and Tomcat benchmarks are adjacent evidence for TLS, request handling, authentication, directory exposure, logging, error handling, and management hardening patterns.",
             queries: [
                 "Apache HTTP Server 2.4",
                 "NGINX",
@@ -338,7 +339,7 @@ function adjacentPlansForTechnology(technology: string, parsed: ParsedSCSEM): Ad
     if (haystack.includes("gentax")) {
         plans.push({
             category: "Enterprise application platform hardening patterns",
-            rationale: "No GenTax-specific CIS/STIG workbook was found. Web/application server and database benchmarks are adjacent evidence for authentication, session handling, audit logging, encryption, service accounts, and data-tier privilege patterns that may apply to an enterprise tax application SCSEM.",
+            rationale: "No GenTax-specific CIS Benchmark or CIS-STIG workbook was found in CIS WorkBench. Web/application server and database benchmarks are adjacent evidence for authentication, session handling, audit logging, encryption, service accounts, and data-tier privilege patterns that may apply to an enterprise tax application SCSEM.",
             queries: [
                 "Apache Tomcat 10.1",
                 "Microsoft IIS 10",
@@ -419,43 +420,14 @@ function selectionScore(selection: SelectedCISProfile, sheetRefCount: number): n
 
 function acceptsSelection(
     selection: SelectedCISProfile,
-    sheetRefCount: number,
-    allowExactProductUpgrade = false
+    sheetRefCount: number
 ): boolean {
     if (sheetRefCount <= 0) return false;
     const shared = selection.sharedRecommendationCount;
     const sharedRatio = shared / sheetRefCount;
 
     if (sheetRefCount <= 5) return shared === sheetRefCount;
-    if (shared >= 5 && sharedRatio >= 0.45) return true;
-
-    // A newer revision of the exact same product generation can legitimately
-    // renumber many recommendations. Retain a meaningful overlap floor, but do
-    // not fall back to an older benchmark merely because the new revision is
-    // precisely what the updater needs to compare and propose.
-    return allowExactProductUpgrade && shared >= 5 && sharedRatio >= 0.15;
-}
-
-function isExactProductUpgradeCandidate(
-    queryProduct: { family: string | null; productGeneration: string | null },
-    candidate: { productFamily: string | null; productGeneration: string | null }
-): boolean {
-    if (!queryProduct.family || queryProduct.family !== candidate.productFamily) return false;
-    if (queryProduct.productGeneration) {
-        const generationParts = (value: string | null) => (value || "")
-            .split(".")
-            .map((part) => Number.parseInt(part, 10))
-            .filter((part) => Number.isFinite(part));
-        const queryParts = generationParts(queryProduct.productGeneration);
-        const candidateParts = generationParts(candidate.productGeneration);
-        const length = Math.max(queryParts.length, candidateParts.length);
-        return length > 0 && Array.from({ length }, (_, index) => index)
-            .every((index) => (queryParts[index] || 0) === (candidateParts[index] || 0));
-    }
-
-    // These families are already specific products; their leading version is
-    // the CIS document revision, not a platform generation.
-    return queryProduct.family.startsWith("aws-");
+    return shared >= 5 && sharedRatio >= 0.45;
 }
 
 async function evaluateQuery({
@@ -519,7 +491,7 @@ async function evaluateQuery({
             candidateAttempts.push({
                 ...attemptBase,
                 outcome: "download_failed",
-                reason: error instanceof Error ? error.message : String(error),
+                reason: scsemBenchmarkCandidateFailureReason(error),
             });
             continue;
         }
@@ -536,11 +508,7 @@ async function evaluateQuery({
             continue;
         }
 
-        const exactProductUpgrade = kind === "CIS" && isExactProductUpgradeCandidate(
-            ranking.queryProduct,
-            candidate
-        );
-        if (!acceptsSelection(selectedProfile, sheetRecommendationCount, exactProductUpgrade)) {
+        if (!acceptsSelection(selectedProfile, sheetRecommendationCount)) {
             candidateAttempts.push({
                 ...attemptBase,
                 outcome: "insufficient_control_overlap",
@@ -553,9 +521,7 @@ async function evaluateQuery({
         candidateAttempts.push({
             ...attemptBase,
             outcome: "accepted",
-            reason: `${selectedProfile.sharedRecommendationCount}/${sheetRecommendationCount} SCSEM recommendation IDs overlap${exactProductUpgrade && selectedProfile.sharedRecommendationCount / sheetRecommendationCount < 0.45
-                ? "; accepted as the newest exact product generation/revision for upgrade analysis"
-                : ""}`,
+            reason: `${selectedProfile.sharedRecommendationCount}/${sheetRecommendationCount} SCSEM recommendation IDs overlap`,
             sharedRecommendationCount: selectedProfile.sharedRecommendationCount,
         });
 
@@ -727,7 +693,7 @@ export async function resolveSCSEMBenchmarkSourcesDetailed({
                 downloadedBenchmarks,
             }),
             resolveKindForSheet({
-                kind: "STIG",
+                kind: "CIS_STIG",
                 queries,
                 sheetName: sheet.sheetName,
                 controls: sheet.controls,
@@ -796,7 +762,7 @@ export async function resolveAdjacentSCSEMBenchmarkSources({
                     downloadedBenchmarks,
                 }),
                 evaluateAdjacentQuery({
-                    kind: "STIG",
+                    kind: "CIS_STIG",
                     query,
                     category: plan.category,
                     rationale: plan.rationale,

@@ -7,6 +7,12 @@ npm-debug.log*
 .env.*
 !.env.example
 
+# CIS SecureSuite license files are credentials. They must be mounted from a
+# runtime secret path, never copied into the Docker build context or image.
+assets/license.xml
+**/*license*.xml
+assets/Safeguards_FY26_Methodology_Plan_Final DRAFT_v1.0.docx
+
 data/*.db
 data/*.sqlite
 data/*.sqlite3

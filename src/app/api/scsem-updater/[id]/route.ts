@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { readSCSEMUpdaterSessionForUser } from "@/lib/scsem-updater-store";
+import {
+    readSCSEMUpdaterSessionForUser,
+    scsemUpdaterRevisionETag,
+} from "@/lib/scsem-updater-store";
+import { requireScsemSteward } from "@/lib/scsem-steward-auth";
+import { scsemUpdaterRouteFailureDetails } from "@/lib/scsem-updater-route-failure";
+import { clientSafeSCSEMUpdaterSession } from "@/lib/scsem-updater-client-session";
 
 export const runtime = "nodejs";
 
@@ -9,20 +14,21 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const session = await auth();
-        if (!session?.user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
+        const access = await requireScsemSteward();
+        if (!access.ok) return access.response;
 
         const { id } = await params;
-        const user = session.user as unknown as { organizationId: string };
-        const updaterSession = readSCSEMUpdaterSessionForUser(id, user);
-        return NextResponse.json({ session: updaterSession });
-    } catch (error: any) {
-        const status = error.message?.includes("not found") ? 404 : 500;
+        const updaterSession = readSCSEMUpdaterSessionForUser(id, access.user);
         return NextResponse.json(
-            { error: error.message || "Failed to load SCSEM updater session." },
-            { status }
+            { session: clientSafeSCSEMUpdaterSession(updaterSession) },
+            { headers: { ETag: scsemUpdaterRevisionETag(updaterSession) } }
         );
+    } catch (error: unknown) {
+        console.error("SCSEM updater session load error:", error);
+        const failure = scsemUpdaterRouteFailureDetails(
+            error,
+            "Failed to load the SCSEM updater session."
+        );
+        return NextResponse.json(failure.response, { status: failure.status });
     }
 }

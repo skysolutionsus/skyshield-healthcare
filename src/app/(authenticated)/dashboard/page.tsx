@@ -5,21 +5,19 @@ import {
   MessageSquare,
   ArrowRight,
   Activity,
-  TrendingUp,
-  CheckCircle2,
-  Clock,
   AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { officialSCSEMManifest } from "@/lib/scsem-official-manifest";
+import { requireScsemSteward } from "@/lib/scsem-steward-auth";
 import { formatDateTime } from "@/lib/utils";
 
 async function getDashboardData(organizationId: string) {
   const [
     incidentCounts,
     totalIncidents,
-    scsemOutdated,
     recentLogs,
     totalConversations,
     recentIncidents,
@@ -31,9 +29,6 @@ async function getDashboardData(organizationId: string) {
     }),
     db.incident.count({
       where: { organizationId, status: { not: "CLOSED" } },
-    }),
-    db.sCSEMUpdateReview.count({
-      where: { status: "PENDING" },
     }),
     db.auditLog.findMany({
       where: { organizationId },
@@ -57,13 +52,9 @@ async function getDashboardData(organizationId: string) {
     severityMap[ic.severity] = ic._count;
   });
 
-  const totalScsems = await db.sCSEMTemplate.count();
-
   return {
     openIncidents: totalIncidents,
     incidentsBySeverity: severityMap,
-    scsemTotal: totalScsems,
-    scsemOutdated: scsemOutdated,
     recentLogs,
     recentIncidents,
     totalConversations,
@@ -135,6 +126,12 @@ export default async function DashboardPage() {
 
   const orgId = (session.user as unknown as { organizationId: string })
     .organizationId;
+  const scsemAccess = await requireScsemSteward();
+  const canManageCanonicalScsems = scsemAccess.ok;
+  const scsemManifest = officialSCSEMManifest();
+  const scsemSourcePolicy = scsemManifest.sourcePolicy === "individual_xlsx_links"
+    ? "Individual IRS XLSX links"
+    : scsemManifest.sourcePolicy;
 
   let data;
   try {
@@ -143,51 +140,11 @@ export default async function DashboardPage() {
     data = {
       openIncidents: 0,
       incidentsBySeverity: {},
-      scsemTotal: 58,
-      scsemOutdated: 0,
       recentLogs: [],
       recentIncidents: [],
       totalConversations: 0,
     };
   }
-
-  const scsemUpToDate = data.scsemTotal - data.scsemOutdated;
-
-  // Compute donut chart segments for SCSEM Health
-  const scsemSegments = [
-    { label: "Up to Date", value: scsemUpToDate, color: "#22c55e" },
-    { label: "Updates Available", value: data.scsemOutdated, color: "#f59e0b" },
-  ].filter((s) => s.value > 0);
-
-  const scsemTotalCount = data.scsemTotal;
-
-  // Build donut SVG pie slices
-  function computeDonutPaths(segments: { value: number; color: string }[], total: number) {
-    if (total === 0) return [];
-    const radius = 40;
-    const cx = 50;
-    const cy = 50;
-    let cumAngle = -90;
-    return segments.map((seg) => {
-      const angle = (seg.value / total) * 360;
-      const startAngle = cumAngle;
-      const endAngle = cumAngle + angle;
-      cumAngle = endAngle;
-      const startRad = (startAngle * Math.PI) / 180;
-      const endRad = (endAngle * Math.PI) / 180;
-      const x1 = cx + radius * Math.cos(startRad);
-      const y1 = cy + radius * Math.sin(startRad);
-      const x2 = cx + radius * Math.cos(endRad);
-      const y2 = cy + radius * Math.sin(endRad);
-      const largeArc = angle > 180 ? 1 : 0;
-      return {
-        d: `M ${cx} ${cy} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} Z`,
-        color: seg.color,
-      };
-    });
-  }
-
-  const donutPaths = computeDonutPaths(scsemSegments, scsemTotalCount);
 
   // Severity bar chart data
   const severities = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
@@ -203,14 +160,15 @@ export default async function DashboardPage() {
           Dashboard
         </h1>
         <p className="mt-1" style={{ color: 'var(--sky-text-secondary)' }}>
-          Office of Safeguards compliance overview
+          Office of Safeguards operations and canonical-template stewardship
         </p>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {/* SCSEM Updater */}
-        <div className="glass-card rounded-xl p-6 slide-up stagger-1">
+        {canManageCanonicalScsems && (
+          <div className="glass-card rounded-xl p-6 slide-up stagger-1">
           <div className="flex items-center justify-between mb-4">
             <span className="text-sm font-medium" style={{ color: 'var(--sky-text-secondary)' }}>
               SCSEM Updater
@@ -219,14 +177,17 @@ export default async function DashboardPage() {
           </div>
           <div className="flex items-end gap-2">
             <span className="text-3xl font-bold text-white">
-              {data.scsemTotal}
+              {scsemManifest.expectedWorkbookCount}
             </span>
             <span className="text-sm pb-1 text-emerald-400 flex items-center gap-1">
-              Active Formats
+              Pinned workbooks
             </span>
           </div>
-          <p className="text-xs mt-3" style={{ color: 'var(--sky-text-muted)' }}>Upload-driven CIS/STIG review</p>
-        </div>
+          <p className="text-xs mt-3" style={{ color: 'var(--sky-text-muted)' }}>
+            Count from the reviewed IRS source manifest
+          </p>
+          </div>
+        )}
 
         {/* Open Incidents */}
         <div className="glass-card rounded-xl p-6 slide-up stagger-2">
@@ -258,24 +219,23 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* SCSEM Status */}
-        <div className="glass-card rounded-xl p-6 slide-up stagger-3">
+        {/* SCSEM source policy */}
+        {canManageCanonicalScsems && (
+          <div className="glass-card rounded-xl p-6 slide-up stagger-3">
           <div className="flex items-center justify-between mb-4">
             <span className="text-sm font-medium" style={{ color: 'var(--sky-text-secondary)' }}>
-              SCSEM Health
+              SCSEM Source Policy
             </span>
             <FileSpreadsheet className="w-5 h-5" style={{ color: 'var(--sky-blue)' }} />
           </div>
-          <div className="text-3xl font-bold text-white">
-            {data.scsemOutdated}
-            <span className="text-lg font-normal" style={{ color: 'var(--sky-text-muted)' }}>/{data.scsemTotal}</span>
+          <div className="text-xl font-bold text-white">
+            {scsemSourcePolicy}
           </div>
-          <div className="mt-3 flex gap-1.5 text-xs flex-col">
-            <span className="flex items-center gap-1 text-amber-400">
-              <AlertCircle className="w-3 h-3" /> {data.scsemOutdated} flagged for CIS updates
-            </span>
+          <p className="text-xs mt-3" style={{ color: 'var(--sky-text-muted)' }}>
+            Each admitted workbook is pinned by byte size and SHA-256
+          </p>
           </div>
-        </div>
+        )}
 
         {/* AI Conversations */}
         <div className="glass-card rounded-xl p-6 slide-up stagger-4">
@@ -294,60 +254,38 @@ export default async function DashboardPage() {
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        {/* SCSEM Coverage Donut Chart */}
-        <div className="glass-card rounded-xl p-6">
+        {/* SCSEM candidate-workflow facts */}
+        {canManageCanonicalScsems && (
+          <div className="glass-card rounded-xl p-6">
           <h2 className="text-lg font-semibold text-white mb-4">
-            SCSEM Coverage
+            SCSEM Candidate Workflow
           </h2>
-          <div className="flex items-center gap-8">
-            <div className="relative w-32 h-32 shrink-0">
-              <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                {scsemTotalCount === 0 ? (
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    fill="none"
-                    stroke="var(--sky-surface-overlay)"
-                    strokeWidth="20"
-                  />
-                ) : (
-                  donutPaths.map((p, i) => (
-                    <path key={i} d={p.d} fill={p.color} />
-                  ))
-                )}
-                <circle cx="50" cy="50" r="28" fill="var(--sky-surface)" />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center">
-                  <span className="text-xl font-bold text-white">
-                    {scsemTotalCount > 0
-                      ? Math.round((scsemUpToDate / scsemTotalCount) * 100)
-                      : 0}%
-                  </span>
-                </div>
-              </div>
+          <dl className="space-y-3 text-sm">
+            <div className="flex items-start justify-between gap-4">
+              <dt style={{ color: 'var(--sky-text-secondary)' }}>Pinned IRS source set</dt>
+              <dd className="font-semibold text-white text-right">
+                {scsemManifest.expectedWorkbookCount} workbooks
+              </dd>
             </div>
-            <div className="flex-1 space-y-3">
-              {scsemSegments.map((seg) => (
-                <div key={seg.label} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: seg.color }}
-                    />
-                    <span className="text-sm" style={{ color: 'var(--sky-text-secondary)' }}>
-                      {seg.label}
-                    </span>
-                  </div>
-                  <span className="text-sm font-semibold text-white">
-                    {seg.value}
-                  </span>
-                </div>
-              ))}
+            <div className="flex items-start justify-between gap-4">
+              <dt style={{ color: 'var(--sky-text-secondary)' }}>Source policy</dt>
+              <dd className="font-semibold text-white text-right">{scsemSourcePolicy}</dd>
             </div>
+            <div className="flex items-start justify-between gap-4">
+              <dt style={{ color: 'var(--sky-text-secondary)' }}>Source page reviewed</dt>
+              <dd className="font-semibold text-white text-right">
+                {scsemManifest.sourcePageReviewedAt}
+              </dd>
+            </div>
+          </dl>
+          <div className="mt-5 rounded-lg border border-amber-500/25 bg-amber-500/10 p-3">
+            <p className="text-sm font-semibold text-amber-200">Candidate only — human review required</p>
+            <p className="mt-1 text-xs leading-5 text-amber-100/80">
+              Benchmark matches and proposed edits require reviewer validation, workbook quality control, and release approval. They are not an automated claim that an update is available, that a template is current, or that any system is compliant.
+            </p>
           </div>
-        </div>
+          </div>
+        )}
 
         {/* Incidents by Severity Bar Chart */}
         <div className="glass-card rounded-xl p-6">
@@ -428,19 +366,21 @@ export default async function DashboardPage() {
               <ArrowRight className="w-4 h-4 text-amber-400 group-hover:translate-x-0.5 transition-transform" />
             </Link>
 
-            <Link
-              href="/scsems"
-              className="flex items-center justify-between p-3 rounded-xl transition-all group"
-              style={{ background: 'rgba(34, 197, 94, 0.08)', border: '1px solid rgba(34, 197, 94, 0.15)' }}
-            >
-              <div className="flex items-center gap-3">
-                <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
-                <span className="text-sm font-medium text-emerald-300">
-                  Open SCSEM Updater
-                </span>
-              </div>
-              <ArrowRight className="w-4 h-4 text-emerald-400 group-hover:translate-x-0.5 transition-transform" />
-            </Link>
+            {canManageCanonicalScsems && (
+              <Link
+                href="/scsems"
+                className="flex items-center justify-between p-3 rounded-xl transition-all group"
+                style={{ background: 'rgba(34, 197, 94, 0.08)', border: '1px solid rgba(34, 197, 94, 0.15)' }}
+              >
+                <div className="flex items-center gap-3">
+                  <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+                  <span className="text-sm font-medium text-emerald-300">
+                    Open SCSEM Updater
+                  </span>
+                </div>
+                <ArrowRight className="w-4 h-4 text-emerald-400 group-hover:translate-x-0.5 transition-transform" />
+              </Link>
+            )}
           </div>
 
           {/* Recent Incidents Mini-List */}

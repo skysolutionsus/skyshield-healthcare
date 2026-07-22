@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { auditRequestContext, logAudit } from "@/lib/audit";
-import { createSCSEMUpdaterSession } from "@/lib/scsem-updater-store";
+import { auditRequestContext } from "@/lib/audit";
+import {
+    createSCSEMUpdaterSession,
+    scsemUpdaterRevisionETag,
+} from "@/lib/scsem-updater-store";
+import { requireScsemSteward } from "@/lib/scsem-steward-auth";
+import { matchOfficialSCSEM, officialSCSEMManifest } from "@/lib/scsem-official-manifest";
+import { scsemUpdaterRouteFailureDetails } from "@/lib/scsem-updater-route-failure";
+import { clientSafeSCSEMUpdaterSession } from "@/lib/scsem-updater-client-session";
 
 export const runtime = "nodejs";
 
@@ -23,11 +29,9 @@ function isOpenXmlWorkbook(buffer: Buffer): boolean {
 
 export async function POST(request: Request) {
     try {
-        const session = await auth();
-        if (!session?.user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
-        const user = session.user as unknown as { id: string; organizationId: string };
+        const access = await requireScsemSteward();
+        if (!access.ok) return access.response;
+        const user = access.user;
 
         const formData = await request.formData();
         const file = formData.get("file");
@@ -53,40 +57,56 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Uploaded file is not a valid Office Open XML workbook." }, { status: 400 });
         }
 
-        const updaterSession = createSCSEMUpdaterSession(file.name, buffer, {
-            organizationId: user.organizationId,
-            userId: user.id,
-        });
-        await logAudit({
-            organizationId: user.organizationId,
-            userId: user.id,
-            action: "SCSEM_UPDATER_UPLOAD",
-            resourceType: "scsem_updater_session",
-            resourceId: updaterSession.id,
-            metadata: {
-                input: {
+        const officialSource = matchOfficialSCSEM(buffer);
+        if (!officialSource) {
+            const manifest = officialSCSEMManifest();
+            return NextResponse.json({
+                error:
+                    `Workbook does not match any of the ${manifest.expectedWorkbookCount} ` +
+                    "current individual IRS-listed SCSEM source files. Use the template's " +
+                    "individual XLSX link on the IRS SCSEM updates page; the separately linked " +
+                    "package ZIP is not a canonical input because its workbook copies conflict " +
+                    "with the current individual downloads.",
+                code: "UNRECOGNIZED_SCSEM_SOURCE",
+                sourcePageUrl: manifest.sourcePageUrl,
+                sourcePageReviewedAt: manifest.sourcePageReviewedAt,
+            }, { status: 422 });
+        }
+
+        // Canonical identity comes from the pinned manifest, not the browser's
+        // user-controlled filename (the exact workbook hash has already matched).
+        const updaterSession = await createSCSEMUpdaterSession(
+            officialSource.fileName,
+            buffer,
+            {
+                organizationId: user.organizationId,
+                userId: user.id,
+            },
+            officialSource,
+            {
+                action: "SCSEM_UPDATER_UPLOAD",
+                affectedPayload: {
                     fileName: file.name,
+                    canonicalFileName: officialSource.fileName,
                     sizeBytes: buffer.length,
                     extension,
+                    uploadedSha256: officialSource.sha256,
+                    officialSourceUrl: officialSource.sourceUrl,
+                    officialSourceSha256: officialSource.sha256,
                 },
-                output: {
-                    sessionId: updaterSession.id,
-                    inferredTechnology: updaterSession.inferredTechnology,
-                    totalControls: updaterSession.scsem.totalControls,
-                    testCaseSheets: updaterSession.scsem.testCaseSheets,
-                    scsemVersion: updaterSession.scsem.version,
-                    effectiveDate: updaterSession.scsem.effectiveDate,
-                    uploadedSha256: updaterSession.audit.uploadedSha256,
-                },
-            },
-            ...auditRequestContext(request),
-        });
-        return NextResponse.json({ session: updaterSession });
-    } catch (error: any) {
-        console.error("SCSEM updater upload error:", error);
-        return NextResponse.json(
-            { error: error.message || "Failed to upload SCSEM workbook." },
-            { status: 500 }
+                ...auditRequestContext(request),
+            }
         );
+        return NextResponse.json(
+            { session: clientSafeSCSEMUpdaterSession(updaterSession) },
+            { headers: { ETag: scsemUpdaterRevisionETag(updaterSession) } }
+        );
+    } catch (error: unknown) {
+        console.error("SCSEM updater upload error:", error);
+        const failure = scsemUpdaterRouteFailureDetails(
+            error,
+            "Failed to upload the SCSEM workbook."
+        );
+        return NextResponse.json(failure.response, { status: failure.status });
     }
 }

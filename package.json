@@ -1,43 +1,63 @@
 {
-  "name": "irs-skyshield",
+  "name": "sky-shield",
   "version": "1.0.0",
-  "description": "AI-Powered IRS Publication 1075 Compliance Platform",
+  "description": "Internal IRS Office of Safeguards SCSEM template stewardship workspace",
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:seed": "npx tsx prisma/seed.ts",
-    "users:sync": "npx tsx scripts/sync-production-users.ts",
+    "users:bootstrap-admin": "npx tsx scripts/bootstrap-admin.ts",
     "rag:ingest:interim-guidance": "npx tsx scripts/ingest-interim-guidance.ts",
     "rag:ingest:pub1075": "npx tsx scripts/ingest-pub1075.ts",
     "rag:sync:pub1075": "npx tsx scripts/sync-pub1075.ts",
     "rag:sync:nist80053": "npx tsx scripts/sync-nist-80053.ts",
+    "test:compliance-evidence": "npx tsx scripts/test-compliance-evidence.ts",
+    "test:benchmark-selection": "npx tsx scripts/test-benchmark-selection.ts",
+    "test:scsem-manifest": "node --expose-gc --import tsx scripts/test-scsem-manifest.ts",
+    "test:scsem-column-schema": "npx tsx scripts/test-scsem-column-schema.ts",
+    "test:scsem-analysis-coverage": "npx tsx scripts/test-scsem-analysis-coverage.ts",
+    "test:scsem-source-integrity": "npx tsx scripts/test-scsem-source-integrity.ts",
+    "test:runtime-hardening": "npx tsx scripts/test-runtime-hardening.ts",
+    "test:legacy-scsem-retirement": "npx tsx scripts/test-legacy-scsem-retirement.ts",
+    "test:user-management-security": "npx tsx scripts/test-user-management-security.ts",
+    "test:credential-lifecycle": "npx tsx scripts/test-credential-lifecycle.ts",
+    "test:mfa-evidence-db": "npx tsx scripts/test-mfa-evidence-db.ts",
+    "test:scsem-updater-lifecycle": "npx tsx scripts/test-scsem-updater-lifecycle.ts",
+    "test:scsem-formula-translation": "npx tsx scripts/test-scsem-formula-translation.ts",
+    "test:scsem-issue-codes": "node --expose-gc --import tsx scripts/test-scsem-issue-codes.ts",
+    "test:scsem-corpus-export": "node --expose-gc --import tsx scripts/test-scsem-corpus-export.ts",
+    "test:scsem-corpus-add-control": "node --expose-gc --import tsx scripts/test-scsem-corpus-export.ts --operation add",
+    "test:scsem-final-export-artifacts": "npx tsx scripts/verify-scsem-final-export-artifacts.ts",
+    "test:native-excel-corpus": "node --import tsx scripts/test-native-excel-corpus.ts",
+    "test:native-excel-corpus:self": "node --import tsx scripts/test-native-excel-corpus.ts --self-test",
     "test:scsem-updater": "npx tsx scripts/test-scsem-updater.ts",
+    "test": "npm run test:compliance-evidence && npm run test:benchmark-selection && npm run test:scsem-manifest && npm run test:scsem-column-schema && npm run test:scsem-analysis-coverage && npm run test:scsem-source-integrity && npm run test:runtime-hardening && npm run test:legacy-scsem-retirement && npm run test:user-management-security && npm run test:credential-lifecycle && npm run test:mfa-evidence-db && npm run test:scsem-updater-lifecycle && npm run test:scsem-formula-translation && npm run test:scsem-issue-codes && npm run test:scsem-updater && npm run test:scsem-corpus-export && npm run test:scsem-corpus-add-control",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/galangai/irs-skyshield.git"
+    "url": "git+https://github.com/skysolutionsus/sky-shield.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/galangai/irs-skyshield/issues"
+    "url": "https://github.com/skysolutionsus/sky-shield/issues"
   },
-  "homepage": "https://github.com/galangai/irs-skyshield#readme",
+  "homepage": "https://github.com/skysolutionsus/sky-shield#readme",
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
-    "@prisma/client": "^6.19.2",
+    "@prisma/client": "^6.19.3",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
@@ -56,32 +76,35 @@
     "clsx": "^2.1.1",
     "jszip": "^3.10.1",
     "lucide-react": "^0.574.0",
-    "next": "^16.1.6",
+    "next": "^16.2.11",
     "next-auth": "^5.0.0-beta.30",
     "next-themes": "^0.4.6",
-    "prisma": "^6.19.2",
+    "prisma": "^6.19.3",
     "qrcode": "^1.5.4",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "tailwind-merge": "^3.5.0",
-    "tsx": "^4.21.0",
-    "uuid": "^13.0.0",
-    "xlsx": "^0.18.5",
+    "tsx": "^4.23.1",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "xlsx-populate": "^1.21.0"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3.3.3",
     "@tailwindcss/postcss": "^4.2.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^25.3.0",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@types/uuid": "^10.0.0",
     "eslint": "^9.39.2",
-    "eslint-config-next": "^16.1.6",
+    "eslint-config-next": "^16.2.11",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.2.0",
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "8.5.21",
+      "sharp": "0.35.3"
+    }
   }
 }

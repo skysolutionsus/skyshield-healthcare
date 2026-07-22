@@ -1,10 +1,10 @@
 import { Prisma } from "@prisma/client";
 import { execFile } from "child_process";
+import { randomUUID } from "node:crypto";
 import { readFileSync } from "fs";
 import { mkdtemp, readFile, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import { v4 as uuidv4 } from "uuid";
 import { db } from "@/lib/db";
 import { chunkKnowledgeDocument, hashText } from "@/lib/knowledge/chunking";
 import { embedTextsInBatches, hasEmbeddingConfig, vectorLiteral } from "@/lib/knowledge/embeddings";
@@ -258,7 +258,7 @@ export async function importKnowledgeDocument(
             "contentHash",
             "embedding"
           ) VALUES (
-            ${uuidv4()},
+            ${randomUUID()},
             ${document.id},
             ${chunk.chunkIndex},
             ${chunk.content},

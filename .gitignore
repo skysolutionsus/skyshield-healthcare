@@ -148,6 +148,10 @@ data/scsem-updater/
 data/cis-benchmarks/
 output/
 
+# CIS SecureSuite credentials must be provided through a secret manager or
+# an untracked local mount. Never commit the WorkBench license document.
+assets/license.xml
+
 # Test scripts
 test-cis-*.ts
 test-prisma-*.ts

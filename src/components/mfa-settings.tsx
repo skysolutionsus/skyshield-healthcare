@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { signOut } from "next-auth/react";
 import {
   CheckCircle2,
   Copy,
@@ -37,8 +36,6 @@ export function MfaSettings({
   status,
   setupRequested = false,
 }: MfaSettingsProps) {
-  const router = useRouter();
-  const { update } = useSession();
   const autoSetupStartedRef = useRef(false);
   const [enabled, setEnabled] = useState(status.enabled);
   const [setup, setSetup] = useState<SetupState | null>(null);
@@ -114,8 +111,9 @@ export function MfaSettings({
       setSetup(null);
       setSetupCode("");
       setRecoveryCodes(data.recoveryCodes);
-      setMessage("MFA enabled");
-      await update({ user: { mfaEnabled: true } });
+      setMessage(
+        "MFA enabled. Save the recovery codes, then sign in again to bind MFA to a new session."
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to verify setup");
     }
@@ -127,9 +125,7 @@ export function MfaSettings({
       setEnabled(false);
       setChallengeCode("");
       setRecoveryCodes([]);
-      setMessage("MFA disabled");
-      await update({ user: { mfaEnabled: false } });
-      router.refresh();
+      await signOut({ callbackUrl: "/login" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to disable MFA");
     }
@@ -156,13 +152,9 @@ export function MfaSettings({
     setMessage("Recovery codes copied");
   }
 
-  function finishRecoveryCodes() {
+  async function finishRecoveryCodes() {
     setRecoveryCodes([]);
-    if (setupRequested) {
-      router.push("/dashboard");
-    } else {
-      router.refresh();
-    }
+    await signOut({ callbackUrl: "/login" });
   }
 
   return (

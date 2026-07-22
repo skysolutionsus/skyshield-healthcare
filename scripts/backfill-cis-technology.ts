@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { db } from "@/lib/db";
+import currentIndex from "../data/scsem-index.json";
 
 type IndexEntry = { file: string; category: string; name: string };
 
@@ -119,11 +120,12 @@ function loadIndex(): IndexEntry[] {
       return JSON.parse(fs.readFileSync(p, "utf-8"));
     }
   }
+  const bundledIndex = currentIndex as IndexEntry[];
   console.log(
     `  SCSEM index JSON not reachable (checked ${candidates.join(", ")}). ` +
-      `Using embedded index (${EMBEDDED_INDEX.length} templates).`
+      `Using build-bundled current index (${bundledIndex.length} templates).`
   );
-  return EMBEDDED_INDEX;
+  return bundledIndex.length > 0 ? bundledIndex : EMBEDDED_INDEX;
 }
 
 async function main() {
