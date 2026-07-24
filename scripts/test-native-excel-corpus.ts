@@ -218,7 +218,20 @@ class HarnessBlocker extends Error {
 const EXCEL_APPLESCRIPT = String.raw`on run argv
     set sourcePath to item 1 of argv
     set outputPath to item 2 of argv
+    set connectionTimeoutSeconds to (item 3 of argv) as integer
     set sourceWorkbook to missing value
+    tell application id "com.microsoft.Excel" to launch
+    set connectionDeadline to (current date) + connectionTimeoutSeconds
+    repeat
+        try
+            tell application id "com.microsoft.Excel" to set workbookCount to count of workbooks
+            exit repeat
+        on error errorMessage number errorNumber
+            if errorNumber is not -609 then error errorMessage number errorNumber
+            if (current date) > connectionDeadline then error "Excel did not accept an automation connection within " & connectionTimeoutSeconds & " seconds." number -609
+            delay 0.5
+        end try
+    end repeat
     tell application id "com.microsoft.Excel"
         set priorDisplayAlerts to display alerts
         set display alerts to true
@@ -542,20 +555,30 @@ function parseScreenLockedFromIoregJson(value: unknown): boolean {
     if (!root || typeof root !== "object") {
         throw new HarnessBlocker("LOCK_STATE_UNKNOWN", "ioreg did not return a root session object.");
     }
-    const users = (root as { IOConsoleUsers?: unknown }).IOConsoleUsers;
+    const sessionRoot = root as { IOConsoleUsers?: unknown; IOConsoleLocked?: unknown };
+    const users = sessionRoot.IOConsoleUsers;
     if (!Array.isArray(users)) {
         throw new HarnessBlocker("LOCK_STATE_UNKNOWN", "ioreg did not expose IOConsoleUsers; failing closed.");
     }
     const consoleUsers = users.filter((entry): entry is ConsoleUser =>
         Boolean(entry && typeof entry === "object" && (entry as ConsoleUser).kCGSSessionOnConsoleKey === true)
     );
-    if (consoleUsers.length !== 1 || typeof consoleUsers[0].CGSSessionScreenIsLocked !== "boolean") {
+    if (consoleUsers.length !== 1) {
         throw new HarnessBlocker(
             "LOCK_STATE_UNKNOWN",
-            "Expected exactly one on-console session with an explicit CGSSessionScreenIsLocked boolean; failing closed."
+            "Expected exactly one on-console session; failing closed."
         );
     }
-    return consoleUsers[0].CGSSessionScreenIsLocked;
+    if (typeof consoleUsers[0].CGSSessionScreenIsLocked === "boolean") {
+        return consoleUsers[0].CGSSessionScreenIsLocked;
+    }
+    if (typeof sessionRoot.IOConsoleLocked === "boolean") {
+        return sessionRoot.IOConsoleLocked;
+    }
+    throw new HarnessBlocker(
+        "LOCK_STATE_UNKNOWN",
+        "ioreg exposed neither a per-session nor root lock-state boolean; failing closed."
+    );
 }
 
 function readScreenLocked(): boolean {
@@ -638,7 +661,7 @@ function collectPreflight(config: HarnessConfig): PreflightResult {
     const facts: PreflightFacts = {
         platform: process.platform,
         screenLocked: null,
-        lockSource: "ioreg Root.IOConsoleUsers[on-console].CGSSessionScreenIsLocked",
+        lockSource: "ioreg on-console CGSSessionScreenIsLocked, with Root.IOConsoleLocked fallback",
         excelAppPath: null,
         excelVersion: null,
         excelBuild: null,
@@ -1197,10 +1220,17 @@ async function runExcelRoundtrip(sourcePath: string, outputPath: string, timeout
     if (fs.existsSync(outputPath)) {
         throw new HarnessBlocker("OUTPUT_EXISTS", `Refusing to overwrite existing round-trip output: ${outputPath}`);
     }
-    const result = await runBoundedSubprocess("/usr/bin/osascript", ["-", sourcePath, outputPath], {
-        input: EXCEL_APPLESCRIPT,
-        timeoutMs,
-    });
+    // Leave a five-second margin for osascript to return the specific
+    // connection failure before the outer watchdog terminates it.
+    const connectionTimeoutSeconds = excelConnectionTimeoutSeconds(timeoutMs);
+    const result = await runBoundedSubprocess(
+        "/usr/bin/osascript",
+        ["-", sourcePath, outputPath, String(connectionTimeoutSeconds)],
+        {
+            input: EXCEL_APPLESCRIPT,
+            timeoutMs,
+        }
+    );
     if (result.timedOut) {
         throw new HarnessBlocker(
             "EXCEL_DIALOG_OR_TIMEOUT",
@@ -1221,6 +1251,10 @@ async function runExcelRoundtrip(sourcePath: string, outputPath: string, timeout
         throw new HarnessBlocker("ROUNDTRIP_OUTPUT_MISSING", `Excel reported success but did not create a non-empty output: ${outputPath}`);
     }
     return { durationMs: result.durationMs, excelVersion, excelBuild };
+}
+
+function excelConnectionTimeoutSeconds(timeoutMs: number): number {
+    return Math.max(1, Math.min(30, Math.floor((timeoutMs - 5_000) / 1_000)));
 }
 
 function sourceControls(filePath: string): ControlIdentity[] {
@@ -1367,11 +1401,15 @@ function bufferText(value: Buffer | string | null | undefined): string {
 }
 
 function staticAppleScriptTest(): void {
+    assert.match(EXCEL_APPLESCRIPT, /tell application id "com\.microsoft\.Excel" to launch/);
+    assert.match(EXCEL_APPLESCRIPT, /errorNumber is not -609/);
+    assert.match(EXCEL_APPLESCRIPT, /connectionTimeoutSeconds to \(item 3 of argv\) as integer/);
+    assert.match(EXCEL_APPLESCRIPT, /connectionDeadline/);
     assert.match(EXCEL_APPLESCRIPT, /display alerts to true/);
     assert.match(EXCEL_APPLESCRIPT, /update links do not update links/);
     assert.match(EXCEL_APPLESCRIPT, /calculate full rebuild/);
     assert.match(EXCEL_APPLESCRIPT, /file format Excel XML file format/);
-    assert.match(EXCEL_APPLESCRIPT, /count of workbooks/);
+    assert.match(EXCEL_APPLESCRIPT, /if \(count of workbooks\) is not 0 then/);
     assert.doesNotMatch(EXCEL_APPLESCRIPT, /\b(?:quit|force-quit|killall)\b/i);
     if (process.platform === "darwin" && fs.existsSync("/Applications/Microsoft Excel.app")) {
         const output = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "skyshield-excel-script-")), "roundtrip.scpt");
@@ -1399,6 +1437,9 @@ async function runSelfTests(): Promise<void> {
     assert.throws(() => parseCli(["--wat"]), /Unknown argument/);
     assert.throws(() => buildConfig({ mode: "run" }, {}), /SCSEM_CORPUS_FINAL_EXPORT_DIR/);
     assert.throws(() => buildConfig({ mode: "run", finalExportDir: "/tmp/x", timeoutMs: 1 }), /between/);
+    assert.equal(excelConnectionTimeoutSeconds(MIN_TIMEOUT_MS), 5);
+    assert.equal(excelConnectionTimeoutSeconds(DEFAULT_TIMEOUT_MS), 30);
+    assert.equal(excelConnectionTimeoutSeconds(MAX_TIMEOUT_MS), 30);
     assert.equal(updatedSCSEMFileName("Safeguards SCSEM (Thing).xlsx"), "Safeguards-SCSEM-Thing-updated.xlsx");
 
     assert.equal(parseScreenLockedFromIoregJson({
@@ -1408,6 +1449,14 @@ async function runSelfTests(): Promise<void> {
         IOConsoleLocked: true,
         IOConsoleUsers: [{ kCGSSessionOnConsoleKey: true, CGSSessionScreenIsLocked: false }],
     }), false);
+    assert.equal(parseScreenLockedFromIoregJson({
+        IOConsoleLocked: false,
+        IOConsoleUsers: [{ kCGSSessionOnConsoleKey: true }],
+    }), false);
+    assert.equal(parseScreenLockedFromIoregJson({
+        IOConsoleLocked: true,
+        IOConsoleUsers: [{ kCGSSessionOnConsoleKey: true }],
+    }), true);
     assert.throws(() => parseScreenLockedFromIoregJson({ IOConsoleUsers: [] }), /failing closed/);
     assert.throws(() => parseScreenLockedFromIoregJson({
         IOConsoleUsers: [{ kCGSSessionOnConsoleKey: true }],

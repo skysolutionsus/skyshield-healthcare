@@ -134,6 +134,45 @@ assert.match(
   "SCSEM stewardship must reject proof from a superseded MFA enrollment"
 );
 
+const scsemAnalyzeSource = fs.readFileSync(
+  path.join(root, "src/app/api/scsem-updater/[id]/analyze/route.ts"),
+  "utf8"
+);
+for (const forbiddenPromptLabel of [
+  "IRS Publication 1075 local source:",
+  "NIST fallback local source:",
+  "Excel snapshot path:",
+]) {
+  assert.ok(
+    !scsemAnalyzeSource.includes(forbiddenPromptLabel),
+    `SCSEM model prompt must not disclose the local path label ${forbiddenPromptLabel}`
+  );
+}
+assert.ok(
+  !scsemAnalyzeSource.includes("${complianceEvidence.pub1075.sourcePath}") &&
+    !scsemAnalyzeSource.includes("${complianceEvidence.nist.sourcePath}") &&
+    !scsemAnalyzeSource.includes("${pub1075.pub1075.sourcePath}") &&
+    !scsemAnalyzeSource.includes("${pub1075.nist.sourcePath}"),
+  "SCSEM model prompt must not transmit local compliance-source paths"
+);
+const benchmarkSummaryStart = scsemAnalyzeSource.indexOf(
+  "const benchmarkSourceSummary"
+);
+const benchmarkPromptStart = scsemAnalyzeSource.indexOf(
+  "const prompt = `",
+  benchmarkSummaryStart
+);
+assert.ok(
+  benchmarkSummaryStart >= 0 && benchmarkPromptStart > benchmarkSummaryStart,
+  "SCSEM benchmark prompt summary must remain discoverable by the hardening regression"
+);
+assert.ok(
+  !scsemAnalyzeSource
+    .slice(benchmarkSummaryStart, benchmarkPromptStart)
+    .includes("snapshot.filePath"),
+  "SCSEM benchmark prompt summary must not transmit the local CIS snapshot path"
+);
+
 const compose = fs.readFileSync(path.join(root, "docker-compose.yml"), "utf8");
 assert.match(
   compose,

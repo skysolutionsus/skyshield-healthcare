@@ -1066,9 +1066,7 @@ Uploaded SCSEM:
 
 Compliance sources:
 - IRS Publication 1075 version: ${complianceEvidence.pub1075.version}
-- IRS Publication 1075 local source: ${complianceEvidence.pub1075.sourcePath}
 - NIST SP 800-53 fallback version: ${complianceEvidence.nist.version}
-- NIST fallback local source: ${complianceEvidence.nist.sourcePath}
 - Pub 1075-covered IDs with excerpts in this prompt: ${complianceEvidence.pub1075.excerptedControlIds.join(", ") || "None"}
 - NIST-fallback IDs with excerpts in this prompt: ${complianceEvidence.nist.excerptedControlIds.join(", ") || "None"}
 
@@ -1233,9 +1231,7 @@ ${adjacentSourceSummary(adjacentSources)}
 
 Compliance sources:
 - IRS Publication 1075 version: ${pub1075.pub1075.version}
-- IRS Publication 1075 local source: ${pub1075.pub1075.sourcePath}
 - NIST SP 800-53 fallback version: ${pub1075.nist.version}
-- NIST fallback local source: ${pub1075.nist.sourcePath}
 
 SCSEM ROWS FOR REVIEW:
 ${controlEvidence || "No SCSEM row text was available."}
@@ -1865,7 +1861,6 @@ export async function POST(
                 `  Selected profile: ${source.selectedProfile.profile}`,
                 `  Matched sheets: ${source.matchedSheets.join(", ")}`,
                 `  Match query: ${source.matchQuery}`,
-                `  Excel snapshot path: ${source.downloaded.snapshot.filePath}`,
                 `  Excel SHA-256: ${source.downloaded.snapshot.sha256}`,
                 `  Matched existing recommendations: ${source.sharedRecommendationCount}/${source.sheetRecommendationCount}`,
             ].join("\n")).join("\n")
@@ -1902,9 +1897,7 @@ ${benchmarkSourceSummary(stigSources, "CIS_STIG")}
 
 Compliance sources:
 - IRS Publication 1075 version: ${pub1075.pub1075.version}
-- IRS Publication 1075 local source: ${pub1075.pub1075.sourcePath}
 - NIST SP 800-53 fallback version: ${pub1075.nist.version}
-- NIST fallback local source: ${pub1075.nist.sourcePath}
 
 CURRENT SCSEM ROWS MATCHED TO CIS CANDIDATES:
 ${cisUpdateEvidence || "None"}
