@@ -11,6 +11,7 @@ export const LIMITED_ACCESS_PREFIXES = [
   "/api/dashboard",
   "/api/chat",
   "/api/mfa",
+  "/api/settings/llm/switch",
   "/api/scsems",
   "/api/scsem-updater",
 ];

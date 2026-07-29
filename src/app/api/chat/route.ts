@@ -9,10 +9,12 @@ import {
   generateBifrostText,
   getConfiguredBifrostModel,
   hasConfiguredBifrostApiKey,
+  isBifrostQuotaError,
   isLikelyBifrostVirtualKey,
   normalizeBifrostModel,
   parseBifrostToolArguments,
 } from "@/lib/ai/bifrost";
+import { BIFROST_QUOTA_FALLBACK_MODELS } from "@/lib/ai/models";
 
 // Helper: Get LLM settings from DB, fall back to env vars
 async function getLLMSettings(): Promise<{ model: string; apiKey: string }> {
@@ -395,6 +397,10 @@ async function retrieveGroundingContext(message: string): Promise<{
 }
 
 export async function POST(request: NextRequest) {
+  let attemptedModel: string | null = null;
+  let answerModelInvoked = false;
+  let activeConversationId: string | null = null;
+
   try {
     const session = await auth();
     if (!session?.user) {
@@ -406,6 +412,7 @@ export async function POST(request: NextRequest) {
       organizationId: string;
     };
     const { message, conversationId } = await request.json();
+    activeConversationId = typeof conversationId === "string" ? conversationId : null;
 
     if (!message || typeof message !== "string") {
       return NextResponse.json(
@@ -472,7 +479,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    let convId = conversationId;
+    let convId = activeConversationId;
     let isNewConversation = false;
     if (!convId) {
       try {
@@ -486,6 +493,7 @@ export async function POST(request: NextRequest) {
           },
         });
         convId = conv.id;
+        activeConversationId = conv.id;
         isNewConversation = true;
       } catch {
         // If DB fails, continue without persistence
@@ -528,6 +536,7 @@ export async function POST(request: NextRequest) {
     }
 
     const llmSettings = await getLLMSettings();
+    attemptedModel = llmSettings.model;
 
     if (!hasConfiguredBifrostApiKey(llmSettings.apiKey)) {
       const responseDate = currentSafeguardsResponseDate();
@@ -609,6 +618,7 @@ System Configuration: Bifrost API key is required for grounded AI responses`;
       .join("\n\n");
 
     let finalText: string;
+    answerModelInvoked = true;
     try {
       finalText = await generateBifrostText({
         apiKey: llmSettings.apiKey,
@@ -709,6 +719,23 @@ System Configuration: Bifrost API key is required for grounded AI responses`;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error("Chat API error:", errorMessage, error);
+
+    if (answerModelInvoked && isBifrostQuotaError(error)) {
+      return NextResponse.json(
+        {
+          error:
+            "The current Bifrost model has reached its available quota. Choose a fallback model to continue.",
+          quotaExceeded: true,
+          currentModel: attemptedModel,
+          conversationId: activeConversationId,
+          modelSwitch: {
+            reason: "quota",
+            options: BIFROST_QUOTA_FALLBACK_MODELS,
+          },
+        },
+        { status: 429 }
+      );
+    }
 
     if (
       errorMessage.includes("DATABASE_URL") ||

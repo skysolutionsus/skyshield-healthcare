@@ -9,6 +9,7 @@ import {
     maskSecret,
     normalizeBifrostModel,
 } from "@/lib/ai/bifrost";
+import { isSupportedBifrostChatModel } from "@/lib/ai/models";
 
 // GET /api/settings/llm — Returns current LLM configuration (admin-only)
 export async function GET() {
@@ -87,7 +88,14 @@ export async function PUT(request: NextRequest) {
         const updates: Array<{ key: string; value: string }> = [];
 
         if (model !== undefined && typeof model === "string") {
-            updates.push({ key: "llm_model", value: normalizeBifrostModel(model) });
+            const normalizedModel = normalizeBifrostModel(model);
+            if (!isSupportedBifrostChatModel(normalizedModel)) {
+                return NextResponse.json(
+                    { error: "Select an approved Bifrost chat model." },
+                    { status: 400 }
+                );
+            }
+            updates.push({ key: "llm_model", value: normalizedModel });
         }
 
         if (apiKey !== undefined && typeof apiKey === "string" && apiKey.trim()) {

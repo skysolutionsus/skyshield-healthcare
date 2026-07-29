@@ -6,13 +6,13 @@ import {
     hasConfiguredBifrostApiKey,
     normalizeBifrostModel,
 } from "@/lib/ai/bifrost";
+import { BIFROST_CHAT_MODEL_OPTIONS } from "@/lib/ai/models";
 
 function modelsToTry(): string[] {
     return Array.from(
         new Set([
             getConfiguredBifrostModel("BIFROST_MODEL"),
-            normalizeBifrostModel("azure/claude-sonnet-4-6"),
-            normalizeBifrostModel("azure/gpt-5.1-chat"),
+            ...BIFROST_CHAT_MODEL_OPTIONS.map((option) => normalizeBifrostModel(option.value)),
         ])
     );
 }

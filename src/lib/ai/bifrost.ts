@@ -1,9 +1,45 @@
-export const DEFAULT_BIFROST_MODEL = "azure/claude-sonnet-4-6";
+import { BIFROST_CHAT_MODEL_OPTIONS } from "@/lib/ai/models";
+
+export const DEFAULT_BIFROST_MODEL = BIFROST_CHAT_MODEL_OPTIONS[0].value;
 export const DEFAULT_BIFROST_EMBEDDING_MODEL = "azure/text-embedding-ada-002";
 export const DEFAULT_BIFROST_BASE_URL = "http://192.168.16.104:8080/v1";
 
 type JsonObject = Record<string, unknown>;
 const DEFAULT_MAX_OUTPUT_TOKENS = 6000;
+
+export class BifrostRequestError extends Error {
+  constructor(
+    message: string,
+    public readonly status?: number,
+    public readonly code?: string
+  ) {
+    super(message);
+    this.name = "BifrostRequestError";
+  }
+}
+
+export function isBifrostQuotaError(error: unknown): boolean {
+  const status = error instanceof BifrostRequestError ? error.status : undefined;
+  const code = error instanceof BifrostRequestError ? error.code || "" : "";
+  const message = error instanceof Error ? error.message : String(error || "");
+  const haystack = `${code} ${message}`.toLowerCase();
+
+  if (status === 429) return true;
+
+  return [
+    "insufficient_quota",
+    "quota exceeded",
+    "quota has been exhausted",
+    "quota exhausted",
+    "out of tokens",
+    "token quota",
+    "rate limit exceeded",
+    "rate_limit_exceeded",
+    "resource exhausted",
+    "resource_exhausted",
+    "insufficient credits",
+  ].some((indicator) => haystack.includes(indicator));
+}
 
 export interface BifrostToolCall {
   id: string;
@@ -214,7 +250,11 @@ export async function createBifrostChatCompletion(
       responseText.slice(0, 500) ||
       response.statusText ||
       "Unknown Bifrost error";
-    throw new Error(`Bifrost chat completion failed (${response.status}): ${message}`);
+    throw new BifrostRequestError(
+      `Bifrost chat completion failed (${response.status}): ${message}`,
+      response.status,
+      payload?.error?.code || payload?.error?.type
+    );
   }
 
   if (!payload) {
@@ -222,7 +262,11 @@ export async function createBifrostChatCompletion(
   }
 
   if (payload.error?.message) {
-    throw new Error(`Bifrost chat completion failed: ${payload.error.message}`);
+    throw new BifrostRequestError(
+      `Bifrost chat completion failed: ${payload.error.message}`,
+      undefined,
+      payload.error.code || payload.error.type
+    );
   }
 
   return payload;

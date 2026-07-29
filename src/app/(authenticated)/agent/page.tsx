@@ -22,6 +22,16 @@ interface Citation {
   text: string;
 }
 
+interface ModelSwitchOption {
+  value: string;
+  label: string;
+}
+
+interface ModelSwitchSuggestion {
+  reason: "quota";
+  options: ModelSwitchOption[];
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
@@ -30,6 +40,7 @@ interface Message {
   piiBlocked?: boolean;
   piiTypes?: string[];
   incidentId?: string;
+  modelSwitch?: ModelSwitchSuggestion;
 }
 
 interface ConversationSummary {
@@ -188,6 +199,32 @@ function MessageBubble({ msg }: { msg: Message }) {
   const [fpSubmitting, setFpSubmitting] = useState(false);
   const [fpResult, setFpResult] = useState<"success" | "error" | null>(null);
   const [fpError, setFpError] = useState("");
+  const [switchingModel, setSwitchingModel] = useState<string | null>(null);
+  const [switchedModel, setSwitchedModel] = useState<string | null>(null);
+  const [modelSwitchError, setModelSwitchError] = useState("");
+
+  async function handleModelSwitch(model: string) {
+    setSwitchingModel(model);
+    setModelSwitchError("");
+
+    try {
+      const res = await fetch("/api/settings/llm/switch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setModelSwitchError(data.error || "Failed to switch the model.");
+        return;
+      }
+      setSwitchedModel(data.model);
+    } catch {
+      setModelSwitchError("Network error. Please try again.");
+    } finally {
+      setSwitchingModel(null);
+    }
+  }
 
   async function handleFalsePositive() {
     if (!msg.incidentId || !fpReason.trim()) return;
@@ -334,6 +371,43 @@ function MessageBubble({ msg }: { msg: Message }) {
           <div className="space-y-1">
             {renderMarkdown(msg.content)}
           </div>
+          {msg.modelSwitch && (
+            <div className="mt-4 border-t border-[var(--sky-border)] pt-4">
+              <p className="text-xs font-medium text-[var(--sky-text-secondary)] mb-2">
+                Switch the model saved in Settings:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {msg.modelSwitch.options.map((option) => {
+                  const isSwitching = switchingModel === option.value;
+                  const isSelected = switchedModel === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => handleModelSwitch(option.value)}
+                      disabled={Boolean(switchingModel) || Boolean(switchedModel)}
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--sky-royal)] hover:bg-[var(--sky-blue)] text-white text-xs font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {isSwitching ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : isSelected ? (
+                        <Check className="w-3.5 h-3.5" />
+                      ) : null}
+                      {isSelected ? `Using ${option.label}` : `Switch to ${option.label}`}
+                    </button>
+                  );
+                })}
+              </div>
+              {switchedModel && (
+                <p className="text-xs text-emerald-400 mt-2">
+                  Model changed in Settings. You can send your question again now.
+                </p>
+              )}
+              {modelSwitchError && (
+                <p className="text-xs text-red-400 mt-2">{modelSwitchError}</p>
+              )}
+            </div>
+          )}
         </div>
 
         {msg.citations && msg.citations.length > 0 && (
@@ -483,6 +557,20 @@ export default function AgentPage() {
             incidentId: data.incidentId,
           },
         ]);
+      } else if (data.modelSwitch) {
+        if (data.conversationId) {
+          setConversationId(data.conversationId);
+        }
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            role: "assistant",
+            content: data.error,
+            modelSwitch: data.modelSwitch,
+          },
+        ]);
+        loadConversations();
       } else if (data.error) {
         setMessages((prev) => [
           ...prev,

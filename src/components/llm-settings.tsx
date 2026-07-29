@@ -2,11 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Bot, Save, Loader2, Check, Eye, EyeOff } from "lucide-react";
-
-const AVAILABLE_MODELS = [
-    { value: "azure/claude-sonnet-4-6", label: "Bifrost Claude Sonnet 4.6 (Default)" },
-    { value: "azure/gpt-5.1-chat", label: "Bifrost GPT-5.1 Chat" },
-];
+import { BIFROST_CHAT_MODEL_OPTIONS } from "@/lib/ai/models";
 
 export function LLMSettings() {
     const [model, setModel] = useState("");
@@ -107,7 +103,7 @@ export function LLMSettings() {
                         onChange={(e) => setModel(e.target.value)}
                         className="w-full max-w-md px-3 py-2.5 bg-[var(--sky-surface-overlay)] border border-[var(--sky-border)] rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)]/50 focus:border-[var(--sky-blue)]/50"
                     >
-                        {AVAILABLE_MODELS.map((m) => (
+                        {BIFROST_CHAT_MODEL_OPTIONS.map((m) => (
                             <option key={m.value} value={m.value}>
                                 {m.label}
                             </option>
