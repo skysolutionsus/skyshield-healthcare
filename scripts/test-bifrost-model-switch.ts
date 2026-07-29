@@ -42,6 +42,23 @@ async function main() {
     false
   );
   assert.equal(isBifrostQuotaError(new Error("Bifrost quota has been exhausted")), true);
+  assert.equal(
+    isBifrostQuotaError(
+      new BifrostRequestError(
+        "Bifrost chat completion failed (402): Model-level budget exceeded: Model:claude-sonnet-4-6:Provider:azure budget exceeded: 100.0384 >= 100.0000 dollars",
+        402
+      )
+    ),
+    true
+  );
+  assert.equal(
+    isBifrostQuotaError(new BifrostRequestError("Payment method required", 402)),
+    false
+  );
+  assert.equal(
+    isBifrostQuotaError(new BifrostRequestError("Request rejected", 402, "budget_exceeded")),
+    true
+  );
   assert.equal(isBifrostQuotaError(new Error("Bifrost chat completion failed (500)")), false);
 
   const upserts: unknown[] = [];
