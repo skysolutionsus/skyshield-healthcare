@@ -31,9 +31,15 @@ async function main() {
 
   assert.equal(
     isBifrostQuotaError(
-      new BifrostRequestError("Too many requests", 429, "rate_limit_exceeded")
+      new BifrostRequestError("Quota exceeded", 429, "insufficient_quota")
     ),
     true
+  );
+  assert.equal(
+    isBifrostQuotaError(
+      new BifrostRequestError("Too many requests", 429, "rate_limit_exceeded")
+    ),
+    false
   );
   assert.equal(isBifrostQuotaError(new Error("Bifrost quota has been exhausted")), true);
   assert.equal(isBifrostQuotaError(new Error("Bifrost chat completion failed (500)")), false);
@@ -49,18 +55,28 @@ async function main() {
   };
 
   await saveBifrostChatModel(mockStore, "gemma-4-26b", "test-user");
+  await saveBifrostChatModel(mockStore, "azure/gpt-5.1-chat", "test-user");
   assert.deepEqual(upserts, [
     {
       where: { key: "llm_model" },
       create: { key: "llm_model", value: "gemma-4-26b", updatedBy: "test-user" },
       update: { value: "gemma-4-26b", updatedBy: "test-user" },
     },
+    {
+      where: { key: "llm_model" },
+      create: {
+        key: "llm_model",
+        value: "azure/gpt-5.1-chat",
+        updatedBy: "test-user",
+      },
+      update: { value: "azure/gpt-5.1-chat", updatedBy: "test-user" },
+    },
   ]);
   await assert.rejects(
     () => saveBifrostChatModel(mockStore, "unapproved-model", "test-user"),
     /Unsupported Bifrost chat model/
   );
-  assert.equal(upserts.length, 1);
+  assert.equal(upserts.length, 2);
 
   console.log("Bifrost model switch tests passed.");
 }

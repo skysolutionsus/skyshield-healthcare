@@ -19,24 +19,21 @@ export class BifrostRequestError extends Error {
 }
 
 export function isBifrostQuotaError(error: unknown): boolean {
-  const status = error instanceof BifrostRequestError ? error.status : undefined;
   const code = error instanceof BifrostRequestError ? error.code || "" : "";
   const message = error instanceof Error ? error.message : String(error || "");
   const haystack = `${code} ${message}`.toLowerCase();
 
-  if (status === 429) return true;
-
   return [
     "insufficient_quota",
+    "quota_exceeded",
     "quota exceeded",
     "quota has been exhausted",
     "quota exhausted",
     "out of tokens",
     "token quota",
-    "rate limit exceeded",
-    "rate_limit_exceeded",
-    "resource exhausted",
-    "resource_exhausted",
+    "token budget exhausted",
+    "billing hard limit",
+    "billing_hard_limit_reached",
     "insufficient credits",
   ].some((indicator) => haystack.includes(indicator));
 }
