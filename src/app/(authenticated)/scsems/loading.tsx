@@ -1,6 +1,6 @@
 export default function SCSEMsLoading() {
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto animate-in fade-in duration-300">
+    <div className="mx-auto w-full max-w-7xl animate-in p-4 fade-in duration-300 sm:p-6 lg:p-8">
       <div className="mb-6">
         <div className="h-8 w-44 rounded-lg bg-[var(--sky-surface-overlay)] animate-pulse" />
         <div className="mt-2 h-4 w-96 max-w-full rounded bg-[var(--sky-surface-overlay)] animate-pulse" />

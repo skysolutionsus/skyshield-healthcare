@@ -117,7 +117,7 @@ export default async function SettingsPage({
   };
 
   return (
-    <div className="p-6 lg:p-8 max-w-5xl mx-auto">
+    <div className="mx-auto w-full max-w-5xl p-4 sm:p-6 lg:p-8">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-white">
           User Management
@@ -150,7 +150,56 @@ export default async function SettingsPage({
             Team Members ({users.length})
           </h2>
         </div>
-        <div className="overflow-x-auto">
+        <div className="divide-y divide-[var(--sky-border)] md:hidden">
+          {users.map((u) => (
+            <div key={u.id} className="space-y-4 p-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--sky-royal)] text-xs font-medium text-white">
+                  {getInitials(u.name)}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-white">{u.name}</p>
+                  <p className="break-all text-xs text-gray-500">{u.email}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <p className="mb-1 text-[var(--sky-text-muted)]">Role</p>
+                  <span className={`inline-flex rounded-full px-2.5 py-0.5 font-medium ${roleColors[u.role] || roleColors.VIEWER}`}>
+                    {roleLabel(u.role)}
+                  </span>
+                </div>
+                <div>
+                  <p className="mb-1 text-[var(--sky-text-muted)]">Status</p>
+                  <span className={u.active ? "text-emerald-400" : "text-gray-400"}>
+                    {u.active ? "Active" : "Inactive"}
+                  </span>
+                </div>
+                <div>
+                  <p className="mb-1 text-[var(--sky-text-muted)]">MFA</p>
+                  <span className={u.mfaEnabled ? "text-emerald-400" : "text-amber-300"}>
+                    {u.mfaEnabled ? "Enabled" : "Setup required"}
+                  </span>
+                </div>
+                <div>
+                  <p className="mb-1 text-[var(--sky-text-muted)]">Last login</p>
+                  <span className="text-gray-400">
+                    {u.lastLogin ? formatDateTime(u.lastLogin) : "Never"}
+                  </span>
+                </div>
+              </div>
+              {isAdmin && (
+                <AdminUserActions
+                  userId={u.id}
+                  currentUserId={userInfo.id}
+                  userName={u.name}
+                  userEmail={u.email}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full">
             <thead>
               <tr className="border-b border-[var(--sky-border)]">
@@ -258,9 +307,9 @@ export default async function SettingsPage({
           </div>
           <div className="divide-y divide-[var(--sky-border)]">
             {pendingInvites.map((inv) => (
-              <div key={inv.id} className="px-6 py-3 flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-white">
+              <div key={inv.id} className="flex flex-col items-start gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                <div className="min-w-0">
+                  <p className="break-all text-sm text-white sm:break-normal">
                     {inv.email}
                   </p>
                   <p className="text-xs text-gray-500">

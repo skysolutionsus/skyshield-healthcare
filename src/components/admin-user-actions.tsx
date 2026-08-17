@@ -108,7 +108,7 @@ export function AdminUserActions({
   }
 
   return (
-    <div className="min-w-[260px] space-y-2">
+    <div className="w-full min-w-0 space-y-2 md:min-w-[260px]">
       <div className="flex flex-wrap gap-2">
         <button
           type="button"

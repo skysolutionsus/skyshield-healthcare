@@ -241,7 +241,7 @@ export function MfaSettings({
             <img
               src={setup.qrCodeDataUrl}
               alt="Authenticator QR code"
-              className="w-[220px] h-[220px]"
+              className="h-auto w-full max-w-[220px]"
             />
           </div>
 

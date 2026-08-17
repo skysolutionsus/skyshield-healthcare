@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, KeyRound, Loader2, Lock, Mail, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, KeyRound, Loader2, Lock, Mail, ShieldCheck } from "lucide-react";
 import { SkyLogo } from "@/components/sky-logo";
 
 export default function LoginPage() {
@@ -12,6 +12,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mfaCode, setMfaCode] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [mfaRequired, setMfaRequired] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -65,7 +66,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 relative overflow-hidden"
+    <div className="relative flex min-h-dvh flex-col items-center justify-start overflow-x-hidden overflow-y-auto px-4 py-6 sm:justify-center sm:py-10"
       style={{ background: 'var(--sky-gradient-surface)' }}
     >
       {/* Animated background effects */}
@@ -96,13 +97,14 @@ export default function LoginPage() {
         @keyframes float3 { 0%, 100% { transform: translateY(0px) scale(1); } 50% { transform: translateY(-10px) scale(1.2); } }
       `}</style>
 
-      <div className="w-full max-w-md relative z-10 animate-in">
+      <div className="relative z-10 flex min-h-[calc(100dvh-3rem)] w-full max-w-md flex-col animate-in sm:min-h-0">
         {/* Branding */}
-        <div className="text-center mb-6">
+        <div className="mb-4 text-center sm:mb-6">
           <div className="flex justify-center mb-2">
             <div className="relative">
-              <div className="relative p-2">
-                <SkyLogo size={90} light={true} className="drop-shadow-[0_0_15px_rgba(33,150,243,0.3)]" />
+              <div className="relative p-1 sm:p-2">
+                <SkyLogo size={76} light={true} className="drop-shadow-[0_0_15px_rgba(33,150,243,0.3)] sm:hidden" />
+                <SkyLogo size={90} light={true} className="hidden drop-shadow-[0_0_15px_rgba(33,150,243,0.3)] sm:block" />
               </div>
             </div>
           </div>
@@ -112,7 +114,7 @@ export default function LoginPage() {
         </div>
 
         {/* Login Card */}
-        <div className="glass-strong rounded-2xl p-8 shadow-2xl shadow-black/40">
+        <div className="glass-strong rounded-2xl p-5 shadow-2xl shadow-black/40 sm:p-8">
           <h2 className="text-lg font-semibold text-white mb-1">
             Welcome back
           </h2>
@@ -154,7 +156,7 @@ export default function LoginPage() {
 	                  required
                     disabled={mfaRequired || loading}
 	                  autoComplete="email"
-	                  className="w-full pl-11 pr-4 py-3 rounded-xl text-white placeholder-[var(--sky-text-muted)] text-sm transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed"
+	                  className="w-full rounded-xl py-3 pl-11 pr-4 text-base text-white placeholder-[var(--sky-text-muted)] transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-70 sm:text-sm"
                   style={{
                     background: 'rgba(10, 22, 40, 0.6)',
                     border: '1px solid var(--sky-border)',
@@ -184,13 +186,13 @@ export default function LoginPage() {
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--sky-text-muted)' }} />
 	                <input
 	                  id="password"
-	                  type="password"
+	                  type={showPassword ? "text" : "password"}
 	                  value={password}
 	                  onChange={(e) => setPassword(e.target.value)}
 	                  required
                     disabled={mfaRequired || loading}
 	                  autoComplete="current-password"
-	                  className="w-full pl-11 pr-4 py-3 rounded-xl text-white placeholder-[var(--sky-text-muted)] text-sm transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed"
+	                  className="w-full rounded-xl py-3 pl-11 pr-12 text-base text-white placeholder-[var(--sky-text-muted)] transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-70 sm:text-sm"
                   style={{
                     background: 'rgba(10, 22, 40, 0.6)',
                     border: '1px solid var(--sky-border)',
@@ -204,8 +206,17 @@ export default function LoginPage() {
                     e.target.style.boxShadow = 'none';
                   }}
                   placeholder="Enter your password"
-                />
-	              </div>
+                  />
+                  <button
+                  type="button"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  disabled={mfaRequired || loading}
+                  className="absolute inset-y-0 right-0 inline-flex min-w-11 items-center justify-center rounded-r-xl text-[var(--sky-text-muted)] transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                  </div>
 	            </div>
 
               {mfaRequired && (
@@ -228,7 +239,7 @@ export default function LoginPage() {
                       required
                       autoComplete="one-time-code"
                       inputMode="text"
-                      className="w-full pl-11 pr-4 py-3 rounded-xl text-white placeholder-[var(--sky-text-muted)] text-sm transition-all duration-200"
+                      className="w-full rounded-xl py-3 pl-11 pr-4 text-base text-white placeholder-[var(--sky-text-muted)] transition-all duration-200 sm:text-sm"
                       style={{
                         background: 'rgba(10, 22, 40, 0.6)',
                         border: '1px solid var(--sky-border)',
@@ -276,7 +287,7 @@ export default function LoginPage() {
 	          <div className="mt-6 pt-6" style={{ borderTop: '1px solid var(--sky-border)' }}>
 	            <div className="flex items-center gap-2 justify-center" style={{ color: 'var(--sky-text-muted)' }}>
 	              {mfaRequired ? <ShieldCheck className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
-	              <p className="text-xs">
+	              <p className="text-sm leading-5">
 	                {mfaRequired
                     ? "Multi-factor verification is required for this account."
                     : "Authorized personnel only. All activity is logged and monitored."}
@@ -286,7 +297,7 @@ export default function LoginPage() {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-xs mt-6" style={{ color: 'var(--sky-text-muted)' }}>
+        <p className="mt-auto pb-[env(safe-area-inset-bottom)] pt-6 text-center text-sm leading-5" style={{ color: 'var(--sky-text-muted)' }}>
           IRS Office of Safeguards Compliance Platform
         </p>
       </div>

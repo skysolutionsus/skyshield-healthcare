@@ -111,7 +111,7 @@ export default async function IncidentDetailPage({
   const currentStatusIndex = statusOrder.indexOf(incident.status);
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+    <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
       {/* Breadcrumb */}
       <div className="mb-6">
         <Link
@@ -169,8 +169,8 @@ export default async function IncidentDetailPage({
       </div>
 
       {/* Status Progress Bar */}
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5 mb-6">
-        <div className="flex items-center justify-between">
+      <div className="mb-6 overflow-x-auto rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900 sm:p-5">
+        <div className="flex min-w-[520px] items-center justify-between">
           {statusOrder.map((status, i) => {
             const isCompleted = i < currentStatusIndex;
             const isCurrent = i === currentStatusIndex;
@@ -220,7 +220,7 @@ export default async function IncidentDetailPage({
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
           {/* Description */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+          <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900 sm:p-6">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
               Description
             </h2>
@@ -231,7 +231,7 @@ export default async function IncidentDetailPage({
 
           {/* Affected Systems */}
           {incident.affectedSystems && (
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+            <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900 sm:p-6">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
                 Affected Systems
               </h2>
@@ -242,7 +242,7 @@ export default async function IncidentDetailPage({
           )}
 
           {/* Remediation Plan */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+          <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900 sm:p-6">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
               Remediation Plan
             </h2>
@@ -253,7 +253,7 @@ export default async function IncidentDetailPage({
 
           {/* Related Pub 1075 Sections */}
           {relatedSections.length > 0 && (
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+            <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900 sm:p-6">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
                 Related Pub 1075 Sections
               </h2>
@@ -281,7 +281,7 @@ export default async function IncidentDetailPage({
           )}
 
           {/* Activity Timeline */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+          <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900 sm:p-6">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
               Activity Timeline
             </h2>
@@ -355,7 +355,7 @@ export default async function IncidentDetailPage({
           />
 
           {/* Incident Metadata */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+          <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900 sm:p-6">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
               Details
             </h3>

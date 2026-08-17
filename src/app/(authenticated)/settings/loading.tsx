@@ -1,6 +1,6 @@
 ﻿export default function SettingsLoading() {
   return (
-    <div className="p-6 lg:p-8 max-w-5xl mx-auto animate-in fade-in duration-300">
+    <div className="mx-auto w-full max-w-5xl animate-in p-4 fade-in duration-300 sm:p-6 lg:p-8">
       <div className="mb-8">
         <div className="h-8 w-48 bg-[var(--sky-surface-overlay)] bg-[var(--sky-surface-overlay)] rounded-lg animate-pulse" />
         <div className="h-4 w-56 bg-[var(--sky-surface-overlay)] bg-[var(--sky-surface-overlay)] rounded mt-2 animate-pulse" />

@@ -149,7 +149,7 @@ function AuditDetailDrawer({ log, onClose }: { log: AuditLogEntry; onClose: () =
     <div className="fixed inset-0 z-50 flex justify-end bg-black/50">
       <button aria-label="Close audit details" className="absolute inset-0 cursor-default" onClick={onClose} />
       <aside className="relative h-full w-full max-w-2xl overflow-y-auto border-l border-[var(--sky-border)] bg-[var(--sky-surface)] shadow-2xl">
-        <div className="sticky top-0 z-10 border-b border-[var(--sky-border)] bg-[var(--sky-surface)] px-6 py-5">
+        <div className="sticky top-0 z-10 border-b border-[var(--sky-border)] bg-[var(--sky-surface)] px-4 py-4 sm:px-6 sm:py-5">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)]">
@@ -170,7 +170,7 @@ function AuditDetailDrawer({ log, onClose }: { log: AuditLogEntry; onClose: () =
           </div>
         </div>
 
-        <div className="space-y-6 px-6 py-5">
+        <div className="space-y-6 px-4 py-4 sm:px-6 sm:py-5">
           <section>
             <h3 className="text-sm font-semibold text-white">Overview</h3>
             <dl className="mt-3">
@@ -219,7 +219,38 @@ export function AuditLogTable({ logs }: { logs: AuditLogEntry[] }) {
 
   return (
     <>
-      <div className="overflow-x-auto">
+      <div className="divide-y divide-[var(--sky-border)] md:hidden">
+        {logs.map((log) => {
+          const Icon = actionIcons[log.action] || ScrollText;
+          return (
+            <button
+              key={log.id}
+              type="button"
+              onClick={() => setSelectedId(log.id)}
+              className="block w-full space-y-3 p-4 text-left transition-colors hover:bg-white/[0.04] focus:bg-white/[0.04] focus:outline-none"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <Icon className="h-4 w-4 shrink-0 text-gray-400" />
+                  <span className="truncate text-sm font-medium text-[var(--sky-text-primary)]">
+                    {actionLabel(log.action)}
+                  </span>
+                </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-[var(--sky-text-muted)]" />
+              </div>
+              <p className="line-clamp-2 text-sm text-[var(--sky-text-secondary)]">
+                {summarizeMetadata(log.metadata)}
+              </p>
+              <div className="flex flex-col gap-1 text-xs text-[var(--sky-text-muted)] sm:flex-row sm:justify-between">
+                <span>{log.user?.name || "System"} · {resourceLabel(log)}</span>
+                <span>{formatDateTime(log.createdAt)}</span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="hidden overflow-x-auto md:block">
         <table className="w-full">
           <thead>
             <tr className="border-b border-[var(--sky-border)]">

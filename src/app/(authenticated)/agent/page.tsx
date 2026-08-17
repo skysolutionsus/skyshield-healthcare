@@ -14,6 +14,7 @@ import {
   PanelLeft,
   BookOpen,
   Check,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -449,10 +450,14 @@ export default function AgentPage() {
   const [loading, setLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
-  const [showSidebar, setShowSidebar] = useState(true);
+  const [showSidebar, setShowSidebar] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    setShowSidebar(window.matchMedia("(min-width: 1024px)").matches);
+  }, []);
 
   useEffect(() => {
     loadConversations();
@@ -622,21 +627,42 @@ export default function AgentPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] lg:h-screen">
+    <div className="relative flex h-full min-h-0 overflow-hidden">
+      {showSidebar && (
+        <button
+          type="button"
+          aria-label="Close conversations"
+          className="absolute inset-0 z-20 bg-black/60 backdrop-blur-sm lg:hidden"
+          onClick={() => setShowSidebar(false)}
+        />
+      )}
       {/* Conversation Sidebar */}
       <div
         className={cn(
-          "border-r border-[var(--sky-border)] bg-[var(--sky-navy)] flex flex-col transition-all duration-200",
-          showSidebar ? "w-72" : "w-0 overflow-hidden"
+          "absolute inset-y-0 left-0 z-30 flex w-[calc(100%_-_2rem)] max-w-72 shrink-0 flex-col border-r border-[var(--sky-border)] bg-[var(--sky-navy)] shadow-2xl transition-all duration-200 lg:static lg:z-auto lg:shadow-none",
+          showSidebar
+            ? "translate-x-0 lg:w-72"
+            : "-translate-x-full lg:w-0 lg:translate-x-0 lg:overflow-hidden"
         )}
       >
-        <div className="p-4 border-b border-[var(--sky-border)]">
+        <div className="flex items-center gap-2 border-b border-[var(--sky-border)] p-3 sm:p-4">
           <button
-            onClick={startNewConversation}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[var(--sky-royal)] hover:bg-[var(--sky-blue)] text-white rounded-xl text-sm font-medium transition-all active:scale-[0.98] shadow-sm"
+            onClick={() => {
+              startNewConversation();
+              if (window.innerWidth < 1024) setShowSidebar(false);
+            }}
+            className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--sky-royal)] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:bg-[var(--sky-blue)] active:scale-[0.98]"
           >
             <Plus className="w-4 h-4" />
             New Conversation
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowSidebar(false)}
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-[var(--sky-text-secondary)] hover:bg-white/5 hover:text-white lg:hidden"
+            aria-label="Close conversations"
+          >
+            <X className="h-5 w-5" />
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
@@ -648,7 +674,10 @@ export default function AgentPage() {
           {conversations.map((conv) => (
             <button
               key={conv.id}
-              onClick={() => loadConversation(conv.id)}
+              onClick={() => {
+                loadConversation(conv.id);
+                if (window.innerWidth < 1024) setShowSidebar(false);
+              }}
               className={cn(
                 "w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all",
                 conversationId === conv.id
@@ -672,11 +701,12 @@ export default function AgentPage() {
       {/* Chat Area */}
       <div className="flex-1 flex flex-col min-w-0" style={{ background: 'var(--sky-surface)' }}>
         {/* Chat Header */}
-        <div className="flex items-center justify-between px-6 py-3 border-b border-[var(--sky-border)] bg-[var(--sky-navy)]">
-          <div className="flex items-center gap-3">
+        <div className="flex min-h-14 items-center justify-between gap-2 border-b border-[var(--sky-border)] bg-[var(--sky-navy)] px-3 py-2 sm:px-6 sm:py-3">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <button
               onClick={() => setShowSidebar(!showSidebar)}
-              className="text-[var(--sky-text-muted)] hover:text-white transition-colors"
+              className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-[var(--sky-text-muted)] transition-colors hover:bg-white/5 hover:text-white"
+              aria-label={showSidebar ? "Close conversations" : "Open conversations"}
             >
               {showSidebar ? (
                 <PanelLeftClose className="w-5 h-5" />
@@ -684,13 +714,13 @@ export default function AgentPage() {
                 <PanelLeft className="w-5 h-5" />
               )}
             </button>
-            <div className="flex items-center gap-2.5">
+            <div className="flex min-w-0 items-center gap-2.5">
               <AgentAvatar size="sm" />
-              <div>
-                <h2 className="text-sm font-semibold text-white">
+              <div className="min-w-0">
+                <h2 className="truncate text-sm font-semibold text-white">
                   Office of Safeguards AI Agent
                 </h2>
-                <p className="text-xs text-[var(--sky-text-muted)]">
+                <p className="hidden text-xs text-[var(--sky-text-muted)] sm:block">
                   Responses follow the Safeguards inquiry format
                 </p>
               </div>
@@ -712,14 +742,14 @@ export default function AgentPage() {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3 overscroll-contain sm:space-y-5 sm:p-6">
           {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-full text-center max-w-lg mx-auto">
+            <div className="mx-auto flex min-h-full max-w-lg flex-col items-center justify-start py-6 text-center sm:justify-center sm:py-0">
               <AgentAvatar size="lg" />
               <h3 className="text-xl font-bold text-white mt-5 mb-2">
                 Office of Safeguards AI Agent
               </h3>
-              <p className="text-sm text-[var(--sky-text-secondary)] mb-8 leading-relaxed">
+              <p className="mb-5 text-sm leading-relaxed text-[var(--sky-text-secondary)] sm:mb-8">
                 Ask any question about IRS Office of Safeguards compliance
                 requirements. Responses are structured by inquiry with a clear response,
                 support, and references.
@@ -748,18 +778,18 @@ export default function AgentPage() {
         </div>
 
         {/* Input */}
-        <div className="border-t border-[var(--sky-border)] bg-[var(--sky-navy)] p-4">
+        <div className="shrink-0 border-t border-[var(--sky-border)] bg-[var(--sky-navy)] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4">
           <form onSubmit={handleSubmit} className="max-w-3xl mx-auto">
-            <div className="flex gap-3 items-end">
+            <div className="flex items-end gap-2 sm:gap-3">
               <div className="flex-1 relative">
                 <textarea
                   ref={inputRef}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Ask about Office of Safeguards compliance..."
+                  placeholder="Ask a compliance question..."
                   rows={1}
-                  className="w-full resize-none px-4 py-3 bg-[var(--sky-surface-overlay)] border border-[var(--sky-border)] rounded-xl text-sm text-white placeholder-[var(--sky-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)]/50 focus:border-[var(--sky-blue)]/50 transition-all"
+                  className="w-full resize-none rounded-xl border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-4 py-3 text-base text-white placeholder-[var(--sky-text-muted)] transition-all focus:border-[var(--sky-blue)]/50 focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)]/50 sm:text-sm"
                   style={{ minHeight: "48px", maxHeight: "200px" }}
                   onInput={(e) => {
                     const target = e.target as HTMLTextAreaElement;
@@ -773,7 +803,7 @@ export default function AgentPage() {
                 type="submit"
                 disabled={!input.trim() || loading}
                 className={cn(
-                  "px-4 py-3 rounded-xl transition-all shadow-sm",
+                  "inline-flex min-h-12 min-w-12 items-center justify-center rounded-xl px-3 py-3 shadow-sm transition-all sm:px-4",
                   input.trim() && !loading
                     ? "bg-[var(--sky-royal)] hover:bg-[var(--sky-blue)] text-white active:scale-95"
                     : "bg-[var(--sky-surface-overlay)] text-[var(--sky-text-muted)] cursor-not-allowed"

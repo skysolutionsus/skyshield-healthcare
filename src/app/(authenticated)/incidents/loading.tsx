@@ -1,7 +1,7 @@
 ﻿export default function IncidentsLoading() {
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto animate-in fade-in duration-300">
-      <div className="flex items-center justify-between mb-8">
+    <div className="mx-auto w-full max-w-7xl animate-in p-4 fade-in duration-300 sm:p-6 lg:p-8">
+      <div className="mb-8 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="h-8 w-44 bg-[var(--sky-surface-overlay)] bg-[var(--sky-surface-overlay)] rounded-lg animate-pulse" />
           <div className="h-4 w-72 bg-[var(--sky-surface-overlay)] bg-[var(--sky-surface-overlay)] rounded mt-2 animate-pulse" />

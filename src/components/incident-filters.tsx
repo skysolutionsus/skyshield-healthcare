@@ -58,11 +58,11 @@ export function IncidentFilters() {
   const hasFilters = currentStatus || currentSeverity || currentType;
 
   return (
-    <div className="flex flex-wrap items-center gap-3 mb-6">
+    <div className="mb-6 grid grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-center">
       <select
         value={currentStatus}
         onChange={(e) => updateFilter("status", e.target.value)}
-        className="px-3 py-2 text-sm rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface)] text-white focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)]"
+        className="min-h-11 w-full rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface)] px-3 py-2 text-base text-white focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)] sm:w-auto sm:text-sm"
       >
         {STATUSES.map((s) => (
           <option key={s.value} value={s.value}>
@@ -74,7 +74,7 @@ export function IncidentFilters() {
       <select
         value={currentSeverity}
         onChange={(e) => updateFilter("severity", e.target.value)}
-        className="px-3 py-2 text-sm rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface)] text-white focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)]"
+        className="min-h-11 w-full rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface)] px-3 py-2 text-base text-white focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)] sm:w-auto sm:text-sm"
       >
         {SEVERITIES.map((s) => (
           <option key={s.value} value={s.value}>
@@ -86,7 +86,7 @@ export function IncidentFilters() {
       <select
         value={currentType}
         onChange={(e) => updateFilter("type", e.target.value)}
-        className="px-3 py-2 text-sm rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface)] text-white focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)]"
+        className="min-h-11 w-full rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface)] px-3 py-2 text-base text-white focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)] sm:w-auto sm:text-sm"
       >
         {TYPES.map((t) => (
           <option key={t.value} value={t.value}>
@@ -98,7 +98,7 @@ export function IncidentFilters() {
       {hasFilters && (
         <button
           onClick={clearFilters}
-          className="px-3 py-2 text-sm rounded-lg text-[var(--sky-text-secondary)] hover:text-gray-700 dark:hover:text-gray-200 hover:bg-[var(--sky-surface-overlay)] transition-colors"
+          className="min-h-11 w-full rounded-lg px-3 py-2 text-sm text-[var(--sky-text-secondary)] transition-colors hover:bg-[var(--sky-surface-overlay)] hover:text-gray-200 sm:w-auto"
         >
           Clear filters
         </button>

@@ -92,32 +92,33 @@ export function NewIncidentDialog() {
     <>
       <button
         onClick={() => setShowDialog(true)}
-        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[var(--sky-royal)] hover:bg-[var(--sky-blue)] rounded-lg transition-colors"
+        className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[var(--sky-royal)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--sky-blue)]"
       >
         <Plus className="w-4 h-4" />
         New Incident
       </button>
 
       {showDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
           <div
             className="fixed inset-0 bg-black/50"
             onClick={handleClose}
           />
-          <div className="relative bg-[var(--sky-surface)] border border-[var(--sky-border)] rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b border-[var(--sky-border)]">
+          <div className="relative max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-xl border border-[var(--sky-border)] bg-[var(--sky-surface)] shadow-xl sm:max-h-[calc(100dvh-2rem)]">
+            <div className="flex items-center justify-between border-b border-[var(--sky-border)] p-4 sm:p-6">
               <h2 className="text-lg font-semibold text-white">
                 Report New Incident
               </h2>
               <button
                 onClick={handleClose}
-                className="p-1 rounded-lg text-[var(--sky-text-muted)] hover:text-gray-600 dark:hover:text-gray-200 hover:bg-[var(--sky-surface-overlay)] transition-colors"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-[var(--sky-text-muted)] transition-colors hover:bg-[var(--sky-surface-overlay)] hover:text-gray-200"
+                aria-label="Close incident form"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4 p-4 sm:p-6">
               {error && (
                 <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-400">
                   {error}
@@ -151,7 +152,7 @@ export function NewIncidentDialog() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-[var(--sky-text-secondary)] mb-1">
                     Type
@@ -212,18 +213,18 @@ export function NewIncidentDialog() {
                 />
               </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-[var(--sky-border)]">
+              <div className="flex flex-col-reverse gap-2 border-t border-[var(--sky-border)] pt-4 sm:flex-row sm:justify-end sm:gap-3">
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="px-4 py-2 text-sm font-medium text-[var(--sky-text-secondary)] hover:bg-[var(--sky-surface-overlay)] rounded-lg transition-colors"
+                  className="min-h-11 rounded-lg px-4 py-2 text-sm font-medium text-[var(--sky-text-secondary)] transition-colors hover:bg-[var(--sky-surface-overlay)]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[var(--sky-royal)] hover:bg-[var(--sky-blue)] disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[var(--sky-royal)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--sky-blue)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {submitting ? (
                     <>

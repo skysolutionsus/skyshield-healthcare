@@ -25,7 +25,7 @@
     --sky-border-bright: rgba(33, 150, 243, 0.3);
     --sky-text-primary: #F1F5F9;
     --sky-text-secondary: #94A3B8;
-    --sky-text-muted: #64748B;
+    --sky-text-muted: #7F8EA3;
     
     /* Gradients */
     --sky-gradient-primary: linear-gradient(135deg, #1565C0 0%, #2196F3 50%, #29B6F6 100%);
@@ -43,6 +43,7 @@
   body {
     background: var(--sky-navy);
     color: var(--sky-text-primary);
+    overflow-x: hidden;
     font-feature-settings: "rlig" 1, "calt" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;

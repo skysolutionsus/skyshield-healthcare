@@ -75,8 +75,8 @@ export function UserManagement({ orgId: _orgId }: { orgId: string }) {
   }
 
   return (
-    <div className="bg-[var(--sky-surface)] border border-[var(--sky-border)] rounded-xl p-6 mb-8">
-      <div className="flex items-center justify-between mb-4">
+    <div className="bg-[var(--sky-surface)] border border-[var(--sky-border)] rounded-xl p-4 sm:p-6 mb-8">
+      <div className="mb-4 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-semibold text-white">Invite Team Member</h2>
           <p className="mt-1 text-xs text-[var(--sky-text-muted)]">

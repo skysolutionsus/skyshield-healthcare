@@ -77,7 +77,7 @@ export function NotificationsMenu() {
             <button
                 ref={buttonRef}
                 onClick={toggleMenu}
-                className="relative p-2 rounded-full transition-colors hover:bg-slate-800/50 text-slate-400 hover:text-white"
+                className="relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-800/50 hover:text-white"
                 aria-label="View notifications"
             >
                 <Bell className="w-5 h-5" />

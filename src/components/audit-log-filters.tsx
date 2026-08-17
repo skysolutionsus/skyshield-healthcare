@@ -51,11 +51,11 @@ export function AuditLogFilters() {
   }
 
   return (
-    <div className="flex gap-3 mb-6">
+    <div className="mb-6 flex w-full gap-3 sm:w-auto">
       <select
         value={currentAction}
         onChange={(e) => handleActionChange(e.target.value)}
-        className="px-3 py-2 bg-[var(--sky-surface-overlay)] border border-[var(--sky-border)] rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)]"
+        className="min-h-11 w-full rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-2 text-base text-white focus:outline-none focus:ring-2 focus:ring-[var(--sky-blue)] sm:w-auto sm:text-sm"
       >
         <option value="">All Actions</option>
         {actionTypes.map((action) => (

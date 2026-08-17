@@ -100,7 +100,7 @@ export default function FalsePositivesPage() {
 
     if (loading) {
         return (
-            <div className="p-6 lg:p-8 max-w-5xl mx-auto">
+            <div className="mx-auto w-full max-w-5xl p-4 sm:p-6 lg:p-8">
                 <div className="flex items-center gap-2 text-[var(--sky-text-muted)]">
                     <Loader2 className="w-5 h-5 animate-spin" />
                     Loading reports...
@@ -110,7 +110,7 @@ export default function FalsePositivesPage() {
     }
 
     return (
-        <div className="p-6 lg:p-8 max-w-5xl mx-auto">
+        <div className="mx-auto w-full max-w-5xl p-4 sm:p-6 lg:p-8">
             <div className="mb-8">
                 <h1 className="text-2xl font-bold text-white">
                     False Positive Reports

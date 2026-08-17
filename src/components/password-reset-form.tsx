@@ -93,7 +93,7 @@ export function PasswordResetForm() {
 
   return (
     <main
-      className="relative min-h-screen overflow-hidden bg-[var(--sky-navy)] px-4 py-10 sm:px-6 lg:flex lg:items-center lg:py-16"
+      className="relative min-h-dvh overflow-x-hidden overflow-y-auto bg-[var(--sky-navy)] px-4 py-6 sm:px-6 sm:py-10 lg:flex lg:items-center lg:py-16"
       style={{ background: "var(--sky-gradient-surface)" }}
     >
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">

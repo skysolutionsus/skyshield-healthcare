@@ -161,19 +161,19 @@ export function AppShell({ children, user }: AppShellProps) {
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden" style={{ background: 'var(--sky-navy)' }}>
+    <div className="flex h-dvh min-h-0 flex-col overflow-hidden" style={{ background: 'var(--sky-navy)' }}>
       {/* View-As Banner */}
       {viewAsUser && (
-        <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 flex items-center justify-between gap-3 shrink-0 z-50">
-          <div className="flex items-center gap-2 text-sm text-amber-400">
-            <Eye className="w-4 h-4" />
+        <div className="z-50 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-amber-500/30 bg-amber-500/15 px-3 py-2 sm:px-4">
+          <div className="flex min-w-0 items-start gap-2 text-sm text-amber-400">
+            <Eye className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
               Viewing as <strong>{viewAsUser.name}</strong> ({roleLabel(viewAsUser.role)})
             </span>
           </div>
           <button
             onClick={stopViewAs}
-            className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-lg transition-colors"
+            className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg bg-amber-500/20 px-3 py-2 text-xs font-medium text-amber-300 transition-colors hover:bg-amber-500/30"
           >
             <EyeOff className="w-3.5 h-3.5" />
             Exit View
@@ -181,7 +181,7 @@ export function AppShell({ children, user }: AppShellProps) {
         </div>
       )}
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Mobile overlay */}
         {sidebarOpen && (
           <div
@@ -193,7 +193,7 @@ export function AppShell({ children, user }: AppShellProps) {
         {/* Sidebar */}
         <aside
           className={cn(
-            "fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ease-out lg:translate-x-0 lg:static lg:z-auto",
+            "fixed inset-y-0 left-0 z-50 w-[calc(100vw_-_2rem)] max-w-72 transform transition-transform duration-300 ease-out sm:w-72 lg:static lg:z-auto lg:w-64 lg:translate-x-0",
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           )}
           style={{
@@ -201,7 +201,7 @@ export function AppShell({ children, user }: AppShellProps) {
             borderRight: '1px solid var(--sky-border)',
           }}
         >
-          <div className="flex flex-col h-full">
+          <div className="flex h-full flex-col pb-[env(safe-area-inset-bottom)]">
             {/* Logo */}
             <div className="flex items-center justify-between px-6 py-6 shrink-0"
               style={{ borderBottom: '1px solid var(--sky-border)' }}
@@ -216,8 +216,9 @@ export function AppShell({ children, user }: AppShellProps) {
 
               <button
                 onClick={() => setSidebarOpen(false)}
-                className="lg:hidden transition-colors ml-2"
+                className="ml-2 inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg transition-colors hover:bg-white/5 lg:hidden"
                 style={{ color: 'var(--sky-text-muted)' }}
+                aria-label="Close navigation"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -235,7 +236,7 @@ export function AppShell({ children, user }: AppShellProps) {
                     href={item.href}
                     onClick={() => setSidebarOpen(false)}
                     className={cn(
-                      "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative group",
+                      "relative flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 group",
                       isActive
                         ? "text-white"
                         : "hover:text-white"
@@ -329,9 +330,10 @@ export function AppShell({ children, user }: AppShellProps) {
                 </div>
                 <button
                   onClick={() => signOut({ callbackUrl: "/login" })}
-                  className="transition-colors duration-200 hover:text-red-400"
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg transition-colors duration-200 hover:bg-white/5 hover:text-red-400"
                   style={{ color: 'var(--sky-text-muted)' }}
                   title="Sign out"
+                  aria-label="Sign out"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
@@ -341,15 +343,17 @@ export function AppShell({ children, user }: AppShellProps) {
         </aside>
 
         {/* Main content */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {/* Mobile header */}
-          <header className="lg:hidden flex items-center justify-between gap-3 px-4 py-3 glass"
+          <header className="glass flex shrink-0 items-center justify-between gap-2 px-3 py-2 lg:hidden sm:px-4"
             style={{ borderBottom: '1px solid var(--sky-border)' }}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-2">
               <button
                 onClick={() => setSidebarOpen(true)}
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg hover:bg-white/5"
                 style={{ color: 'var(--sky-text-secondary)' }}
+                aria-label="Open navigation"
               >
                 <Menu className="w-6 h-6" />
               </button>
@@ -363,7 +367,7 @@ export function AppShell({ children, user }: AppShellProps) {
             <NotificationsMenu />
           </header>
 
-          <main className="flex-1 overflow-y-auto">{children}</main>
+          <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{children}</main>
         </div>
       </div>
     </div>

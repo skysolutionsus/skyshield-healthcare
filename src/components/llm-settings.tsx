@@ -88,7 +88,7 @@ export function LLMSettings() {
 
     return (
         <div className="bg-[var(--sky-surface)] border border-[var(--sky-border)] rounded-xl overflow-hidden mb-8">
-            <div className="px-6 py-4 border-b border-[var(--sky-border)] flex items-center gap-2">
+            <div className="flex items-center gap-2 border-b border-[var(--sky-border)] px-4 py-4 sm:px-6">
                 <Bot className="w-5 h-5 text-gray-500" />
                 <h2 className="font-semibold text-white">Assistant AI Configuration</h2>
             </div>
