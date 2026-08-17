@@ -438,7 +438,7 @@ export default async function DashboardPage() {
               {data.recentLogs.map((log: { id: string; action: string; user?: { name: string } | null; createdAt: Date }) => (
                 <div
                   key={log.id}
-                  className="flex items-center gap-3 p-3 rounded-lg transition-colors hover:bg-white/[0.03]"
+                  className="flex flex-wrap items-center gap-3 rounded-lg p-3 transition-colors hover:bg-white/[0.03]"
                 >
                   <div
                     className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${ACTION_COLORS[log.action] || "bg-slate-500/10 text-slate-400"
@@ -454,7 +454,7 @@ export default async function DashboardPage() {
                       </span>
                     </p>
                   </div>
-                  <span className="text-xs shrink-0 tabular-nums" style={{ color: 'var(--sky-text-muted)' }}>
+                  <span className="basis-full pl-11 text-xs tabular-nums sm:basis-auto sm:pl-0" style={{ color: 'var(--sky-text-muted)' }}>
                     {formatDateTime(log.createdAt)}
                   </span>
                 </div>

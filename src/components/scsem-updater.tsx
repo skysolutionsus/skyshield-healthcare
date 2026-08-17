@@ -671,7 +671,7 @@ export function SCSEMUpdater() {
                         <FileSpreadsheet className="h-6 w-6 text-emerald-300" />
                     </div>
                     <div>
-                        <p className="text-sm font-semibold text-white">
+                        <p className="max-w-full break-all text-sm font-semibold text-white">
                             {session ? session.originalFileName : "Drop official IRS SCSEM template"}
                         </p>
                         <p className="mt-1 text-xs text-[var(--sky-text-muted)]">
@@ -1160,7 +1160,7 @@ function ChangeReview({
             >
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 font-mono text-xs font-medium text-blue-300">
+                        <span className="max-w-full break-all rounded border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 font-mono text-xs font-medium text-blue-300">
                             {change.testId}
                         </span>
                         {change.targetSheet && (
@@ -1197,7 +1197,7 @@ function ChangeReview({
                         <span className="mb-2 block text-[10px] font-bold uppercase text-[var(--sky-text-muted)]">
                             Why This Is Proposed
                         </span>
-                        <p className="whitespace-pre-wrap text-sm leading-6 text-[var(--sky-text-secondary)]">
+                        <p className="break-words [overflow-wrap:anywhere] whitespace-pre-wrap text-sm leading-6 text-[var(--sky-text-secondary)]">
                             {change.reason}
                         </p>
                     </div>
@@ -1207,7 +1207,7 @@ function ChangeReview({
                             <span className="mb-2 block text-[10px] font-bold uppercase text-red-200">
                                 {isNewControl ? "Current SCSEM Coverage" : `Current ${fieldLabel} In Uploaded SCSEM`}
                             </span>
-                            <p className="whitespace-pre-wrap text-sm leading-6 text-[var(--sky-text-primary)]">{change.currentValue}</p>
+                            <p className="break-words [overflow-wrap:anywhere] whitespace-pre-wrap text-sm leading-6 text-[var(--sky-text-primary)]">{change.currentValue}</p>
                         </div>
                         <div className="rounded-lg border border-emerald-500/25 bg-emerald-950/30 p-3">
                             <span className="mb-2 block text-[10px] font-bold uppercase text-emerald-200">
@@ -1231,11 +1231,11 @@ function ChangeReview({
 
                     <SourceEvidencePanel change={change} />
 
-                    <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+                    <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
                         <button
                             onClick={onSave}
                             disabled={statusBusy}
-                            className="inline-flex items-center gap-2 rounded-lg border border-[var(--sky-border)] bg-[var(--sky-navy)] px-3 py-2 text-sm font-medium text-white transition hover:bg-white/10 disabled:opacity-50"
+                            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-[var(--sky-border)] bg-[var(--sky-navy)] px-3 py-2 text-sm font-medium text-white transition hover:bg-white/10 disabled:opacity-50 sm:w-auto"
                         >
                             {busy === `save:${change.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                             Save
@@ -1243,7 +1243,7 @@ function ChangeReview({
                         <button
                             onClick={onApprove}
                             disabled={statusBusy}
-                            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
+                            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50 sm:w-auto"
                         >
                             {busy === `APPROVED:${change.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                             Approve for Draft
@@ -1251,7 +1251,7 @@ function ChangeReview({
                         <button
                             onClick={onReject}
                             disabled={statusBusy}
-                            className="inline-flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm font-medium text-red-200 transition hover:bg-red-500/20 disabled:opacity-50"
+                            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm font-medium text-red-200 transition hover:bg-red-500/20 disabled:opacity-50 sm:w-auto"
                         >
                             {busy === `REJECTED:${change.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
                             Reject

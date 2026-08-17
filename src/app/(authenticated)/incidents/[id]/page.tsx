@@ -224,7 +224,7 @@ export default async function IncidentDetailPage({
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
               Description
             </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
+            <p className="break-words [overflow-wrap:anywhere] text-sm leading-relaxed text-gray-600 whitespace-pre-wrap dark:text-gray-300">
               {incident.description || "No description provided."}
             </p>
           </div>
@@ -246,7 +246,7 @@ export default async function IncidentDetailPage({
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
               Remediation Plan
             </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
+            <p className="break-words [overflow-wrap:anywhere] text-sm leading-relaxed text-gray-600 whitespace-pre-wrap dark:text-gray-300">
               {incident.remediationPlan || "No remediation plan defined yet."}
             </p>
           </div>
@@ -330,7 +330,7 @@ export default async function IncidentDetailPage({
                           </div>
                           {activity.details && (
                             <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700/50">
-                              <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">
+                              <p className="break-words [overflow-wrap:anywhere] text-sm text-gray-600 whitespace-pre-wrap dark:text-gray-300">
                                 {activity.details}
                               </p>
                             </div>

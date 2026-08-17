@@ -20,8 +20,8 @@ export default function IncidentDetailLoading() {
       </div>
 
       {/* Status progress bar skeleton */}
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5 mb-6">
-        <div className="flex items-center justify-between">
+      <div className="mb-6 overflow-x-auto overscroll-x-contain rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900 sm:p-5">
+        <div className="flex min-w-[520px] items-center justify-between">
           {[...Array(5)].map((_, i) => (
             <div key={i} className="flex items-center flex-1 last:flex-initial">
               <div className="flex flex-col items-center">

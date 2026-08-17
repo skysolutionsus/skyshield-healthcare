@@ -335,33 +335,33 @@ export function KnowledgeConsole() {
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <section className="rounded-2xl border border-[var(--sky-border)] bg-[var(--sky-surface)] overflow-hidden">
-          <div className="flex items-center justify-between gap-3 border-b border-[var(--sky-border)] px-5 py-4">
+          <div className="flex flex-col items-start gap-3 border-b border-[var(--sky-border)] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <div>
               <h2 className="font-semibold text-white">Knowledge Documents</h2>
               <p className="text-sm text-[var(--sky-text-muted)]">
                 Admin-only database view for source documents, chunks, metadata, and status.
               </p>
             </div>
-            <div className="flex flex-wrap justify-end gap-2">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
               <button
                 onClick={importBundledInterimGuidance}
                 disabled={importing}
-                className="rounded-lg bg-[var(--sky-surface-overlay)] px-3 py-2 text-sm font-medium text-white transition hover:bg-white/10 disabled:opacity-50"
+                className="min-h-11 w-full rounded-lg bg-[var(--sky-surface-overlay)] px-3 py-2 text-sm font-medium text-white transition hover:bg-white/10 disabled:opacity-50 sm:w-auto"
               >
                 {importing ? "Importing..." : "Import Interim Guidance"}
               </button>
               <button
                 onClick={syncLatestPub1075}
                 disabled={importing}
-                className="rounded-lg bg-[var(--sky-royal)] px-3 py-2 text-sm font-medium text-white transition hover:bg-[var(--sky-blue)] disabled:opacity-50"
+                className="min-h-11 w-full rounded-lg bg-[var(--sky-royal)] px-3 py-2 text-sm font-medium text-white transition hover:bg-[var(--sky-blue)] disabled:opacity-50 sm:w-auto"
               >
                 {importing ? "Syncing..." : "Sync Latest Pub 1075"}
               </button>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          <div className="overflow-x-auto overscroll-x-contain">
+            <table className="w-full min-w-[44rem]">
               <thead>
                 <tr className="border-b border-[var(--sky-border)] text-left text-xs uppercase tracking-wider text-[var(--sky-text-muted)]">
                   <th className="px-4 py-3 font-medium">Document</th>
@@ -467,11 +467,11 @@ export function KnowledgeConsole() {
               placeholder="Title"
               className="w-full rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-2 text-sm text-white outline-none focus:border-[var(--sky-blue)]"
             />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <select
                 value={form.sourceType}
                 onChange={(e) => setForm({ ...form, sourceType: e.target.value })}
-                className="rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-2 text-sm text-white outline-none"
+                className="min-w-0 w-full rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-2 text-base text-white outline-none sm:text-sm"
               >
                 {SOURCE_TYPES.map((type) => (
                   <option key={type} value={type}>
@@ -483,7 +483,7 @@ export function KnowledgeConsole() {
                 value={form.version}
                 onChange={(e) => setForm({ ...form, version: e.target.value })}
                 placeholder="Version"
-                className="rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-2 text-sm text-white outline-none"
+                className="min-w-0 w-full rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-2 text-base text-white outline-none sm:text-sm"
               />
             </div>
             <input
@@ -530,7 +530,7 @@ export function KnowledgeConsole() {
             <Search className="h-5 w-5 text-sky-300" />
             <h2 className="font-semibold text-white">Hybrid Search Preview</h2>
           </div>
-          <div className="mt-4 flex gap-2">
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -543,7 +543,7 @@ export function KnowledgeConsole() {
             <button
               onClick={runSearch}
               disabled={searching}
-              className="rounded-lg bg-[var(--sky-surface-overlay)] px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10 disabled:opacity-50"
+              className="min-h-11 w-full rounded-lg bg-[var(--sky-surface-overlay)] px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10 disabled:opacity-50 sm:w-auto"
             >
               {searching ? "Searching..." : "Search"}
             </button>
@@ -686,7 +686,7 @@ function ChunkPreview({ chunk }: { chunk: KnowledgeChunk }) {
       </div>
       {chunk.heading && <p className="mb-2 text-sm font-medium text-white">{chunk.heading}</p>}
       <p
-        className={`whitespace-pre-wrap text-sm leading-6 text-[var(--sky-text-secondary)] ${
+        className={`break-words [overflow-wrap:anywhere] whitespace-pre-wrap text-sm leading-6 text-[var(--sky-text-secondary)] ${
           expanded ? "" : "line-clamp-6"
         }`}
       >
