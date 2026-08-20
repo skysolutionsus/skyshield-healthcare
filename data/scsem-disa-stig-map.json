@@ -1,0 +1,1139 @@
+{
+  "schemaVersion": 2,
+  "irsManifestReviewedAt": "2026-08-20",
+  "disaCatalogReviewedAt": "2026-08-20",
+  "workbookCount": 60,
+  "entries": [
+    {
+      "fileName": "safeguards-scsem-acf2.xlsx",
+      "sha256": "500d0541967340d1a87da62c6ef6d79f2416a6899a1bdbc7259911c5528b8662",
+      "sheets": {
+        "zOS_ACF2": {
+          "classification": "historical_sunset",
+          "rationale": "Only product bundles or historical/sunset material were found; no current eligible manual STIG is approved for proposals."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-aix7-v3-0-03312025.xlsx",
+      "sha256": "dce856e0f534bbd9207f47c7510e927a90dc13348378f0575317a49e100dbfe3",
+      "sheets": {
+        "Gen Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "AIX7 Test Cases": {
+          "classification": "direct",
+          "rationale": "Exact AIX 7 product-generation source.",
+          "catalogName": "IBM AIX 7.x STIG - Ver 3, Rel 3",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_IBM_AIX_7-x_V3R3_STIG.zip",
+          "sourceUploadDate": "2026-07-10",
+          "benchmarkIds": [
+            "IBM_AIX_7-x_STIG"
+          ],
+          "sourcePackageSha256": "95ab5ad65651d381eade98aa4078ed455387725e3823c08e04a2b757a00fcee8"
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-amazon-linux-2023-v1-0.xlsx",
+      "sha256": "dfcb4946c5353b474bc35a6722a15fb308029faf748000bdcaceaa8e6463fcfa",
+      "sheets": {
+        "Common System Test Cases": {
+          "classification": "none",
+          "rationale": "The Amazon Linux STIG is bound to the exact Amazon Linux product sheet; unmatched product rules must not be inserted into the common-system sheet."
+        },
+        "Amazon Linux 23 Test Cases": {
+          "classification": "direct",
+          "rationale": "Exact Amazon Linux 2023 source.",
+          "catalogName": "Amazon Linux 2023 STIG - Ver 1, Rel 4",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Amazon_Linux_2023_V1R4_STIG.zip",
+          "sourceUploadDate": "2026-07-10",
+          "benchmarkIds": [
+            "Amazon_Linux_2023_STIG"
+          ],
+          "sourcePackageSha256": "9cc32f567d002b8811709b71eb937457034e86b88084162be8f04b5fbc073533"
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-apacheo-tomcat.xlsx",
+      "sha256": "c02ea824df26ef1cb652dba5f005ff6fc0f2cd827253f2366eb4bb4508c62c6d",
+      "sheets": {
+        "Gen Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "Tomcat9": {
+          "classification": "direct",
+          "rationale": "Exact Tomcat 9 benchmark.",
+          "catalogName": "Apache Tomcat Application Server 9 STIG - Ver 3, Rel 4",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Apache_Tomcat_Application_Server_9_V3R4_STIG.zip",
+          "sourceUploadDate": "2026-04-07",
+          "benchmarkIds": [
+            "Tomcat_Application_Server_9_STIG"
+          ],
+          "sourcePackageSha256": "b511e7a82da44a99aed3c715f26550ee615abe8da73270db6c8e18b7441dfbaa"
+        },
+        "Tomcat10": {
+          "classification": "adjacent_version",
+          "rationale": "Same product family, older Tomcat generation.",
+          "catalogName": "Apache Tomcat Application Server 9 STIG - Ver 3, Rel 4",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Apache_Tomcat_Application_Server_9_V3R4_STIG.zip",
+          "sourceUploadDate": "2026-04-07"
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-apache24-iis-10-webserver-v6-2.xlsx",
+      "sha256": "d9b2f247de995c29ac655afdb967af74916a3e954866357d8488ff66da1233d8",
+      "sheets": {
+        "General Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "Apache2.4": {
+          "classification": "direct",
+          "rationale": "Exact Apache 2.4 Unix benchmark for this dedicated sheet.",
+          "catalogName": "Apache Server 2.4 Unix STIG",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Apache_Server_2-4_Unix_Y26M07_STIG.zip",
+          "sourceUploadDate": "2026-07-10",
+          "benchmarkIds": [
+            "Apache_Server_2-4_UNIX_Server_STIG",
+            "Apache_Server_2-4_UNIX_Site_STIG"
+          ],
+          "sourcePackageSha256": "c6e817b9628c57ce03b2a9948d0c99ce2bdb5fa67ba3f98c12a3d9ca5aa0dc03"
+        },
+        "IIS10": {
+          "classification": "direct",
+          "rationale": "Exact IIS 10 benchmark for this dedicated sheet.",
+          "catalogName": "Microsoft IIS 10.0 STIG",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_IIS_10-0_Y26M07_STIG.zip",
+          "sourceUploadDate": "2026-07-10",
+          "benchmarkIds": [
+            "IIS_10-0_Server_STIG",
+            "IIS_10-0_Site_STIG"
+          ],
+          "sourcePackageSha256": "807e1bfcb9a30a1392324d0c03bd240e90b9c3587f2eb910603b61527ce352d3"
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-apple-ios-ipad-os-v1-0-02212025.xlsx",
+      "sha256": "5a628c9286a98dfa527482f05d618abb1052510e11919d22f7c423afd4e3ec4b",
+      "sheets": {
+        "Test Cases": {
+          "classification": "adjacent_version",
+          "rationale": "Same mobile OS family; workbook generation is not explicit.",
+          "catalogName": "Apple iOS/iPadOS 26 STIG - Ver 1, Rel 3",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Apple_iOS-iPadOS_26_V1R3_STIG.zip",
+          "sourceUploadDate": "2026-07-13"
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-application-v4-1.xlsx",
+      "sha256": "4553b3aa46ae4986084a39a5dccc0aabefb8cefa5d930de6717c94c156002217",
+      "sheets": {
+        "General App Test Cases": {
+          "classification": "direct",
+          "rationale": "Generic application-security benchmark explicitly scoped to application sheets.",
+          "catalogName": "Application Security and Development STIG - Ver 6, Rel 4",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_ASD_V6R4_STIG.zip",
+          "sourceUploadDate": "2025-11-26",
+          "benchmarkIds": [
+            "Application_Security_Development_STIG"
+          ],
+          "sourcePackageSha256": "3361a742c58ba7cc3f86bc1fa6aa6b0d9a588824c017a90c9b6786df8ffdd681"
+        },
+        "Web App Test Cases": {
+          "classification": "none",
+          "rationale": "The ASD STIG is bound to the general application sheet; unmatched rules are not duplicated into the separate web-application sheet without an explicit rule-level target."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-aws-cloud-services-scsem-v1-0.xlsx",
+      "sha256": "407690f0060cb9b0ae546789c0faa0940c8c1fad3d5f5db04aa9db0258c5675c",
+      "sheets": {
+        "AWS Foundation Services": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "AWS Compute Services": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "AWS Database Services": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "AWS End User Compute Services": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-azure-cloud-services-scsem-v1-0.xlsx",
+      "sha256": "7d79900df34286f13adb7b521fd438a1c1314ec3a4072a6fa74317215758f99d",
+      "sheets": {
+        "Azure Foundation Services": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-check-point-firewall-v1-0-02202025.xlsx",
+      "sha256": "26c788823f7e196f1315314c438a980c84d1ec4635e23d7fc69f64b8eb7533d6",
+      "sheets": {
+        "Check Point Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-cisco-asa-firewall-v1-1-02202025.xlsx",
+      "sha256": "9680954f5f16bdc6e192abcf7a30ced3489cbebcfe7837b0dda6b5bf4e0b026a",
+      "sheets": {
+        "ASA Test Cases": {
+          "classification": "direct",
+          "rationale": "Exact Cisco ASA source.",
+          "catalogName": "Cisco ASA STIG",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Cisco_ASA_Y26M07_STIG.zip",
+          "sourceUploadDate": "2026-07-10",
+          "benchmarkIds": [
+            "Cisco_ASA_FW_STIG",
+            "Cisco_ASA_NDM_STIG"
+          ],
+          "sourcePackageSha256": "3953975d221848224b5145151205700ac7555b4fc63d3fa7ac788c419f380195"
+        }
+      }
+    },
+    {
+      "fileName": "safeguard-cloud-scsem-v7-0-01152025.xlsx",
+      "sha256": "a4c51058369d81b04dd2cbe2b5446ce2509c8985798b4f3dbcc4dd9bcea823a8",
+      "sheets": {
+        "Gen Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "AWS Foundations": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "Office 365": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "Azure": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "Google": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "Safeguards-SCSEM Containers-v2--06262025.xlsx",
+      "sha256": "e56a102d9491786d344780dbb86bba2b86aac007a30158674e9b199ade781975",
+      "sheets": {
+        "Gen Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "Kubernetes": {
+          "classification": "direct",
+          "rationale": "Exact Kubernetes benchmark unit.",
+          "catalogName": "Kubernetes STIG - Ver 2, Rel 6",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Kubernetes_V2R6_STIG.zip",
+          "sourceUploadDate": "2026-04-07",
+          "benchmarkIds": [
+            "Kubernetes_STIG"
+          ],
+          "sourcePackageSha256": "2e66cc46e19889f337b40a7827745146c40c7b532529c03d826ba7462419876a"
+        },
+        "Docker": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "RedHat OpenShift": {
+          "classification": "direct",
+          "rationale": "Exact OpenShift 4.x benchmark unit.",
+          "catalogName": "Red Hat OpenShift Container Platform 4.x STIG - Ver 2, Rel 6",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RH_OpenShift_Container_Platform_4-x_V2R6_STIG.zip",
+          "sourceUploadDate": "2026-07-10",
+          "benchmarkIds": [
+            "RH_OpenShift_Container_Platform_4-x_STIG"
+          ],
+          "sourcePackageSha256": "dba61b6440f35a67d9643517ce6c206c885c73a532727070a93e57f8a3dd104a"
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-data-warehouse.xlsx",
+      "sha256": "0746d73ce6df6cf5935b43da471367ed24c43624c7a4f131d854be3ff15606e9",
+      "sheets": {
+        "Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-db2-luw-zos.xlsx",
+      "sha256": "3575ab43155555f586bab27e57211fe9ef85f59f508fa26731ef4bb4b2008297",
+      "sheets": {
+        "Gen Test Cases": {
+          "classification": "adjacent_version",
+          "rationale": "Same distributed DB2 family, older 10.5 generation.",
+          "catalogName": "IBM DB2 V10.5 LUW STIG - Ver 2, Rel 2",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_IBM_DB2_V10-5_LUW_V2R2_STIG.zip",
+          "sourceUploadDate": "2026-07-10"
+        },
+        "DB2 v11 Test Cases": {
+          "classification": "adjacent_version",
+          "rationale": "Same distributed DB2 family, older 10.5 generation.",
+          "catalogName": "IBM DB2 V10.5 LUW STIG - Ver 2, Rel 2",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_IBM_DB2_V10-5_LUW_V2R2_STIG.zip",
+          "sourceUploadDate": "2026-07-10"
+        },
+        "DB2 v13 for z_OS Test Cases ": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-debian.xlsx",
+      "sha256": "299ea982bcba40cd0d17b993e3dd060ec3da27311bc1dc243e3f0f70f198a9a9",
+      "sheets": {
+        "Gen Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "Debian 9": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "Debian 10": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "Debian 11": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "Safeguards-SCSEM-Fortigate-v10-120124.xlsx",
+      "sha256": "d731ebafb4b9464368e09244a3c0ef7b8ff8a0211c2d50c9f27f467f71172c06",
+      "sheets": {
+        "Fortigate Test Cases": {
+          "classification": "direct",
+          "rationale": "Exact FortiGate source.",
+          "catalogName": "Fortinet FortiGate Firewall STIG",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_FN_FortiGate_Firewall_Y26M01_STIG.zip",
+          "sourceUploadDate": "2026-01-22",
+          "benchmarkIds": [
+            "FN_FortiGate_Firewall_STIG",
+            "FN_FortiGate_Firewall_NDM_STIG"
+          ],
+          "sourcePackageSha256": "616c768d2f0f6ec05c00190e34dbda92f59f7b9101d3511261b6282a7de119fc"
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-generic-db.xlsx",
+      "sha256": "11993ebeac852743941197620d542c5f3a9f6bef7aade6f3b7adc83408ca88d7",
+      "sheets": {
+        "Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "Safeguards-SCSEM Generic-Firewall-v7_0-02202025.xlsx",
+      "sha256": "658d726e6fadb25ceb98f15602e8109a670040ea91d5014ffcd175a2393e8ea1",
+      "sheets": {
+        "Gen Firewall Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-generic-unix-linux.xlsx",
+      "sha256": "4a8171c90775bff42ba816fb5f6fd757474e46e51dfaca064e050ec49ca07a8a",
+      "sheets": {
+        "Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-generic-vdi.xlsx",
+      "sha256": "335225ce07617d00aa131d8840a881021b84e27076c16b2ca5bfb90bef0e5569",
+      "sheets": {
+        "Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-generic-web-server.xlsx",
+      "sha256": "bbce4c778fb672d0e8a9ca948b8dbbb267b49d82baf32404df661a96fd207c7f",
+      "sheets": {
+        "Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-gentax.xlsx",
+      "sha256": "0f1018dfe66d6c3d859b0686a86a43588ca98ce4dec8df484908c85254e99c9e",
+      "sheets": {
+        "GenTax 8 and 9": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "GenTax 10 and 11": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "FAST Application 12": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-hpux11i.xlsx",
+      "sha256": "6cecf61c875c3ca673ed50d38779b42bbf2635fa827c6d551ee5293ba3649aa4",
+      "sheets": {
+        "Gen Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "HP-UX 11i Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-ibmi-os.xlsx",
+      "sha256": "38e82f478296713e3098b496414670df7d65f4ec7fdf978b2bef6812542da712",
+      "sheets": {
+        "IBMi Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-macosx.xlsx",
+      "sha256": "71e7f2f298d9fcaabf9a0fc9ef76e00c22b7a82fb2c35972690e6ae4b19abae7",
+      "sheets": {
+        "OSX 10.15": {
+          "classification": "adjacent_version",
+          "rationale": "Same macOS family, newer generation.",
+          "catalogName": "Apple macOS 15 (Sequoia) STIG - Ver 1, Rel 7",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Apple_macOS_15_V1R7_STIG.zip",
+          "sourceUploadDate": "2026-04-07"
+        },
+        "OSX 11.0": {
+          "classification": "adjacent_version",
+          "rationale": "Same macOS family, newer generation.",
+          "catalogName": "Apple macOS 15 (Sequoia) STIG - Ver 1, Rel 7",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Apple_macOS_15_V1R7_STIG.zip",
+          "sourceUploadDate": "2026-04-07"
+        },
+        "OSX 12.0": {
+          "classification": "adjacent_version",
+          "rationale": "Same macOS family, newer generation.",
+          "catalogName": "Apple macOS 15 (Sequoia) STIG - Ver 1, Rel 7",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Apple_macOS_15_V1R7_STIG.zip",
+          "sourceUploadDate": "2026-04-07"
+        },
+        "OSX 13.0": {
+          "classification": "adjacent_version",
+          "rationale": "Same macOS family, newer generation.",
+          "catalogName": "Apple macOS 15 (Sequoia) STIG - Ver 1, Rel 7",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Apple_macOS_15_V1R7_STIG.zip",
+          "sourceUploadDate": "2026-04-07"
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-mot-v6-2.xlsx",
+      "sha256": "f451bae18a2372262ed7cc4471f57fa09aaa36545c6edb7dced7bfcaf65d771e",
+      "sheets": {
+        "MOT": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "Tumbleweed-Axway": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "Web Portal": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "IVR": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-mongodb.xlsx",
+      "sha256": "8cbc7928bb01533bb0fe6d928049fc25254ed010796dfc88b6e8ae93b8f9848a",
+      "sheets": {
+        "Gen Test Cases": {
+          "classification": "adjacent_version",
+          "rationale": "Same MongoDB family, different generation.",
+          "catalogName": "MongoDB 7.x STIG - Ver 1, Rel 1",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MongoDB_Enterprise_Advanced_7-x_V1R1_STIG.zip",
+          "sourceUploadDate": "2024-10-01"
+        },
+        "MongoDB 3.6": {
+          "classification": "adjacent_version",
+          "rationale": "Same MongoDB family, different generation.",
+          "catalogName": "MongoDB 7.x STIG - Ver 1, Rel 1",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MongoDB_Enterprise_Advanced_7-x_V1R1_STIG.zip",
+          "sourceUploadDate": "2024-10-01"
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-mysql.xlsx",
+      "sha256": "a38e9da08fb6a76c6a89b4f3e188b089543f71b633dcf06ba76e06a629c21fef",
+      "sheets": {
+        "Gen Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "MySQL 5.7": {
+          "classification": "adjacent_version",
+          "rationale": "Same MySQL family, different generation.",
+          "catalogName": "Oracle MySQL 8.0 STIG - Ver 2, Rel 2",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Oracle_MySQL_8-0_V2R2_STIG.zip",
+          "sourceUploadDate": "2024-10-23"
+        },
+        "MySQL 8.0": {
+          "classification": "direct",
+          "rationale": "Exact MySQL 8.0 source.",
+          "catalogName": "Oracle MySQL 8.0 STIG - Ver 2, Rel 2",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Oracle_MySQL_8-0_V2R2_STIG.zip",
+          "sourceUploadDate": "2024-10-23",
+          "benchmarkIds": [
+            "Oracle_MySQL_8.0_STIG"
+          ],
+          "sourcePackageSha256": "889d39132f3261db2d21309eb9739cafbda9e71db08698bc7fcdeb49f876a575"
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-network-assessment-v4-1.xlsx",
+      "sha256": "53d361076d7f85fbdf669c9328d275e04919ff787a1575ba6900eccecdd27e65",
+      "sheets": {
+        "Network Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-printer.xlsx",
+      "sha256": "f7485ed79a6d914fcd6d106661fc2894c12da676aa1a2907e09fef3563dfc0e5",
+      "sheets": {
+        "Gen Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "HVP Application": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-generic-os.xlsx",
+      "sha256": "3b6eef52cbf472c4e20cd8d90a7b060229104a947fbfd73b192e140042f7dbc2",
+      "sheets": {
+        "Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-oracle.xlsx",
+      "sha256": "aed0e5f86a998c6acaa8db7405ddb03bf89c9f0f2baa529e3fdfc1ecf2b02b59",
+      "sheets": {
+        "Gen Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "Oracle 12 RDBMS Test Cases": {
+          "classification": "direct",
+          "rationale": "Exact Oracle Database 12c source.",
+          "catalogName": "Oracle Database 12c STIG - Ver 3, Rel 5",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Oracle_Database_12c_V3R5_STIG.zip",
+          "sourceUploadDate": "2025-08-07",
+          "benchmarkIds": [
+            "Oracle_Database_12c_STIG"
+          ],
+          "sourcePackageSha256": "75398ae44f48578c74cb566ede9347b9af432ef642cf41a237c3dba377d5e8bc"
+        },
+        "Oracle 18 RDBMS Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "Oracle 19 RDBMS Test Cases": {
+          "classification": "direct",
+          "rationale": "Exact Oracle Database 19c source.",
+          "catalogName": "Oracle Database 19c STIG - Ver 1, Rel 5",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Oracle_Database_19c_V1R5_STIG.zip",
+          "sourceUploadDate": "2026-04-07",
+          "benchmarkIds": [
+            "Oracle_Database_19c_STIG"
+          ],
+          "sourcePackageSha256": "1492e4dcfc2c58290918e50aef55ea63c8fb6dd277812d6f3b159ce388cff7ab"
+        },
+        "UNIX or Linux Host Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "Windows Host Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-oel-v5-0-03312025.xlsx",
+      "sha256": "7ea2be7512d025b1b65c8db067334eaf4ebfaf858ef58221226e546431bb6379",
+      "sheets": {
+        "Gen Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "OEL 7 Test Cases": {
+          "classification": "adjacent_version",
+          "rationale": "Same Oracle Linux family, different generation.",
+          "catalogName": "Oracle Linux 8 STIG - Ver 2, Rel 9",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Oracle_Linux_8_V2R9_STIG.zip",
+          "sourceUploadDate": "2026-07-10"
+        },
+        "OEL 8 Test Cases": {
+          "classification": "direct",
+          "rationale": "Exact Oracle Linux 8 source.",
+          "catalogName": "Oracle Linux 8 STIG - Ver 2, Rel 9",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Oracle_Linux_8_V2R9_STIG.zip",
+          "sourceUploadDate": "2026-07-10",
+          "benchmarkIds": [
+            "Oracle_Linux_8_STIG"
+          ],
+          "sourcePackageSha256": "bde1924f720bee8db16da4f0881fb24b48391f04b101c8b49af96d5b72cac3e4"
+        },
+        "OEL 9 Test Cases": {
+          "classification": "direct",
+          "rationale": "Exact Oracle Linux 9 source.",
+          "catalogName": "Oracle Linux 9 STIG - Ver 1, Rel 6",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Oracle_Linux_9_V1R6_STIG.zip",
+          "sourceUploadDate": "2026-07-10",
+          "benchmarkIds": [
+            "Oracle_Linux_9_STIG"
+          ],
+          "sourcePackageSha256": "6891f1bc994818a37ee1ed7c5c4daa24f1df1b1bed67eb99f9c504b743772364"
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-etpm.xlsx",
+      "sha256": "9039ac9a31779fdc31d6d9cbe821a4d1ab3186f715cfc04175d8fed5760fb167",
+      "sheets": {
+        "Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "Safeguards-SCSEM Oracle-Solaris-v4_0_0 - 05222025.xlsx",
+      "sha256": "49db7ceaa69c57ed6c647672dcb3a12639c520471b2fce791f5f87c7a47adc0e",
+      "sheets": {
+        "Gen Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "Solaris 10 Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "Solaris 11.4 Test Cases ": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-palo-alto-firewall-v1.xlsx",
+      "sha256": "414fdf8e76d4c3bde67095bc6e7902df5aad3e8aa807825d3abbc29f09c95e5b",
+      "sheets": {
+        "PaloAlto10": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "PaloAlto11": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "Safeguards-SCSEM Red Hat Enterprise Linux (RHEL)-v7_02182025.xlsx",
+      "sha256": "37f1d170120a4e54d3f0480d8ccab299ea409e9e2a73859d5e0b6dcfada3c051",
+      "sheets": {
+        "Gen Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "RHEL 7 Test Cases": {
+          "classification": "adjacent_version",
+          "rationale": "Same RHEL family, different generation.",
+          "catalogName": "Red Hat Enterprise Linux 8 STIG - Ver 2, Rel 8",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RHEL_8_V2R8_STIG.zip",
+          "sourceUploadDate": "2026-07-10"
+        },
+        "RHEL 8 Test Cases": {
+          "classification": "direct",
+          "rationale": "Exact RHEL 8 source.",
+          "catalogName": "Red Hat Enterprise Linux 8 STIG - Ver 2, Rel 8",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RHEL_8_V2R8_STIG.zip",
+          "sourceUploadDate": "2026-07-10",
+          "benchmarkIds": [
+            "RHEL_8_STIG"
+          ],
+          "sourcePackageSha256": "5180ff6be545c306950f2041330e0cba835b148529e3c51c55c386f95c363a8c"
+        },
+        "RHEL 9 Test Cases": {
+          "classification": "direct",
+          "rationale": "Exact RHEL 9 source.",
+          "catalogName": "Red Hat Enterprise Linux 9 STIG - Ver 2, Rel 9",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RHEL_9_V2R9_STIG.zip",
+          "sourceUploadDate": "2026-07-10",
+          "benchmarkIds": [
+            "RHEL_9_STIG"
+          ],
+          "sourcePackageSha256": "1875de2543d01695c5a346c51888cc336113e9199bfe6726d74a08de286ca1ae"
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-racf.xlsx",
+      "sha256": "ce8fdddbcd0bc72b5cef5c89946b0c4d681d72a7dec24d53cf6b183e2c7e134a",
+      "sheets": {
+        "Test Cases": {
+          "classification": "historical_sunset",
+          "rationale": "Only product bundles or historical/sunset material were found; no current eligible manual STIG is approved for proposals."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-rocky.xlsx",
+      "sha256": "acfd41815ab72d3eb67bc1a724b17daaa478f2465f918bffd1ea4f4ac5c84d91",
+      "sheets": {
+        "Gen Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "Rocky 9 Test Cases": {
+          "classification": "adjacent_product",
+          "rationale": "Related enterprise Linux product, not a direct Rocky Linux source.",
+          "catalogName": "Red Hat Enterprise Linux 9 STIG - Ver 2, Rel 9",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RHEL_9_V2R9_STIG.zip",
+          "sourceUploadDate": "2026-07-10"
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-rsi-revenue-premier.xlsx",
+      "sha256": "1d10a031ef5771df565eabef6b96c99410b947e612f4ed4c97c8d5d8ecff00d8",
+      "sheets": {
+        "RSI": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "RPTP": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "ITP": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-microsoft-sql-server-scem-v60-08252024.xlsx",
+      "sha256": "a862a9b71b572782236331df9ea8158d70a273a7029a305941099f58cf34a260",
+      "sheets": {
+        "Gen Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "SQL 2016 Test Cases": {
+          "classification": "direct",
+          "rationale": "Exact SQL Server 2016 source.",
+          "catalogName": "Microsoft SQL Server 2016 STIG",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_SQL_Server_2016_Y26M04_STIG.zip",
+          "sourceUploadDate": "2026-04-07",
+          "benchmarkIds": [
+            "MS_SQL_Server_2016_Database_STIG",
+            "MS_SQL_Server_2016_Instance_STIG"
+          ],
+          "sourcePackageSha256": "59874d5569738f39045fb66b68c0bf870a0a4affceb9d6c5816fef6dc730ef21"
+        },
+        "SQL 2017 Test Cases": {
+          "classification": "adjacent_version",
+          "rationale": "Same SQL Server family, nearest prior supported generation.",
+          "catalogName": "Microsoft SQL Server 2016 STIG",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_SQL_Server_2016_Y26M04_STIG.zip",
+          "sourceUploadDate": "2026-04-07"
+        },
+        "SQL 2019 Test Cases": {
+          "classification": "adjacent_version",
+          "rationale": "Same SQL Server family, nearest current generation.",
+          "catalogName": "Microsoft SQL Server 2022 STIG",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_SQL_Server_2022_Y26M04_STIG.zip",
+          "sourceUploadDate": "2026-04-07"
+        },
+        "SQL 2022 Test Cases": {
+          "classification": "direct",
+          "rationale": "Exact SQL Server 2022 source.",
+          "catalogName": "Microsoft SQL Server 2022 STIG",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_SQL_Server_2022_Y26M04_STIG.zip",
+          "sourceUploadDate": "2026-04-07",
+          "benchmarkIds": [
+            "MS_SQL_Server_2022_Instance_STIG",
+            "MS_SQL_Server_2022_Database_STIG"
+          ],
+          "sourcePackageSha256": "e46bfae4b5e2ad7a068bef2539f6f98467c9cdfa8a012f01f7868bf4e07a5e64"
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-san.xlsx",
+      "sha256": "e868666306dafbc43ac681ef417c3d90528841d785535893fc93e2423dacc304",
+      "sheets": {
+        "Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-suse-linux-v5-0-03312025.xlsx",
+      "sha256": "da689bdd8f3f04d36552062d36144e2350063f649bd1f0703f51762a16ebf333",
+      "sheets": {
+        "Gen Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "SUSE12 Test Cases": {
+          "classification": "direct",
+          "rationale": "Exact SLES 12 source.",
+          "catalogName": "SUSE Linux Enterprise Server 12 STIG - Ver 3, Rel 4",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SLES_12_V3R4_STIG.zip",
+          "sourceUploadDate": "2026-01-22",
+          "benchmarkIds": [
+            "SLES_12_STIG"
+          ],
+          "sourcePackageSha256": "da1bea0b5a5e6f81fc7fd9712ff2a305c82542b09307d07eb73d30c08dfc8cf2"
+        },
+        "SUSE15 Test Cases": {
+          "classification": "direct",
+          "rationale": "Exact SLES 15 source.",
+          "catalogName": "SUSE Linux Enterprise Server 15 STIG - Ver 2, Rel 8",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SLES_15_V2R8_STIG.zip",
+          "sourceUploadDate": "2026-07-10",
+          "benchmarkIds": [
+            "SLES_15_STIG"
+          ],
+          "sourcePackageSha256": "954994d3916e733ca54852770ee52072836f7e7cfda421de835a847e8c772c1b"
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-switch-router-v7-0.xlsx",
+      "sha256": "c1f05b3c7999980edbc5e9e00a299620906ddc61e1506e39c97a8681a50ee9bd",
+      "sheets": {
+        "Gen Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "IOS 15.0M Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "IOS 16.0M Test Cases ": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "IOS 17.0M Test Cases  ": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "NX-OS Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-teradata.xlsx",
+      "sha256": "929adf46c5154accffae44c1c52b492074596f039e342fb8fdde924a54bdfc78",
+      "sheets": {
+        "Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-top-secret.xlsx",
+      "sha256": "66b006303f046d3bd02cd81cbacb4211c67ab6ed96940324f6d853f36db55248",
+      "sheets": {
+        "Test Cases": {
+          "classification": "historical_sunset",
+          "rationale": "Only product bundles or historical/sunset material were found; no current eligible manual STIG is approved for proposals."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-unisys.xlsx",
+      "sha256": "0f30b89bae46506738d364883b6882540dc26541e4b48bcfe86bcdf1b94e90a5",
+      "sheets": {
+        "Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-vmwareesxi-v5.xlsx",
+      "sha256": "5f4be6ee77378f7e17fdd68a156f4da3a43724b31a9731b63634175daf9e6d2d",
+      "sheets": {
+        "ESXI7.0 Test Cases": {
+          "classification": "direct",
+          "rationale": "Exact vSphere/ESXi 7.0 source.",
+          "catalogName": "VMware vSphere 7.0 STIG",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_VMW_vSphere_7-0_Y25M04_STIG.zip",
+          "sourceUploadDate": "2025-04-07",
+          "benchmarkIds": [
+            "VMW_vSphere_7-0_ESXi_STIG"
+          ],
+          "sourcePackageSha256": "39f3743471023ece7c96ca16ad1c1e132973a65a7151ce9ecbe1aba44b2eeb6f"
+        },
+        "ESXi8.0 Test Cases": {
+          "classification": "direct",
+          "rationale": "Exact vSphere/ESXi 8.0 source.",
+          "catalogName": "VMware vSphere 8.0 STIG",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_VMW_vSphere_8-0_Y26M07_STIG.zip",
+          "sourceUploadDate": "2026-07-10",
+          "benchmarkIds": [
+            "VMW_vSphere_8-0_ESXi_STIG"
+          ],
+          "sourcePackageSha256": "4009353b08bdaaffc38ba5ce8377ea364908c2ad93755e0c4bdbcd797c34f652"
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-voip-network.xlsx",
+      "sha256": "01393f9735d24a27480837c5b97367208e0a7e59bb4b735f40330fb81ad1609e",
+      "sheets": {
+        "Test Cases": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-vpn-v3-0.xlsx",
+      "sha256": "412f6f515c582d28bdcb0d6412d9aa1ac3f206eee09b6c03a16ce27e18e6f261",
+      "sheets": {
+        "Remote Access VPN": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        },
+        "Site to Site VPN": {
+          "classification": "none",
+          "rationale": "No safe current public DISA STIG source is explicitly approved for this pinned workbook sheet."
+        }
+      }
+    },
+    {
+      "fileName": "safeguard-microsoft-windows-10-scsem-v60-08122024.xlsx",
+      "sha256": "8c4ad7ed2445f76d4f78b0aa80ee6e071c51e514735e02baedfa347107c7a783",
+      "sheets": {
+        "Windows 10": {
+          "classification": "adjacent_version",
+          "rationale": "Same Windows client family, different generation.",
+          "catalogName": "Microsoft Windows 11 STIG - Ver 2, Rel 9",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_11_V2R9_STIG.zip",
+          "sourceUploadDate": "2026-08-17"
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-microsoft-windows-11-v3-01-03312025.xlsx",
+      "sha256": "1ed7d8f0979adbfb3dc3af015aa230ecf4a3fd2e184da52ca6184ab3f2aa6f28",
+      "sheets": {
+        "Win11": {
+          "classification": "direct",
+          "rationale": "Exact Windows 11 source.",
+          "catalogName": "Microsoft Windows 11 STIG - Ver 2, Rel 9",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_11_V2R9_STIG.zip",
+          "sourceUploadDate": "2026-08-17",
+          "benchmarkIds": [
+            "Microsoft_Windows_11_STIG"
+          ],
+          "sourcePackageSha256": "a452b0ec21c877539ed6a11477b1303eed1a5788a20ca4b6de29217fa89cf5a7"
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-win-server2012.xlsx",
+      "sha256": "346793ee22e18b3b5ba26640a660c30d7d12a94432c26ee993397c07fc495772",
+      "sheets": {
+        "Test Cases": {
+          "classification": "adjacent_version",
+          "rationale": "Same Windows Server family, different generation.",
+          "catalogName": "Microsoft Windows Server 2022 STIG - Ver 2, Rel 10",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_Server_2022_V2R10_STIG.zip",
+          "sourceUploadDate": "2026-08-17"
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-win-server2012r2.xlsx",
+      "sha256": "1950a49eebca735a0f5800807f71836ca337daea055b1a634f4934d6b1153582",
+      "sheets": {
+        "Test Cases": {
+          "classification": "adjacent_version",
+          "rationale": "Same Windows Server family, different generation.",
+          "catalogName": "Microsoft Windows Server 2022 STIG - Ver 2, Rel 10",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_Server_2022_V2R10_STIG.zip",
+          "sourceUploadDate": "2026-08-17"
+        }
+      }
+    },
+    {
+      "fileName": "safeguard-microsoft-windows-server-2016-scsem-v30-08122024.xlsx",
+      "sha256": "f13e1d3c6074fb66291a560997a6bf74e70727f007be0e5d698b2e795aac4b1f",
+      "sheets": {
+        "Test Cases": {
+          "classification": "adjacent_version",
+          "rationale": "Same Windows Server family, different generation.",
+          "catalogName": "Microsoft Windows Server 2022 STIG - Ver 2, Rel 10",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_Server_2022_V2R10_STIG.zip",
+          "sourceUploadDate": "2026-08-17"
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-win-server2019-v2-point-0-10242024.xlsx",
+      "sha256": "e43942b8c598aec075f8d8aa937f31b26179118fa618c8a3e74c61c31cd2192a",
+      "sheets": {
+        "Test Cases Server 2019": {
+          "classification": "adjacent_version",
+          "rationale": "Same Windows Server family, different generation.",
+          "catalogName": "Microsoft Windows Server 2022 STIG - Ver 2, Rel 10",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_Server_2022_V2R10_STIG.zip",
+          "sourceUploadDate": "2026-08-17"
+        }
+      }
+    },
+    {
+      "fileName": "safeguard-microsoft-windows-server-2022-scsem-v20-08122024.xlsx",
+      "sha256": "305e7157181c99ca12c2be3dc65b44ded6b823aa6bb580774a0e3c381c8183df",
+      "sheets": {
+        "Test Cases Server 2022": {
+          "classification": "direct",
+          "rationale": "Exact Windows Server 2022 source.",
+          "catalogName": "Microsoft Windows Server 2022 STIG - Ver 2, Rel 10",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_Server_2022_V2R10_STIG.zip",
+          "sourceUploadDate": "2026-08-17",
+          "benchmarkIds": [
+            "MS_Windows_Server_2022_STIG"
+          ],
+          "sourcePackageSha256": "13cbe77e5d87e106e459de21ed051ed51ddbdef59dd0ce16a8aa64f9c1e6e88b"
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-windows-server- 2025-v1-1.xlsx",
+      "sha256": "da75cc24ecd038bdb59b971d18309348bc34eed7c7cd492e3ba1a4103b563daf",
+      "sheets": {
+        "Common System Test Cases": {
+          "classification": "none",
+          "rationale": "The Windows Server 2025 STIG is bound to the exact Server 2025 product sheet; unmatched OS rules must not be inserted into the common-system sheet."
+        },
+        "Test Cases Server 2025": {
+          "classification": "direct",
+          "rationale": "Exact Windows Server 2025 source.",
+          "catalogName": "Microsoft Windows Server 2025 STIG - Ver 1, Rel 3",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_Server_2025_V1R3_STIG.zip",
+          "sourceUploadDate": "2026-08-17",
+          "benchmarkIds": [
+            "MS_Windows_Server_2025_STIG"
+          ],
+          "sourcePackageSha256": "b6ce0d9b411eeba602fe705e2b1d3b378ecd5e2e11f8851197bc6e081756bcbe"
+        }
+      }
+    },
+    {
+      "fileName": "safeguards-scsem-wireless-networking.xlsx",
+      "sha256": "10952ff5c5a76a8da6e3b5af675b5da5651b97e5fde9fcb127f964c95ab00615",
+      "sheets": {
+        "Test Cases": {
+          "classification": "direct",
+          "rationale": "Exact public WLAN source.",
+          "catalogName": "Network WLAN STIG",
+          "sourceUrl": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Network_WLAN_Y23M10_STIG.zip",
+          "sourceUploadDate": "2023-10-23",
+          "benchmarkIds": [
+            "Network_WLAN_AP-IG_Mgmt_STIG",
+            "Network_WLAN_AP-IG_Platform_STIG",
+            "Network_WLAN_AP-NIPR_Mgmt_STIG",
+            "Network_WLAN_AP-NIPR_Platform_STIG",
+            "Network_WLAN_Bridge_Mgmt_STIG",
+            "Network_WLAN_Bridge_Platform_STIG",
+            "Network_WLAN_Controller_Mgmt_STIG",
+            "Network_WLAN_Controller_Platform_STIG"
+          ],
+          "sourcePackageSha256": "6641d372dd2fcea2f800065f60af94f4e2fb173507b1f70bc3aa493254601e0c"
+        }
+      }
+    }
+  ],
+  "directPackageAudit": {
+    "reviewedAt": "2026-08-20",
+    "sourceCount": 27,
+    "benchmarkCount": 76,
+    "ruleCount": 6375
+  }
+}

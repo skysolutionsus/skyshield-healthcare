@@ -4,6 +4,7 @@ import {
     fetchAllBenchmarkExcelFiles,
     fetchAllBenchmarks,
     getCISToken,
+    hasConfiguredCISLicense,
 } from "@/lib/cis-api";
 import {
     recommendationEvidenceSummary,
@@ -60,6 +61,13 @@ import {
     normalizeNistControlId,
     type ComplianceEvidence,
 } from "@/lib/compliance-evidence";
+import { buildMissingPub1075ControlCandidates } from "@/lib/scsem-compliance-gap-candidates";
+import {
+    buildDisaStigChanges,
+    downloadAndParseDisaStigSource,
+    resolveDisaStigCatalogSources,
+    type ResolvedDisaStigSource,
+} from "@/lib/disa-stig";
 import {
     generateBifrostText,
     getConfiguredBifrostModel,
@@ -82,7 +90,14 @@ const UPDATER_CANDIDATE_LIMITS = {
 const MAX_UPDATER_CHANGES = 5000;
 const AI_CONTROL_LIMIT = Number(process.env.SCSEM_UPDATER_AI_CONTROL_LIMIT || 500);
 const AI_PROMPT_CHAR_LIMIT = Number(process.env.SCSEM_UPDATER_AI_PROMPT_CHAR_LIMIT || 90000);
-const AI_TIMEOUT_MS = Number(process.env.SCSEM_UPDATER_AI_TIMEOUT_MS || 25000);
+// Production evidence prompts routinely need longer than 25 seconds on the
+// governed SCSEM model. A 25-second abort made most bounded batches fail even
+// though the model and credential were healthy. Keep the timeout bounded, but
+// allow enough time for a complete evidence-grounded JSON response.
+const AI_TIMEOUT_MS = Math.max(
+    30_000,
+    Math.min(Number(process.env.SCSEM_UPDATER_AI_TIMEOUT_MS || 90_000), 180_000)
+);
 const COMPLIANCE_BATCH_CONTROL_LIMIT = Math.max(
     12,
     Math.min(Number(process.env.SCSEM_UPDATER_COMPLIANCE_BATCH_SIZE || 72), 120)
@@ -941,11 +956,17 @@ function deterministicComplianceGapChanges(
 function dedupeProposedChanges(changes: any[]): any[] {
     const seen = new Set<string>();
     return changes.filter((change) => {
+        const sourceIdentity = change.sourceEvidence?.sourceKind === "STIG"
+            ? `${change.sourceEvidence.stigBenchmarkId || ""}|${change.sourceEvidence.stigRuleId || ""}`
+            : change.sourceEvidence?.gapType === "missing_control_id"
+                ? String(change.sourceEvidence.pub1075ControlId || "")
+                : "";
         const key = [
             change.action || "updateField",
             change.targetSheet || "",
             change.testId || "",
             change.field || "",
+            sourceIdentity,
         ].join("|");
         if (seen.has(key)) return false;
         seen.add(key);
@@ -999,9 +1020,17 @@ async function buildCompliancePayload({
         Boolean(normalizeNistControlId(control.nistId))
     ).length;
     if (batches.length === 0) {
+        const missingControlCandidates = buildMissingPub1075ControlCandidates({
+            parsed,
+            controls,
+            pub1075Version: complianceOverview.pub1075.version,
+            nistVersion: complianceOverview.nist.version,
+        });
         return {
-            summary: `Compliance review found no normalized NIST control identifiers in the ${technology} SCSEM rows, so Pub 1075 and NIST evidence could not be mapped safely.`,
-            changes: [],
+            summary:
+                `Compliance review found no normalized NIST control identifiers in the ${technology} SCSEM rows. ` +
+                `Generated ${missingControlCandidates.length} deterministic Publication 1075 applicability candidate(s); existing rows remain unmapped and require reviewer correction.`,
+            changes: missingControlCandidates,
             batchCount: 0,
             completedBatchCount: 0,
             reviewedRowCount: 0,
@@ -1165,13 +1194,29 @@ Rules:
 
     const completedBatchCount = batchResults.filter((result) => result.analyzed).length;
     const reviewedRowCount = batches.reduce((total, batch) => total + batch.length, 0);
-    const changes = dedupeProposedChanges(batchResults.flatMap((result) => result.changes));
+    // Missing-control coverage cannot depend on model inference. Compare the
+    // exact normalized control IDs in the workbook with every substantive
+    // control section in the pinned Publication 1075 source. These candidates
+    // require an applicability decision and an exact workbook issue code
+    // before approval; they are not assertions that every control belongs in
+    // every technology template.
+    const missingControlCandidates = buildMissingPub1075ControlCandidates({
+        parsed,
+        controls,
+        pub1075Version: complianceOverview.pub1075.version,
+        nistVersion: complianceOverview.nist.version,
+    });
+    const changes = dedupeProposedChanges([
+        ...batchResults.flatMap((result) => result.changes),
+        ...missingControlCandidates,
+    ]);
     const coverage = [
         `${batches.length} bounded batch(es)`,
         `${reviewedRowCount} NIST-mapped row(s) distributed across version/provider tabs`,
         `${completedBatchCount} completed with AI reasoning`,
         `${complianceOverview.pub1075.controlIds.length} control ID(s) mapped to Pub 1075`,
         `${complianceOverview.nist.controlIds.length} control ID(s) mapped to NIST fallback`,
+        `${missingControlCandidates.length} missing Publication 1075 control ID candidate(s) requiring applicability review`,
     ].join(", ");
 
     return {
@@ -1464,6 +1509,43 @@ export async function POST(
             throw new Error("No SCSEM test case controls were found in the uploaded workbook.");
         }
 
+        // Public DISA STIGs are an independent official source and do not
+        // require a CIS SecureSuite license. Resolve the pinned public catalog
+        // for every full analysis and begin downloading only exact-generation
+        // direct sources while the compliance and CIS lanes run.
+        const disaCatalogSources = requestedScope === "full"
+            ? resolveDisaStigCatalogSources({
+                technology: updaterSession.inferredTechnology,
+                parsed,
+                officialSource: updaterSession.audit.officialSource
+                    ? {
+                        fileName: updaterSession.audit.officialSource.fileName,
+                        sha256: updaterSession.audit.officialSource.sha256,
+                    }
+                    : null,
+            })
+            : [];
+        const disaDownloadResultsPromise = Promise.all(
+            disaCatalogSources
+                .filter((source) => source.sourceRelationship === "direct")
+                .map(async (source) => {
+                    try {
+                        return {
+                            source,
+                            resolved: await downloadAndParseDisaStigSource(source),
+                            error: null,
+                        };
+                    } catch (error) {
+                        console.warn("SCSEM updater DISA STIG source failed validation.", error);
+                        return {
+                            source,
+                            resolved: null,
+                            error: "Official DISA STIG package could not be downloaded or validated.",
+                        };
+                    }
+                })
+        );
+
         // Start the governing compliance review before attempting any benchmark lookup.
         // This promise resolves independently, so CIS credentials, catalog availability,
         // or title/profile matching can never suppress Pub 1075/NIST analysis.
@@ -1494,8 +1576,9 @@ export async function POST(
         const downloadedBenchmarks = new Map<number, DownloadedBenchmark>();
         let resolvedSources: ResolvedBenchmarkSource[] = [];
         let benchmarkResolutionDiagnostics: BenchmarkQueryResolutionDiagnostic[] = [];
+        const cisLicenseConfigured = requestedScope === "full" && hasConfiguredCISLicense();
 
-        if (requestedScope === "full") {
+        if (cisLicenseConfigured) {
             try {
                 cisToken = await getCISToken();
                 [allBenchmarks, allExcelFiles] = await Promise.all([
@@ -1521,6 +1604,8 @@ export async function POST(
                     error
                 );
             }
+        } else if (requestedScope === "full") {
+            benchmarkLookupErrorCode = "CIS_LICENSE_NOT_CONFIGURED";
         }
 
         const updateCandidates: AnalysisUpdateCandidate[] = [];
@@ -1619,6 +1704,47 @@ export async function POST(
             adjacentCategory: source.adjacentCategory,
             adjacentRationale: source.adjacentRationale,
         }));
+        const disaDownloadResults = await disaDownloadResultsPromise;
+        const resolvedDisaStigSources = disaDownloadResults
+            .map((result) => result.resolved)
+            .filter((source): source is ResolvedDisaStigSource => Boolean(source));
+        const disaStigChanges = resolvedDisaStigSources.flatMap((source) => buildDisaStigChanges({
+            source,
+            controls,
+            pub1075Version: compliance.pub1075.version,
+            nistVersion: compliance.nist.version,
+        }));
+        const disaStigAuditSources = disaCatalogSources.map((source) => {
+            const result = disaDownloadResults.find((candidate) =>
+                candidate.source.catalogEntry.url === source.catalogEntry.url &&
+                candidate.source.sourceRelationship === source.sourceRelationship
+            );
+            const resolved = result?.resolved;
+            return {
+                sourceKind: "STIG" as const,
+                sourceRelationship: source.sourceRelationship,
+                sourceTitle: resolved?.parsed.title || source.catalogEntry.name,
+                sourceVersion: resolved?.parsed.version || "catalog-only",
+                sourceReleaseInfo: resolved?.parsed.releaseInfo ||
+                    (source.sourceRelationship === "adjacent"
+                        ? "Adjacent source metadata only; content was not used as a direct benchmark."
+                        : "The direct source package was not available for comparison."),
+                sourceUploadDate: source.catalogEntry.uploadDate,
+                sourceUrl: source.catalogEntry.url,
+                catalogSourceUrl: source.catalogSourceUrl,
+                catalogReviewedAt: source.catalogReviewedAt,
+                benchmarkIds: source.benchmarkIds,
+                ...(source.expectedPackageSha256 ? { expectedPackageSha256: source.expectedPackageSha256 } : {}),
+                ...(resolved ? {
+                    packageSha256: resolved.packageSha256,
+                    downloadedAt: resolved.downloadedAt,
+                    ruleCount: resolved.parsed.rules.length,
+                } : {}),
+                matchedSheets: source.matchedSheets,
+                matchQuery: source.matchQuery,
+                ...(result?.error ? { error: result.error } : {}),
+            };
+        });
 
         updaterSession.audit = {
             ...updaterSession.audit,
@@ -1659,6 +1785,7 @@ export async function POST(
             cisSources: cisAuditSources,
             stigSources: stigAuditSources,
             adjacentSources: adjacentAuditSources,
+            disaStigSources: disaStigAuditSources,
         };
 
         if (requestedScope === "compliance_only") {
@@ -1686,10 +1813,10 @@ export async function POST(
             });
             updaterSession.audit.analysisCoverage = analysisCoverage;
             const validChanges = addIdsToChanges(validateChanges(
-                dedupeProposedChanges(addUnambiguousTargetSheets(
-                    compliancePayload.changes || [],
-                    controls
-                )),
+                dedupeProposedChanges(addUnambiguousTargetSheets([
+                    ...(compliancePayload.changes || []),
+                    ...disaStigChanges,
+                ], controls)),
                 controls,
                 MAX_UPDATER_CHANGES
             ));
@@ -1764,20 +1891,36 @@ export async function POST(
                     adjacentCandidates,
                 })
                 : { summary: "", changes: [] };
+            const expectedDirectDisaSourceCount = disaCatalogSources.filter(
+                (source) => source.sourceRelationship === "direct"
+            ).length;
+            const disaComparisonFailed = expectedDirectDisaSourceCount !== resolvedDisaStigSources.length;
+            const registryNotApplicable =
+                expectedDirectDisaSourceCount === 0 &&
+                requestedScope === "full" &&
+                Boolean(updaterSession.audit.officialSource);
             const supplementalComparison: SCSEMSupplementalComparison = {
-                mode: "failed",
-                complete: false,
+                mode: benchmarkLookupError || disaComparisonFailed
+                    ? "failed"
+                    : disaStigChanges.length > 0
+                        ? "deterministic_fallback"
+                        : "no_delta",
+                complete: !benchmarkLookupError && !disaComparisonFailed,
                 candidateOnly: true,
-                applicabilityStatus: "review_required",
-                directSourceCount: 0,
-                comparedDirectSourceCount: 0,
-                candidateCount: 0,
-                comparedCandidateCount: 0,
-                rawProposalCount: 0,
-                evidenceBoundProposalCount: 0,
+                applicabilityStatus: registryNotApplicable ? "not_applicable" : "review_required",
+                directSourceCount: expectedDirectDisaSourceCount,
+                comparedDirectSourceCount: resolvedDisaStigSources.length,
+                candidateCount: disaStigChanges.length,
+                comparedCandidateCount: disaStigChanges.length,
+                rawProposalCount: disaStigChanges.length,
+                evidenceBoundProposalCount: disaStigChanges.length,
                 reason: benchmarkLookupError
-                    ? "Direct-source lookup was unavailable."
-                    : "No direct workbook/profile passed source, generation, profile, and content validation.",
+                    ? "Configured CIS source lookup failed; public DISA results remain independently source-bound."
+                    : disaComparisonFailed
+                        ? "One or more exact public DISA STIG packages could not be downloaded and validated."
+                        : registryNotApplicable
+                            ? "The pinned IRS-workbook and sheet registry records no safe direct public DISA STIG source."
+                            : `All ${resolvedDisaStigSources.length} exact public DISA STIG source(s) and ${disaStigChanges.length} deterministic proposal(s) were compared and source-bound.`,
             };
             updaterSession.audit.supplementalComparison = supplementalComparison;
             const analysisCoverage = buildSCSEMAnalysisCoverage({
@@ -1798,6 +1941,7 @@ export async function POST(
             );
             const rawChanges = dedupeProposedChanges(addUnambiguousTargetSheets([
                 ...(compliancePayload.changes || []),
+                ...disaStigChanges,
                 ...boundAdjacentChanges,
             ], controls));
             const validChanges = addIdsToChanges(
@@ -1812,9 +1956,16 @@ export async function POST(
             updaterSession.summary = [
                 compliancePayload.summary,
                 adjacentPayload.summary,
+                resolvedDisaStigSources.length > 0
+                    ? `Compared ${resolvedDisaStigSources.length} current official public DISA STIG source(s) and generated ${disaStigChanges.length} reviewer-gated proposal(s).`
+                    : disaCatalogSources.length > 0
+                        ? "Matched only adjacent or unavailable DISA STIG source metadata; no direct DISA content was used."
+                        : "No direct current public DISA STIG source matched this technology.",
                 benchmarkLookupError
-                    ? `CIS Benchmark/CIS-STIG lookup was unavailable (${benchmarkLookupError}); this analysis is incomplete and cannot be released.`
-                    : `No direct CIS Benchmark or CIS-STIG workbook/profile matched ${updaterSession.inferredTechnology}; this analysis remains incomplete until an IRS reviewer records an applicability determination.`,
+                    ? `Configured CIS Benchmark lookup was unavailable (${benchmarkLookupError}); see coverage blockers before release.`
+                    : cisLicenseConfigured
+                        ? "No direct licensed CIS workbook/profile matched; the public DISA and compliance comparisons remain independently auditable."
+                        : "No CIS SecureSuite license is configured, so licensed CIS content was not accessed. Publication 1075, NIST fallback, and current public DISA STIG sources were still evaluated.",
             ].filter(Boolean).join(" ");
             updaterSession.changes = validChanges;
             updaterSession.history.push({
@@ -1847,6 +1998,8 @@ export async function POST(
                             stigNewControls: 0,
                             adjacentSources: adjacentSources.length,
                             adjacentRecommendations: adjacentCandidates.length,
+                            disaStigSources: resolvedDisaStigSources.length,
+                            disaStigChanges: disaStigChanges.length,
                             complianceBatches: compliancePayload.batchCount,
                             completedComplianceBatches: compliancePayload.completedBatchCount,
                             complianceChanges: compliancePayload.changes.length,
@@ -1871,19 +2024,27 @@ export async function POST(
 
         if (updateCandidates.length === 0 && newControlCandidates.length === 0) {
             const compliancePayload = await compliancePayloadPromise;
+            const expectedDirectDisaSourceCount = disaCatalogSources.filter(
+                (source) => source.sourceRelationship === "direct"
+            ).length;
             const supplementalComparison: SCSEMSupplementalComparison = {
-                mode: "no_delta",
-                complete: totalUpdateCandidateCount === 0 && totalNewControlCandidateCount === 0,
+                mode: disaStigChanges.length > 0 ? "deterministic_fallback" : "no_delta",
+                complete:
+                    totalUpdateCandidateCount === 0 &&
+                    totalNewControlCandidateCount === 0 &&
+                    expectedDirectDisaSourceCount === resolvedDisaStigSources.length,
                 candidateOnly: true,
                 applicabilityStatus: "review_required",
-                directSourceCount: resolvedSources.length,
-                comparedDirectSourceCount,
-                candidateCount: totalUpdateCandidateCount + totalNewControlCandidateCount,
-                comparedCandidateCount: 0,
-                rawProposalCount: 0,
-                evidenceBoundProposalCount: 0,
+                directSourceCount: resolvedSources.length + expectedDirectDisaSourceCount,
+                comparedDirectSourceCount: comparedDirectSourceCount + resolvedDisaStigSources.length,
+                candidateCount: totalUpdateCandidateCount + totalNewControlCandidateCount + disaStigChanges.length,
+                comparedCandidateCount: disaStigChanges.length,
+                rawProposalCount: disaStigChanges.length,
+                evidenceBoundProposalCount: disaStigChanges.length,
                 reason:
-                    "Validated direct source candidates produced no material field or missing-recommendation deltas; " +
+                    (disaStigChanges.length > 0
+                        ? "Current public DISA STIG sources produced deterministic reviewer-gated deltas; "
+                        : "Validated direct source candidates produced no material field or missing-recommendation deltas; ") +
                     "the technical match remains candidate-only pending reviewer applicability confirmation.",
             };
             updaterSession.audit.supplementalComparison = supplementalComparison;
@@ -1897,10 +2058,10 @@ export async function POST(
             });
             updaterSession.audit.analysisCoverage = analysisCoverage;
             const validChanges = addIdsToChanges(validateChanges(
-                dedupeProposedChanges(addUnambiguousTargetSheets(
-                    compliancePayload.changes || [],
-                    controls
-                )),
+                dedupeProposedChanges(addUnambiguousTargetSheets([
+                    ...(compliancePayload.changes || []),
+                    ...disaStigChanges,
+                ], controls)),
                 controls,
                 MAX_UPDATER_CHANGES
             ));
@@ -2185,9 +2346,14 @@ Rules:
         const comparedCandidateCount = comparisonMode === "ai"
             ? availableCandidateCount
             : Number(payload.examinedCandidateCount || 0);
+        const expectedDirectDisaSourceCount = disaCatalogSources.filter(
+            (source) => source.sourceRelationship === "direct"
+        ).length;
+        const disaComparisonComplete = expectedDirectDisaSourceCount === resolvedDisaStigSources.length;
         let comparisonComplete =
             comparedCandidateCount === totalCandidateCount &&
-            boundBenchmarkChanges.length === rawProposalCount;
+            boundBenchmarkChanges.length === rawProposalCount &&
+            disaComparisonComplete;
         if (
             comparisonMode === "deterministic_fallback" &&
             totalCandidateCount > 0 &&
@@ -2202,20 +2368,23 @@ Rules:
             comparisonComplete = false;
         } else if (!comparisonComplete) {
             comparisonReason +=
-                ` Compared ${comparedCandidateCount} of ${totalCandidateCount} discovered candidate(s) and bound ` +
-                `${boundBenchmarkChanges.length} of ${rawProposalCount} emitted proposal(s).`;
+                ` Compared ${comparedCandidateCount} of ${totalCandidateCount} discovered licensed-source candidate(s) and bound ` +
+                `${boundBenchmarkChanges.length} of ${rawProposalCount} emitted licensed-source proposal(s).` +
+                (!disaComparisonComplete
+                    ? ` Compared ${resolvedDisaStigSources.length} of ${expectedDirectDisaSourceCount} pinned public DISA STIG source(s).`
+                    : "");
         }
         const supplementalComparison: SCSEMSupplementalComparison = {
             mode: comparisonMode,
             complete: comparisonComplete,
             candidateOnly: true,
             applicabilityStatus: "review_required",
-            directSourceCount: resolvedSources.length,
-            comparedDirectSourceCount,
-            candidateCount: totalCandidateCount,
-            comparedCandidateCount,
-            rawProposalCount,
-            evidenceBoundProposalCount: boundBenchmarkChanges.length,
+            directSourceCount: resolvedSources.length + expectedDirectDisaSourceCount,
+            comparedDirectSourceCount: comparedDirectSourceCount + resolvedDisaStigSources.length,
+            candidateCount: totalCandidateCount + disaStigChanges.length,
+            comparedCandidateCount: comparedCandidateCount + disaStigChanges.length,
+            rawProposalCount: rawProposalCount + disaStigChanges.length,
+            evidenceBoundProposalCount: boundBenchmarkChanges.length + disaStigChanges.length,
             reason: comparisonReason,
         };
         updaterSession.audit.supplementalComparison = supplementalComparison;
@@ -2226,11 +2395,13 @@ Rules:
             uncoveredControlIdCount: compliance.uncoveredControlIds.length,
             benchmarkLookupError,
             supplementalComparison,
+            additionalBlockers: sourceCoverageBlockers,
         });
         updaterSession.audit.analysisCoverage = analysisCoverage;
         const combinedChanges = dedupeProposedChanges(addUnambiguousTargetSheets([
             ...(compliancePayload.changes || []),
             ...boundBenchmarkChanges,
+            ...disaStigChanges,
         ],
             controls
         ));
@@ -2246,6 +2417,9 @@ Rules:
         updaterSession.summary = [
             compliancePayload.summary,
             payload.summary || `Supplemental CIS Benchmark/CIS-STIG review generated for ${updaterSession.inferredTechnology}.`,
+            resolvedDisaStigSources.length > 0
+                ? `Compared ${resolvedDisaStigSources.length} exact public DISA STIG source(s) and generated ${disaStigChanges.length} source-bound proposal(s).`
+                : null,
             analysisCoverage.complete ? null : "Analysis remains incomplete; see coverage blockers before treating this draft as release-ready.",
         ].filter(Boolean).join(" ");
         updaterSession.changes = validChanges;
@@ -2281,6 +2455,8 @@ Rules:
                         cisNewControls: cisNewControlCandidates.length,
                         stigUpdates: stigUpdateCandidates.length,
                         stigNewControls: stigNewControlCandidates.length,
+                        disaStigSources: resolvedDisaStigSources.length,
+                        disaStigChanges: disaStigChanges.length,
                         complianceBatches: compliancePayload.batchCount,
                         completedComplianceBatches: compliancePayload.completedBatchCount,
                         complianceChanges: compliancePayload.changes.length,

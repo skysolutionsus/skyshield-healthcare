@@ -146,6 +146,7 @@ vite.config.ts.timestamp-*
 # Runtime workbook/audit snapshots
 data/scsem-updater/
 data/cis-benchmarks/
+data/disa-stig/
 output/
 
 # CIS SecureSuite credentials must be provided through a secret manager or

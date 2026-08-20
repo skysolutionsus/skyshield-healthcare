@@ -4017,6 +4017,26 @@ export async function buildSCSEMUpdaterWorkbookBuffer(
     const officialUpgrade = session.audit.officialReference?.selectedAsBase
         ? session.audit.officialReference
         : null;
+    const approvedEvidence = session.changes
+        .filter((change) => change.status === "APPROVED")
+        .map((change) => change.sourceEvidence || {});
+    const reviewedSources = [
+        approvedEvidence.some((evidence) => String(evidence.complianceSource || "").includes("Publication 1075"))
+            ? "IRS Publication 1075"
+            : null,
+        approvedEvidence.some((evidence) => String(evidence.complianceSource || "").includes("NIST") || evidence.nistFallbackControlId)
+            ? "NIST SP 800-53 fallback"
+            : null,
+        approvedEvidence.some((evidence) => evidence.cisRecommendation || (evidence.sourceWorkbenchId && !evidence.stigRecommendation))
+            ? "licensed CIS Benchmark evidence from CIS WorkBench"
+            : null,
+        approvedEvidence.some((evidence) => evidence.stigRecommendation)
+            ? "licensed CIS-STIG evidence from CIS WorkBench"
+            : null,
+        approvedEvidence.some((evidence) => evidence.sourceKind === "STIG" && evidence.sourcePackageSha256)
+            ? "official public DISA STIG evidence"
+            : null,
+    ].filter((value): value is string => Boolean(value));
     const changeLogs: ChangeLogEntry[] = applied.length > 0 || officialUpgrade
         ? [{
             version: `SCSEM ${candidateState} ${new Date().toISOString().slice(0, 10)}`,
@@ -4033,8 +4053,8 @@ export async function buildSCSEMUpdaterWorkbookBuffer(
                         ].filter((value): value is string => Boolean(value?.trim())).slice(0, 4).join("; ") ||
                             "required benchmark evidence was not fully resolved"}.`
                     : `${candidateState} workbook only; not an official SCSEM release. ` +
-                        `${plan.updates.length + plan.additions.length} reviewer-approved SkyShield change(s) applied after IRS Pub 1075, ` +
-                        "NIST SP 800-53 fallback, and CIS Benchmark/CIS-STIG review using CIS WorkBench evidence.",
+                        `${plan.updates.length + plan.additions.length} reviewer-approved SkyShield change(s) applied after review of ` +
+                        `${reviewedSources.join(", ") || "the source evidence recorded in the review session"}.`,
                 applied.slice(0, 12).join("; "),
             ].filter(Boolean).join(" "),
             changedBy: "SkyShield SCSEM Updater",

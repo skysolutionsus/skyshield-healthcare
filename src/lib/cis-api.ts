@@ -29,6 +29,13 @@ export interface CISExcelFile {
 
 const MAX_LICENSE_BYTES = 1_000_000;
 
+export function hasConfiguredCISLicense(): boolean {
+    return Boolean(
+        process.env.CIS_LICENSE_XML_BASE64?.trim() ||
+        process.env.CIS_LICENSE_XML_PATH?.trim()
+    );
+}
+
 function validateLicenseXML(value: string, source: string): string {
     const xml = value.trim();
     if (!xml || xml.length > MAX_LICENSE_BYTES || !xml.startsWith("<") || !xml.endsWith(">")) {

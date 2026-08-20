@@ -9,7 +9,7 @@ export interface SCSEMSupplementalComparison {
     mode: SCSEMSupplementalComparisonMode;
     complete: boolean;
     candidateOnly: true;
-    applicabilityStatus: "review_required" | "not_requested";
+    applicabilityStatus: "review_required" | "not_requested" | "not_applicable";
     directSourceCount: number;
     comparedDirectSourceCount: number;
     candidateCount: number;
@@ -73,6 +73,15 @@ export function isSupplementalComparisonComplete(
             comparison.rawProposalCount === 0 &&
             comparison.evidenceBoundProposalCount === 0;
     }
+    if (comparison.applicabilityStatus === "not_applicable") {
+        return comparison.mode === "no_delta" &&
+            comparison.directSourceCount === 0 &&
+            comparison.comparedDirectSourceCount === 0 &&
+            comparison.candidateCount === 0 &&
+            comparison.comparedCandidateCount === 0 &&
+            comparison.rawProposalCount === 0 &&
+            comparison.evidenceBoundProposalCount === 0;
+    }
     if (comparison.directSourceCount <= 0) return false;
     if (
         comparison.candidateCount < 0 ||
@@ -128,13 +137,15 @@ export function buildSCSEMAnalysisCoverage({
             ? `${uncoveredControlIdCount} requested control identifier(s) lack exact Pub 1075 or NIST coverage`
             : null,
         supplementalComparison.mode !== "not_requested" && benchmarkLookupError
-            ? `CIS Benchmark/CIS-STIG lookup unavailable: ${benchmarkLookupError}`
+            ? `Configured supplemental-source lookup unavailable: ${benchmarkLookupError}`
             : null,
-        supplementalComparison.mode !== "not_requested" && supplementalComparison.directSourceCount === 0
-            ? "No direct applicable CIS Benchmark or CIS-STIG workbook was validated; a reviewer has not recorded a not-applicable determination"
+        supplementalComparison.mode !== "not_requested" &&
+            supplementalComparison.applicabilityStatus === "review_required" &&
+            supplementalComparison.directSourceCount === 0
+            ? "No direct applicable supplemental source was validated and the pinned registry does not record a not-applicable determination"
             : null,
         supplementalComparison.mode !== "not_requested" && supplementalComparison.directSourceCount > 0 && !supplementalComparisonComplete
-            ? `Supplemental CIS Benchmark/CIS-STIG comparison did not complete: ${supplementalComparison.reason}`
+            ? `Supplemental source comparison did not complete: ${supplementalComparison.reason}`
             : null,
         ...additionalBlockers.map((blocker) => blocker.trim()).filter(Boolean),
     ].filter((value): value is string => Boolean(value));

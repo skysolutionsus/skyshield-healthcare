@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type {
     SCSEMUpdaterClientAuditSource as AuditSource,
     SCSEMUpdaterClientChange as UpdaterChange,
+    SCSEMUpdaterClientDisaStigSource as DisaStigSource,
     SCSEMUpdaterClientSession as UpdaterSession,
 } from "@/lib/scsem-updater-client-session";
 
@@ -124,11 +125,13 @@ function formatRetryWindow(milliseconds: number): string {
 }
 
 function supplementalComparisonLabel(
-    mode: "ai" | "deterministic_fallback" | "no_delta" | "not_requested" | "failed"
+    mode: "ai" | "deterministic_fallback" | "no_delta" | "not_requested" | "failed",
+    applicabilityStatus?: "review_required" | "not_requested" | "not_applicable"
 ): string {
     if (mode === "ai") return "AI evidence comparison";
     if (mode === "deterministic_fallback") return "Deterministic evidence comparison";
-    if (mode === "no_delta") return "Direct sources checked — no material delta";
+    if (mode === "no_delta" && applicabilityStatus === "not_applicable") return "Not applicable — no safe direct public source";
+    if (mode === "no_delta") return "Completed — zero genuine source deltas";
     if (mode === "not_requested") return "CIS WorkBench excluded by reviewer scope";
     return "Supplemental comparison failed or unavailable";
 }
@@ -280,6 +283,10 @@ export function SCSEMUpdater() {
 
     const adjacentAuditSources = useMemo(() => {
         return session?.audit.adjacentSources || [];
+    }, [session]);
+
+    const disaStigAuditSources = useMemo(() => {
+        return session?.audit.disaStigSources || [];
     }, [session]);
 
     const cisResolutionMessage = useMemo(() => {
@@ -943,7 +950,7 @@ export function SCSEMUpdater() {
                 </section>
             )}
 
-            {session && (cisAuditSources.length > 0 || stigAuditSources.length > 0 || adjacentAuditSources.length > 0 || session.audit.pub1075Version || session.audit.nistVersion || session.audit.officialReference || session.audit.benchmarkLookupError || session.audit.supplementalComparison) && (
+            {session && (cisAuditSources.length > 0 || stigAuditSources.length > 0 || adjacentAuditSources.length > 0 || disaStigAuditSources.length > 0 || session.audit.pub1075Version || session.audit.nistVersion || session.audit.officialReference || session.audit.benchmarkLookupError || session.audit.supplementalComparison) && (
                 <section className="mb-6 rounded-xl border border-[var(--sky-border)] bg-[var(--sky-surface)] p-5">
                     <div className="mb-4 flex items-center gap-2">
                         <ShieldCheck className="h-5 w-5 text-[var(--sky-light)]" />
@@ -951,14 +958,17 @@ export function SCSEMUpdater() {
                     </div>
                     <p className="mb-4 text-xs leading-5 text-[var(--sky-text-muted)]">
                         CIS access uses POST /license, then GET /benchmarks and GET /excel; selected workbooks use GET /excel/&#123;workbenchId&#125;.
-                        SkyShield matches CIS Benchmark and CIS-published STIG profile workbooks (CIS-STIG) returned by CIS WorkBench. Licensed access or a technical match does not establish applicability; an authorized reviewer must verify the source, profile, permitted use, and proposed change. Independent DISA STIG release validation is not implemented.
+                        SkyShield matches licensed CIS Benchmark and CIS-published STIG profile workbooks (CIS-STIG) only when SecureSuite access is configured. Public DISA STIG packages are resolved independently from the reviewed Cyber Exchange catalog, pinned by package SHA-256, and limited to exact XCCDF benchmark IDs. A technical match does not establish applicability; an authorized reviewer must verify every proposed change.
                     </p>
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                         {session.audit.supplementalComparison && (
                             <article className="rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] p-4">
                                 <p className="text-xs font-semibold uppercase text-[var(--sky-text-muted)]">Supplemental Comparison</p>
                                 <p className="mt-2 text-sm font-medium text-white">
-                                    {supplementalComparisonLabel(session.audit.supplementalComparison.mode)}
+                                    {supplementalComparisonLabel(
+                                        session.audit.supplementalComparison.mode,
+                                        session.audit.supplementalComparison.applicabilityStatus
+                                    )}
                                 </p>
                                 <div className={`mt-2 rounded border px-2 py-1 text-xs ${session.audit.supplementalComparison.complete
                                     ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-200"
@@ -991,7 +1001,9 @@ export function SCSEMUpdater() {
                             : <AuditSourceCard
                                 title="CIS Benchmark"
                                 source={null}
-                                emptyMessage={session.audit.benchmarkLookupError
+                                emptyMessage={session.audit.benchmarkLookupErrorCode === "CIS_LICENSE_NOT_CONFIGURED"
+                                    ? "Not available: no CIS SecureSuite license is configured. Licensed CIS content was not accessed; Publication 1075, NIST, and public DISA analysis continue independently."
+                                    : session.audit.benchmarkLookupError
                                     ? `CIS source unresolved: ${session.audit.benchmarkLookupError}. Reviewer disposition is required before release.`
                                     : `${cisResolutionMessage || "No direct workbook passed content/profile validation."} CIS applicability remains unresolved until a reviewer records a disposition.`}
                             />)}
@@ -1003,7 +1015,30 @@ export function SCSEMUpdater() {
                                     source={source}
                                 />
                             ))
-                            : <AuditSourceCard title="CIS-STIG Workbook" source={null} emptyMessage="No direct CIS-STIG workbook from CIS WorkBench passed content/profile validation. Applicability remains unresolved until a reviewer records a disposition; independent DISA STIG validation is not implemented." />)}
+                            : <AuditSourceCard
+                                title="CIS-STIG Workbook"
+                                source={null}
+                                emptyMessage={session.audit.benchmarkLookupErrorCode === "CIS_LICENSE_NOT_CONFIGURED"
+                                    ? "Not available: no CIS SecureSuite license is configured. Public DISA STIG analysis is reported separately."
+                                    : "No direct CIS-STIG workbook from CIS WorkBench passed content/profile validation. Applicability remains unresolved until a reviewer records a disposition."}
+                            />)}
+                        {session.audit.supplementalComparison?.mode !== "not_requested" && (disaStigAuditSources.length > 0
+                            ? disaStigAuditSources.map((source, index) => (
+                                <DisaStigSourceCard
+                                    key={`disa-${source.sourceUrl}-${source.sourceRelationship}-${index}`}
+                                    source={source}
+                                    index={index}
+                                />
+                            ))
+                            : <AuditSourceCard
+                                title="Public DISA STIG"
+                                source={null}
+                                emptyMessage={session.audit.supplementalComparison?.applicabilityStatus === "not_applicable"
+                                    ? "Not applicable: the pinned IRS-workbook and sheet registry records no safe current direct public DISA STIG for this SCSEM. This is not a source failure."
+                                    : session.audit.supplementalComparison?.mode === "failed"
+                                        ? "Failed or unavailable: an expected public DISA STIG source could not be validated. Review the comparison reason above."
+                                        : "Not available for direct matching: this workbook was not eligible for the pinned official IRS workbook-and-sheet registry. No public DISA rules were used."}
+                            />)}
                         {adjacentAuditSources.map((source, index) => (
                             <AuditSourceCard
                                 key={`adjacent-${source.workbenchId}-${index}`}
@@ -1147,6 +1182,69 @@ function StatusPill({ status, count }: { status: ChangeStatus; count: number }) 
     );
 }
 
+function DisaStigSourceCard({
+    source,
+    index,
+}: {
+    source: DisaStigSource;
+    index: number;
+}) {
+    const direct = source.sourceRelationship === "direct";
+    const status = source.error
+        ? "Failed"
+        : direct
+            ? "Completed"
+            : "Adjacent version only";
+    const statusStyle = source.error
+        ? "border-red-500/25 bg-red-500/10 text-red-200"
+        : direct
+            ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-200"
+            : "border-amber-500/25 bg-amber-500/10 text-amber-200";
+    return (
+        <article className="rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] p-4">
+            <p className="text-xs font-semibold uppercase text-[var(--sky-text-muted)]">
+                Public DISA STIG{index > 0 ? ` ${index + 1}` : ""}
+            </p>
+            <p className="mt-2 text-sm font-medium text-white">{source.sourceTitle}</p>
+            <div className={`mt-2 rounded border px-2 py-1 text-xs ${statusStyle}`}>{status}</div>
+            <p className="mt-2 text-xs leading-5 text-[var(--sky-text-secondary)]">
+                {source.error || (direct
+                    ? `${source.ruleCount ?? 0} selected XCCDF rule(s) were parsed from the exact reviewed package.`
+                    : "Catalog metadata only. No adjacent-version rule was used to generate a proposal.")}
+            </p>
+            <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-[var(--sky-text-secondary)]">
+                <span>Version: {source.sourceVersion}</span>
+                <span>Uploaded: {source.sourceUploadDate}</span>
+                <span className="line-clamp-3" title={source.sourceReleaseInfo}>
+                    Release: {source.sourceReleaseInfo}
+                </span>
+                <span className="truncate" title={source.benchmarkIds.join(", ")}>
+                    XCCDF: {source.benchmarkIds.length > 0 ? source.benchmarkIds.join(", ") : "metadata only"}
+                </span>
+                <span className="truncate" title={source.matchedSheets.join(", ")}>
+                    Sheets: {source.matchedSheets.join(", ")}
+                </span>
+                <span className="truncate" title={source.matchQuery}>Registry match: {source.matchQuery}</span>
+                <a className="truncate text-blue-300 underline" href={source.sourceUrl} target="_blank" rel="noreferrer">
+                    Official package
+                </a>
+                <a className="truncate text-blue-300 underline" href={source.catalogSourceUrl} target="_blank" rel="noreferrer">
+                    DISA catalog reviewed {source.catalogReviewedAt}
+                </a>
+                {source.packageSha256 ? (
+                    <span className="truncate font-mono" title={source.packageSha256}>
+                        SHA {source.packageSha256.slice(0, 16)}...
+                    </span>
+                ) : source.expectedPackageSha256 ? (
+                    <span className="truncate font-mono" title={source.expectedPackageSha256}>
+                        Expected SHA {source.expectedPackageSha256.slice(0, 16)}...
+                    </span>
+                ) : null}
+            </div>
+        </article>
+    );
+}
+
 function AuditSourceCard({
     title,
     source,
@@ -1260,6 +1358,17 @@ function SourceEvidencePanel({ change }: { change: UpdaterChange }) {
     const evidence = change.sourceEvidence;
     const rows = [
         ["Tier", evidenceTier(change) || sourceEvidenceText(evidence, "evidenceTier")],
+        ["Source kind", sourceEvidenceText(evidence, "sourceKind")],
+        ["Source title", sourceEvidenceText(evidence, "sourceTitle")],
+        ["Source URL", sourceEvidenceText(evidence, "sourceUrl")],
+        ["Source upload date", sourceEvidenceText(evidence, "sourceUploadDate")],
+        ["Package SHA-256", sourceEvidenceText(evidence, "sourcePackageSha256")],
+        ["DISA benchmark", sourceEvidenceText(evidence, "stigBenchmarkId")],
+        ["DISA rule", sourceEvidenceText(evidence, "stigRuleId")],
+        ["DISA rule version", sourceEvidenceText(evidence, "stigVersion")],
+        ["Vulnerability ID", sourceEvidenceText(evidence, "stigVulnerabilityId")],
+        ["CCI mappings", sourceEvidenceText(evidence, "cciIds")],
+        ["NIST mappings", sourceEvidenceText(evidence, "nistControlIds")],
         ["Benchmark", sourceEvidenceText(evidence, "sourceBenchmarkTitle")],
         ["Workbench", sourceEvidenceText(evidence, "sourceWorkbenchId")],
         ["CIS", sourceEvidenceText(evidence, "cisRecommendation")],

@@ -196,6 +196,26 @@ export interface SCSEMUpdaterAuditSource {
     sourceUrl?: string;
 }
 
+export interface SCSEMDisaStigAuditSource {
+    sourceKind: "STIG";
+    sourceRelationship: "direct" | "adjacent";
+    sourceTitle: string;
+    sourceVersion: string;
+    sourceReleaseInfo: string;
+    sourceUploadDate: string;
+    sourceUrl: string;
+    catalogSourceUrl: string;
+    catalogReviewedAt: string;
+    benchmarkIds: string[];
+    expectedPackageSha256?: string;
+    packageSha256?: string;
+    downloadedAt?: string;
+    ruleCount?: number;
+    matchedSheets: string[];
+    matchQuery: string;
+    error?: string;
+}
+
 export interface SCSEMUpdaterSession {
     id: string;
     revision: number;
@@ -271,6 +291,7 @@ export interface SCSEMUpdaterSession {
         cisSources?: SCSEMUpdaterAuditSource[];
         stigSources?: SCSEMUpdaterAuditSource[];
         adjacentSources?: SCSEMUpdaterAuditSource[];
+        disaStigSources?: SCSEMDisaStigAuditSource[];
         cisBootstrap?: {
             workbenchId: number;
             benchmarkTitle: string;
@@ -503,6 +524,15 @@ function sourceHashSnapshot(session: SCSEMUpdaterSession): Record<string, unknow
             selectedProfile: source.selectedProfile || null,
         });
     }
+    const disaStigs = (session.audit.disaStigSources || []).map((source) => ({
+        sourceRelationship: source.sourceRelationship,
+        sourceTitle: source.sourceTitle,
+        sourceUrl: source.sourceUrl,
+        sourceUploadDate: source.sourceUploadDate,
+        benchmarkIds: [...source.benchmarkIds],
+        expectedPackageSha256: source.expectedPackageSha256 || null,
+        packageSha256: source.packageSha256 || null,
+    }));
 
     return {
         uploaded: {
@@ -538,6 +568,7 @@ function sourceHashSnapshot(session: SCSEMUpdaterSession): Record<string, unknow
             }
             : null,
         benchmarks: [...uniqueBenchmarks.values()],
+        disaStigs,
     };
 }
 

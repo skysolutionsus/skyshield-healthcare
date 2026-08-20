@@ -1,4 +1,5 @@
 import type {
+    SCSEMDisaStigAuditSource,
     SCSEMUpdaterAuditSource,
     SCSEMUpdaterChange,
     SCSEMUpdaterSession,
@@ -8,7 +9,7 @@ import {
     boundedStoredSCSEMBenchmarkNarrative,
 } from "@/lib/scsem-benchmark-failure";
 
-type ClientEvidenceValue = string | number | boolean | null;
+type ClientEvidenceValue = string | number | boolean | null | string[];
 
 export type SCSEMUpdaterClientChange = Pick<
     SCSEMUpdaterChange,
@@ -58,6 +59,26 @@ export type SCSEMUpdaterClientAuditSource = Pick<
     | "adjacentRationale"
 >;
 
+export type SCSEMUpdaterClientDisaStigSource = Pick<
+    SCSEMDisaStigAuditSource,
+    | "sourceKind"
+    | "sourceRelationship"
+    | "sourceTitle"
+    | "sourceVersion"
+    | "sourceReleaseInfo"
+    | "sourceUploadDate"
+    | "sourceUrl"
+    | "catalogSourceUrl"
+    | "catalogReviewedAt"
+    | "benchmarkIds"
+    | "expectedPackageSha256"
+    | "packageSha256"
+    | "ruleCount"
+    | "matchedSheets"
+    | "matchQuery"
+    | "error"
+>;
+
 export interface SCSEMUpdaterClientSession {
     id: string;
     revision: number;
@@ -100,11 +121,12 @@ export interface SCSEMUpdaterClientSession {
             uncovered: number;
         };
         benchmarkLookupError?: string;
+        benchmarkLookupErrorCode?: string;
         supplementalComparison?: {
             mode: "ai" | "deterministic_fallback" | "no_delta" | "not_requested" | "failed";
             complete: boolean;
             candidateOnly: true;
-            applicabilityStatus: "review_required" | "not_requested";
+            applicabilityStatus: "review_required" | "not_requested" | "not_applicable";
             directSourceCount: number;
             comparedDirectSourceCount: number;
             candidateCount: number;
@@ -139,6 +161,7 @@ export interface SCSEMUpdaterClientSession {
         cisSources?: SCSEMUpdaterClientAuditSource[];
         stigSources?: SCSEMUpdaterClientAuditSource[];
         adjacentSources?: SCSEMUpdaterClientAuditSource[];
+        disaStigSources?: SCSEMUpdaterClientDisaStigSource[];
         cisBootstrap?: {
             workbenchId: number;
             benchmarkTitle: string;
@@ -179,6 +202,19 @@ const SOURCE_EVIDENCE_KEYS = [
     "sourceSheet",
     "pub1075Version",
     "nistVersion",
+    "sourceKind",
+    "sourceUrl",
+    "sourceTitle",
+    "sourceUploadDate",
+    "sourcePackageSha256",
+    "stigBenchmarkId",
+    "stigRuleId",
+    "stigVersion",
+    "stigVulnerabilityId",
+    "cciIds",
+    "nistControlIds",
+    "gapType",
+    "applicabilityReviewRequired",
 ] as const;
 
 function clientSourceEvidence(
@@ -186,15 +222,18 @@ function clientSourceEvidence(
 ): Record<string, ClientEvidenceValue> | null | undefined {
     if (evidence === null) return null;
     if (!evidence) return undefined;
-    const selected = Object.fromEntries(
-        SOURCE_EVIDENCE_KEYS.flatMap((key) => {
-            const value = evidence[key];
-            return typeof value === "string" || typeof value === "number" ||
-                typeof value === "boolean" || value === null
-                ? [[key, value] as const]
-                : [];
-        })
-    );
+    const selected: Record<string, ClientEvidenceValue> = {};
+    for (const key of SOURCE_EVIDENCE_KEYS) {
+        const value = evidence[key];
+        if (Array.isArray(value) && value.every((item) => typeof item === "string")) {
+            selected[key] = value.slice(0, 100);
+        } else if (
+            typeof value === "string" || typeof value === "number" ||
+            typeof value === "boolean" || value === null
+        ) {
+            selected[key] = value;
+        }
+    }
     return Object.keys(selected).length > 0 ? selected : null;
 }
 
@@ -353,6 +392,9 @@ export function clientSafeSCSEMUpdaterSession(
                     benchmarkLookupError: benchmarkNarrative.benchmarkLookupError,
                 }
                 : {}),
+            ...(session.audit.benchmarkLookupErrorCode !== undefined
+                ? { benchmarkLookupErrorCode: session.audit.benchmarkLookupErrorCode }
+                : {}),
             ...(session.audit.supplementalComparison !== undefined
                 ? {
                     supplementalComparison: {
@@ -419,6 +461,32 @@ export function clientSafeSCSEMUpdaterSession(
                 : {}),
             ...(session.audit.adjacentSources !== undefined
                 ? { adjacentSources: clientAuditSourceList(session.audit.adjacentSources) }
+                : {}),
+            ...(session.audit.disaStigSources !== undefined
+                ? {
+                    disaStigSources: session.audit.disaStigSources.map((source) => ({
+                        sourceKind: source.sourceKind,
+                        sourceRelationship: source.sourceRelationship,
+                        sourceTitle: source.sourceTitle,
+                        sourceVersion: source.sourceVersion,
+                        sourceReleaseInfo: source.sourceReleaseInfo,
+                        sourceUploadDate: source.sourceUploadDate,
+                        sourceUrl: source.sourceUrl,
+                        catalogSourceUrl: source.catalogSourceUrl,
+                        catalogReviewedAt: source.catalogReviewedAt,
+                        benchmarkIds: [...source.benchmarkIds],
+                        ...(source.expectedPackageSha256 !== undefined
+                            ? { expectedPackageSha256: source.expectedPackageSha256 }
+                            : {}),
+                        ...(source.packageSha256 !== undefined
+                            ? { packageSha256: source.packageSha256 }
+                            : {}),
+                        ...(source.ruleCount !== undefined ? { ruleCount: source.ruleCount } : {}),
+                        matchedSheets: [...source.matchedSheets],
+                        matchQuery: source.matchQuery,
+                        ...(source.error !== undefined ? { error: source.error } : {}),
+                    })),
+                }
                 : {}),
             ...(session.audit.cisBootstrap !== undefined
                 ? {

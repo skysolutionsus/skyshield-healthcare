@@ -1,0 +1,2879 @@
+{
+  "schemaVersion": 1,
+  "sourceUrl": "https://www.cyber.mil/stigs/downloads",
+  "reviewedAt": "2026-08-20",
+  "entryCount": 410,
+  "entries": [
+    {
+      "name": "Microsoft Windows Server 2025 STIG SCAP Benchmark - Ver 1, Rel 1",
+      "downloadType": "SCAP 1.3, Security Content Application Protocols (SCAP), Automation",
+      "uploadDate": "2026-08-20",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_Server_2025_V1R1_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Windows Server 2022 STIG SCAP Benchmark \u2013 Ver 2, Rel 10",
+      "downloadType": "SCAP 1.3, Automation",
+      "uploadDate": "2026-08-20",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_Server_2022_V2R10_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Infoblox NIOS 9.x STIG - Ver 1 Rel 1",
+      "downloadType": "STIGs, Network/Perimeter/Wireless",
+      "uploadDate": "2026-08-19",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Infoblox_NIOS_9-x_V1R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "STIG Viewer 3.8.0 Hashes",
+      "downloadType": "STIGs, STIG Viewer 3.x",
+      "uploadDate": "2026-08-18",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/txt/U_STIGViewer_3-8-0_Hashes.txt",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "STIG Viewer 3.8.0-Linux",
+      "downloadType": "STIGs, STIG Viewer 3.x",
+      "uploadDate": "2026-08-18",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_STIGViewer-linux-x64-3-8-0.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "STIG Viewer 3.8.0-Win64",
+      "downloadType": "STIGs, STIG Viewer 3.x",
+      "uploadDate": "2026-08-18",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_STIGViewer-win32_x64-3-8-0.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "STIG Viewer 3.8.0-Win64 msi",
+      "downloadType": "STIGs, STIG Viewer 3.x",
+      "uploadDate": "2026-08-18",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_STIGViewer-win32_x64-3-8-0_msi.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "STIG Viewer 3.x User Guide - Ver 1, Rel 8",
+      "downloadType": "STIGs, STIG Viewer 3.x",
+      "uploadDate": "2026-08-18",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/pdf/U_STIG_Viewer_3-x_User_Guide_V1R8.pdf",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "STIG Viewer 3.8.0 Release Notes",
+      "downloadType": "STIGs, STIG Viewer 3.x",
+      "uploadDate": "2026-08-18",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/pdf/STIG_Viewer_3-8-0_Release_Notes.pdf",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "STIG Viewer 3.8.0-Linux Hashes",
+      "downloadType": "STIGs, STIG Viewer 3.x",
+      "uploadDate": "2026-08-18",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/txt/U_STIGViewer-linux-x64-3-8-0_Hashes.txt",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Group Policy Objects (GPOs) - July 2026",
+      "downloadType": "STIGs, Group Policy Objects (GPO)",
+      "uploadDate": "2026-08-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_STIG_GPO_Package_July_2026.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Windows 11 STIG - Ver 2, Rel 9",
+      "downloadType": "Operating Systems, STIGs, Windows",
+      "uploadDate": "2026-08-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_11_V2R9_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Windows 11 STIG SCAP Benchmark - Ver 2, Rel 10",
+      "downloadType": "STIGs, SCAP 1.3, Security Content Application Protocols (SCAP)",
+      "uploadDate": "2026-08-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_11_V2R10_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Windows Server 2022 STIG - Ver 2, Rel 10",
+      "downloadType": "Operating Systems, STIGs, Windows",
+      "uploadDate": "2026-08-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_Server_2022_V2R10_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Windows Server 2025 STIG - Ver 1, Rel 3",
+      "downloadType": "Operating Systems, STIGs, Windows",
+      "uploadDate": "2026-08-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_Server_2025_V1R3_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Samsung Android OS 17 with Knox 3.x STIG",
+      "downloadType": "STIGs, Mobility, Smartphone",
+      "uploadDate": "2026-08-12",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SS_Android_OS_17_KPE_3-x_Y26M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Intune Policy - July 2026",
+      "downloadType": "STIGs, Group Policy Objects (GPO)",
+      "uploadDate": "2026-07-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Intune_Policy_Package_July_2026.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Cisco Secure Network Analytics (SNA) STIG - Ver 1, Rel 1",
+      "downloadType": "Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2026-07-16",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Cisco_SNA_V1R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Google Android 17 STIG",
+      "downloadType": "Mobility, Smartphone",
+      "uploadDate": "2026-07-16",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Google_Android_17_Y26M06_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Ivanti Policy Secure STIG",
+      "downloadType": "Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2026-07-16",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Ivanti_Policy_Secure_Y26M06_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "CCI List",
+      "downloadType": "STIGs, Control Correlation Identifier (CCI)",
+      "uploadDate": "2026-07-15",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/CCI_List.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Apple iOS/iPadOS 26 STIG - Ver 1, Rel 3",
+      "downloadType": "STIGs, Mobility, Smartphone",
+      "uploadDate": "2026-07-13",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Apple_iOS-iPadOS_26_V1R3_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Adobe Acrobat Reader DC Continuous Track STIG Benchmark - Ver 2, Rel 5",
+      "downloadType": "STIGs, SCAP 1.3, Security Content Application Protocols (SCAP)",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Adobe_Acrobat_Reader_DC_Continuous_V2R5_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Apache Server 2.4 Unix STIG",
+      "downloadType": "Web Servers, STIGs, Application Security",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Apache_Server_2-4_Unix_Y26M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Application Layer Gateway SRG - Ver 2, Rel 4",
+      "downloadType": "STIGs, Network/Perimeter/Wireless, Network Other",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Application_Layer_Gateway_V2R4_SRG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Application Server SRG - Ver 4, Rel 5",
+      "downloadType": "STIGs, Application Security, Application Servers",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Application_Server_V4R5_SRG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "BIND 9.x STIG - Ver 3, Rel 3",
+      "downloadType": "STIGs, Network/Perimeter/Wireless, Network Other",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_BIND_9-x_V3R3_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "CA IDMS STIG - Ver 2, Rel 2",
+      "downloadType": "STIGs, Application Security, Database",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_CA_IDMS_V2R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Canonical Ubuntu 22.04 LTS STIG - Ver 2, Rel 9",
+      "downloadType": "Operating Systems, STIGs, UNIX/Linux",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_CAN_Ubuntu_22-04_LTS_V2R9_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Canonical Ubuntu 22.04 LTS STIG for Ansible - Ver 2, Rel 9",
+      "downloadType": "STIGs, Ansible, Supplemental Automation Content",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_CAN_Ubuntu_22-04_LTS_V2R9_STIG_Ansible.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Canonical Ubuntu 22.04 LTS STIG for Chef - Ver 2, Rel 9",
+      "downloadType": "STIGs, Supplemental Automation Content, Chef",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_CAN_Ubuntu_22-04_LTS_V2R9_STIG_Chef.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Canonical Ubuntu 24.04 LTS STIG - Ver 1, Rel 6",
+      "downloadType": "Operating Systems, STIGs, UNIX/Linux",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_CAN_Ubuntu_24-04_LTS_V1R6_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Cisco ASA STIG",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Cisco_ASA_Y26M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Cisco IOS Router STIG",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Cisco_IOS_Router_Y26M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Cisco IOS Switch STIG",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Cisco_IOS_Switch_Y26M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Cisco ISE STIG",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Cisco_ISE_Y26M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Cisco NX OS Switch STIG",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Cisco_NX-OS_Switch_Y26M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Cloud Linux AlmaLinux OS 9 STIG - Ver 1, Rel 7",
+      "downloadType": "Operating Systems, STIGs, UNIX/Linux",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_CL_AlmaLinux_OS_9_V1R7_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Crunchy Data Postgres 16 STIG - Ver 1, Rel 3",
+      "downloadType": "STIGs, Application Security, Database",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_CD_Postgres_16_V1R3_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Crunchy Data PostgreSQL STIG - Ver 3, Rel 2",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_CD_PGSQL_V3R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Enterprise Voice, Video, and Messaging SRG",
+      "downloadType": "STIGs, Network/Perimeter/Wireless, Telecommunications",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_EVVM_Y26M07_SRG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "F5 BIG-IP TMOS STIG",
+      "downloadType": "STIGs, Network/Perimeter/Wireless",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_F5_BIG-IP_TMOS_Y26M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Firewall SRG - Ver 3, Rel 4",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Firewall_V3R4_SRG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Forescout STIG",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_FS_Y26M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - HPE 3PAR StoreServ 3.2.x STIG - Ver 2, Rel 2",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_HPE_3PAR_StoreServ_3-2-x_V2R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - HPE 3PAR StoreServ OS STIG",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_HPE_3PAR_StoreServ_OS_Y26M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "HYCU Prot\u00e9g\u00e9 STIG - Ver 1, Rel 3",
+      "downloadType": "STIGs, Application Security, Application Servers",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_HYCU_Protege_V1R3_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "IBM AIX 7.x STIG - Ver 3, Rel 3",
+      "downloadType": "Operating Systems, STIGs, UNIX/Linux",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_IBM_AIX_7-x_V3R3_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "IBM DB2 V10.5 LUW STIG - Ver 2, Rel 2",
+      "downloadType": "STIGs, Application Security, Database",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_IBM_DB2_V10-5_LUW_V2R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "IBM z/OS STIG",
+      "downloadType": "Operating Systems, STIGs, Mainframe",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_IBM_zOS_Y26M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Infoblox 8.x DNS STIG - Ver 1, Rel 3",
+      "downloadType": "STIGs, Network/Perimeter/Wireless, Network Other",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_IB_8-x_DNS_V1R3_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Juniper EX Series Switches STIG",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Juniper_EX_Switches_Y26M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Kubernetes STIG SCAP Benchmark - Ver 2, Rel 5",
+      "downloadType": "STIGs, SCAP 1.3, Security Content Application Protocols (SCAP)",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Kubernetes_V2R5_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Mainframe Product SRG - Ver 3, Rel 5",
+      "downloadType": "Operating Systems, STIGs, Mainframe",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Mainframe_Product_V3R5_SRG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Defender Antivirus STIG - Ver 2, Rel 9",
+      "downloadType": "STIGs, Application Security, Antivirus",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Defender_Antivirus_V2R9_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Defender Antivirus STIG SCAP Benchmark - Ver 2, Rel 9",
+      "downloadType": "SCAP 1.3, Security Content Application Protocols (SCAP)",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Defender_Antivirus_V2R9_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Microsoft DotNet Framework 4.0 STIG - Ver 2, Rel 9",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_DotNet_Framework_4-0_V2R9_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Microsoft DotNet Framework 4.0 STIG SCAP Benchmark - Ver 2, Rel 8",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_DotNet_Framework_4-0_V2R8_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft IIS 10.0 STIG",
+      "downloadType": "Web Servers, STIGs, Application Security",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_IIS_10-0_Y26M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Intune (Desktop & Mobile) STIG",
+      "downloadType": "STIGs, Mobility, MDM/EMM Server",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Intune_Desktop_Mobile_Y26M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Microsoft Windows Server 2019 STIG - Ver 3, Rel 9",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_Server_2019_V3R9_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Microsoft Windows Server 2019 STIG SCAP Benchmark - Ver 3, Rel 9",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_Server_2019_V3R9_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Windows Server DNS STIG - Ver 2, Rel 5",
+      "downloadType": "STIGs, Network/Perimeter/Wireless, Network Other",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_Server_DNS_V2R5_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Mozilla Firefox for Linux STIG SCAP Benchmark - Ver 6, Rel 7",
+      "downloadType": "STIGs, SCAP 1.3, Security Content Application Protocols (SCAP)",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MOZ_Firefox_Linux_V6R7_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Mozilla Firefox for Windows STIG SCAP Benchmark - Ver 6, Rel 8",
+      "downloadType": "STIGs, SCAP 1.3, Security Content Application Protocols (SCAP)",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MOZ_Firefox_Windows_V6R8_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Mozilla Firefox STIG - Ver 6, Rel 8",
+      "downloadType": "STIGs, Application Security, Browser Guidance",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MOZ_Firefox_V6R8_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "NetApp ONTAP DSC 9.x STIG - Ver 2, Rel 4",
+      "downloadType": "STIGs, Network/Perimeter/Wireless, Network Other",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_NetApp_ONTAP_DSC_9-x_V2R4_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Network Device Management SRG - Ver 5, Rel 5",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_NDM_V5R5_SRG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Oracle Linux 8 STIG - Ver 2, Rel 9",
+      "downloadType": "Operating Systems, STIGs, UNIX/Linux",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Oracle_Linux_8_V2R9_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Oracle Linux 8 STIG for Ansible - Ver 2, Rel 9",
+      "downloadType": "STIGs, Ansible, Supplemental Automation Content",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Oracle_Linux_8_V2R9_STIG_Ansible.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Oracle Linux 8 STIG SCAP Benchmark - Ver 2, Rel 9",
+      "downloadType": "SCAP 1.3, Security Content Application Protocols (SCAP)",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Oracle_Linux_8_V2R9_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Oracle Linux 9 STIG - Ver 1, Rel 6",
+      "downloadType": "Operating Systems, STIGs, UNIX/Linux",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Oracle_Linux_9_V1R6_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Palo Alto Networks STIG",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_PAN_Y26M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Rancher Government Solutions RKE2 STIG - Ver 2, Rel 7",
+      "downloadType": "STIGs, Application Security, Container Platform",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RGS_RKE2_V2R7_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Red Hat Enterprise Linux 8 STIG - Ver 2, Rel 8",
+      "downloadType": "Operating Systems, STIGs, UNIX/Linux",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RHEL_8_V2R8_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Red Hat Enterprise Linux 8 STIG for Ansible - Ver 2, Rel 8",
+      "downloadType": "STIGs, Ansible, Supplemental Automation Content",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RHEL_8_V2R8_STIG_Ansible.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Red Hat Enterprise Linux 8 STIG SCAP Benchmark - Ver 2, Rel 8",
+      "downloadType": "SCAP 1.3, Security Content Application Protocols (SCAP)",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RHEL_8_V2R8_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Red Hat Enterprise Linux 9 STIG - Ver 2, Rel 9",
+      "downloadType": "Operating Systems, STIGs, UNIX/Linux",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RHEL_9_V2R9_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Red Hat Enterprise Linux 9 STIG for Ansible- Ver 2, Rel 9",
+      "downloadType": "STIGs, Ansible, Supplemental Automation Content",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RHEL_9_V2R9_STIG_Ansible.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Red Hat Enterprise Linux 9 STIG for Chef - Ver 2, Rel 9",
+      "downloadType": "Supplemental Automation Content, Chef",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RHEL_9_V2R9_STIG_Chef.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Red Hat Enterprise Linux 9 STIG SCAP Benchmark - Ver 2, Rel 9",
+      "downloadType": "SCAP 1.3, Security Content Application Protocols (SCAP)",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RHEL_9_V2R9_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Red Hat OpenShift Container Platform 4.x STIG - Ver 2, Rel 6",
+      "downloadType": "STIGs, Application Security, Container Platform",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RH_OpenShift_Container_Platform_4-x_V2R6_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Solaris 11 SPARC STIG - Ver 3, Rel 6",
+      "downloadType": "Operating Systems, STIGs, UNIX/Linux",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SOL_11_SPARC_V3R6_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Solaris 11 SPARC STIG Benchmark - Ver 3, Rel 5",
+      "downloadType": "STIGs, SCAP 1.3, Security Content Application Protocols (SCAP)",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SOL_11_SPARC_V3R5_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Solaris 11 x86 STIG - Ver 3, Rel 6",
+      "downloadType": "Operating Systems, STIGs, UNIX/Linux",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SOL_11_x86_V3R6_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Solaris 11 x86 STIG Benchmark - Ver 3, Rel 5",
+      "downloadType": "STIGs, SCAP 1.3, Security Content Application Protocols (SCAP)",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SOL_11_X86_V3R5_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "SUSE Linux Enterprise Server 15 for Ansible - Ver 2, Rel 8",
+      "downloadType": "Ansible, Supplemental Automation Content",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SLES_15_V2R8_STIG_Ansible.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "SUSE Linux Enterprise Server 15 STIG - Ver 2, Rel 8",
+      "downloadType": "Operating Systems, STIGs, UNIX/Linux",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SLES_15_V2R8_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "SUSE Linux Enterprise Server 15 STIG SCAP Benchmark - Ver 2, Rel 9",
+      "downloadType": "SCAP 1.3, Security Content Application Protocols (SCAP)",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SLES_15_V2R9_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Traditional Security Checklist - Ver 2, Rel 9",
+      "downloadType": "STIGs",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Traditional_Security_Checklist_V2R9.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Tri-Lab Operating System Stack (TOSS) 4 STIG - Ver 2, Rel 6",
+      "downloadType": "Operating Systems, STIGs, General Purpose OS",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_TOSS_4_V2R6_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Tri-Lab Operating System Stack (TOSS) 4 STIG SCAP Benchmark - Ver 2, Rel 7",
+      "downloadType": "SCAP 1.3, Security Content Application Protocols (SCAP)",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_TOSS_4_V2R7_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Virtual Machine Manager SRG - Ver 2, Rel 4",
+      "downloadType": "Operating Systems, STIGs, Virtualization",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Virtual_Machine_Manager_V2R4_SRG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Virtual Private Network (VPN) SRG - Ver 3, Rel 5",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_VPN_V3R5_SRG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "VMware vSphere 8.0 STIG",
+      "downloadType": "Operating Systems, STIGs, Virtualization",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_VMW_vSphere_8-0_Y26M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Web Server SRG - Ver 4, Rel 5",
+      "downloadType": "Web Servers, STIGs, Application Security",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Web_Server_V4R5_SRG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "z/OS ACF2 Products",
+      "downloadType": "Operating Systems, STIGs, Mainframe",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_zOS_ACF2_Y26M07_Products.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "z/OS RACF Products",
+      "downloadType": "Operating Systems, STIGs, Mainframe",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_zOS_RACF_Y26M07_Products.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "z/OS SRR Scripts",
+      "downloadType": "Operating Systems, STIGs, Mainframe",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_zOS_Y26M07_SRR.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "z/OS TSS Products",
+      "downloadType": "Operating Systems, STIGs, Mainframe",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_zOS_TSS_Y26M07_Products.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Canonical Ubuntu 24.04 LTS STIG SCAP Benchmark - Ver 1, Rel 5",
+      "downloadType": "SCAP 1.3, Security Content Application Protocols (SCAP)",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_CAN_Ubuntu_24-04_LTS_V1R5_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Amazon Linux 2023 STIG - Ver 1, Rel 4",
+      "downloadType": "Operating System, General Purpose OS",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Amazon_Linux_2023_V1R4_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Oracle Linux 9 STIG SCAP Benchmark - Ver 1, Rel 4",
+      "downloadType": "SCAP 1.3, Security Content Application Protocols (SCAP)",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Oracle_Linux_9_V1R4_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Apple macOS 26 (Tahoe) STIG - Ver 1, Rel 3",
+      "downloadType": "Operating Systems, STIGs, Mac OS",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Apple_macOS_26_V1R3_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Canonical Ubuntu 24.04 LTS STIG for Chef - Ver 1, Rel 6",
+      "downloadType": "STIGs, Supplemental Automation Content",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_CAN_Ubuntu_24-04_LTS_V1R6_STIG_Chef.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Canonical Ubuntu 24.04 LTS STIG for Ansible - Ver 1, Rel 6",
+      "downloadType": "STIGs, Ansible, Supplemental Automation Content",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_CAN_Ubuntu_24-04_LTS_V1R6_STIG_Ansible.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Canonical Ubuntu 22.04 LTS STIG SCAP Benchmark - Ver 2, Rel 7",
+      "downloadType": "STIGs, SCAP 1.3, Automation",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_CAN_Ubuntu_22-04_LTS_V2R7_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Adobe ColdFusion STIG - Ver 1, Rel 2",
+      "downloadType": "STIGs, Application Security, Desktop",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Adobe_ColdFusion_V1R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Compilation - SRG-STIG Library",
+      "downloadType": "STIGs, STIG Compilations",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SRG-STIG_Library_July_2026.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Adobe Acrobat Professional DC Continuous Track STIG Benchmark - Ver 2, Rel 2",
+      "downloadType": "SCAP 1.3, Automation",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Adobe_Acrobat_Pro_DC_Continuous_V2R2_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Oracle Linux 9 STIG for Chef - Ver 1, Rel 6",
+      "downloadType": "Supplemental Automation Content, Chef, Automation",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Oracle_Linux_9_V1R6_STIG_Chef.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Oracle Linux 9 STIG for Ansible - Ver 1, Rel 6",
+      "downloadType": "Ansible, Supplemental Automation Content, Automation",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Oracle_Linux_9_V1R6_STIG_Ansible.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Red Hat Enterprise Linux 10 STIG - Ver 1, Rel 2",
+      "downloadType": "Operating Systems",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RHEL_10_V1R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Amazon Linux 2023 STIG SCAP Benchmark - Ver 1, Rel 2",
+      "downloadType": "SCAP 1.3, Security Content Application Protocols (SCAP), Automation",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Amazon_Linux_2023_V1R2_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "MongoDB Enterprise Advanced 7.x STIG - Ver 1, Rel 2",
+      "downloadType": "STIGs, Application Security, Database",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MongoDB_Enterprise_Advanced_7-x_V1R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Zebra Android 13 STIG",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-07-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Zebra_Android_13_Y26M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Unified Endpoint Management SRG",
+      "downloadType": "STIGs, Mobility, MDM/EMM Server",
+      "uploadDate": "2026-07-09",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_UEM_Y26M06_SRG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Nokia Service Router (SR) OS 25.x STIG",
+      "downloadType": "STIGs, Network",
+      "uploadDate": "2026-07-06",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Nokia_SR_OS_25-x_Y26M04_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "AvePoint Fly Server STIG - Ver 1, Rel 1",
+      "downloadType": "STIGs, Application Security",
+      "uploadDate": "2026-07-06",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_AP_Fly_Server_V1R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Omnissa Workspace ONE UEM STIG",
+      "downloadType": "STIGs, Mobility",
+      "uploadDate": "2026-07-01",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Omnissa_WS1_UEM_Y26M05_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Cloud Computing SRG",
+      "downloadType": "DoD Cloud Computing Security (DCCS), STIGs, Cloud Security",
+      "uploadDate": "2026-06-26",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Cloud_Computing_Y26M06_SRG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Apple iOS/iPadOS 18 - Ver 2, Rel 3",
+      "downloadType": "STIGs, Mobility, Smartphone",
+      "uploadDate": "2026-06-03",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Apple_iOS-iPadOS_18_V2R3_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Google Android 14 STIG",
+      "downloadType": "STIGs, Mobility, Smartphone",
+      "uploadDate": "2026-06-03",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Google_Android_14_Y26M05_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Google Android 15 STIG",
+      "downloadType": "STIGs, Mobility, Smartphone",
+      "uploadDate": "2026-06-03",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Google_Android_15_Y26M05_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Zebra Android 14 STIG",
+      "downloadType": "STIGs, Mobility, Smartphone",
+      "uploadDate": "2026-06-03",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Zebra_Android_14_Y26M05_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Google Android 16 STIG",
+      "downloadType": "STIGs, Mobility, Smartphone",
+      "uploadDate": "2026-06-03",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Google_Android_16_Y26M05_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Samsung Android 16 STIG",
+      "downloadType": "Mobility, Smartphone",
+      "uploadDate": "2026-06-03",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SS_Android_16_KPE_3-x_Y26M05_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Apple vision OS 2 STIG",
+      "downloadType": "Operating System, STIGs, Mobility",
+      "uploadDate": "2026-06-03",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Apple_visionOS_2_Y26M05_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Apple visionOS 26 STIG",
+      "downloadType": "Operating Systems, STIGs, Mobility",
+      "uploadDate": "2026-06-03",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Apple_visionOS_26_Y26M05_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "SCC 5.14.1 Solaris 11 i386",
+      "downloadType": "STIGs, Security Content Application Protocols (SCAP), SCAP Tools",
+      "uploadDate": "2026-05-05",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/scc-5.14.1_solaris11_i386_bundle.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "SCC 5.14.1 Solaris 11 SPARC",
+      "downloadType": "STIGs, Security Content Application Protocols (SCAP), SCAP Tools",
+      "uploadDate": "2026-05-05",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/scc-5.14.1_solaris11_sparc_bundle.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "SCC 5.14.1 Ubuntu 18/20 AMD64",
+      "downloadType": "STIGs, Security Content Application Protocols (SCAP), SCAP Tools",
+      "uploadDate": "2026-05-05",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/scc-5.14.1_ubuntu18_ubuntu20_amd64_bundle.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "SCC 5.14.1 Ubuntu 20/Raspios-bulleye Aarch64",
+      "downloadType": "STIGs, Security Content Application Protocols (SCAP), SCAP Tools",
+      "uploadDate": "2026-05-05",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/scc-5.14.1_ubuntu20_raspios-bullseye_arm64_bundle.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "SCC 5.14.1 Ubuntu 22/24 AMD64",
+      "downloadType": "STIGs, Security Content Application Protocols (SCAP), SCAP Tools",
+      "uploadDate": "2026-05-05",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/scc-5.14.1_ubuntu22_ubuntu24_amd64_bundle.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "SCC 5.14.1 Ubuntu 22/24 ARM64",
+      "downloadType": "STIGs, Security Content Application Protocols (SCAP), SCAP Tools",
+      "uploadDate": "2026-05-05",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/scc-5.14.1_ubuntu22_ubuntu24_arm64_bundle.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "SCC 5.14.1 Windows",
+      "downloadType": "STIGs, Security Content Application Protocols (SCAP), SCAP Tools",
+      "uploadDate": "2026-05-05",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/scc-5.14.1_Windows_bundle.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "SCC 5.14 .1 MacOS ARM64",
+      "downloadType": "STIGs, Security Content Application Protocols (SCAP), SCAP Tools",
+      "uploadDate": "2026-05-05",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/scc-5.14.1_macOS_arm64_bundle.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "SCC 5.14.1 RPM GPG key",
+      "downloadType": "STIGs, Security Content Application Protocols (SCAP), SCAP Tools",
+      "uploadDate": "2026-05-05",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/RPM-GPG-KEY-SCC-5.14.1",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "SCC 5.14.1 Checksums File",
+      "downloadType": "STIGs, Security Content Application Protocols (SCAP), SCAP Tools",
+      "uploadDate": "2026-05-04",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/txt/SCC_5.14.1_Checksums.txt",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "SCC 5.14.1 Readme",
+      "downloadType": "STIGs, Security Content Application Protocols (SCAP), SCAP Tools",
+      "uploadDate": "2026-05-04",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/txt/SCC_5.14.1_Readme.txt",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "SCC 5.14.1 Release Notes",
+      "downloadType": "STIGs, Security Content Application Protocols (SCAP), SCAP Tools",
+      "uploadDate": "2026-05-04",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/txt/SCC_5.14.1_ReleaseNotes.txt",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "SCC 5.14.1 UNIX Remote Scanning Plugin",
+      "downloadType": "STIGs, Security Content Application Protocols (SCAP), SCAP Tools",
+      "uploadDate": "2026-05-04",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/SCC_5.14.1_UNIX_Remote_Scanning_Plugin.scc",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "SCC 5.14.1 RHEL 7/Oracle Linux 7/SLES12/SLES 15 x86 64",
+      "downloadType": "STIGs, Security Content Application Protocols (SCAP), SCAP Tools",
+      "uploadDate": "2026-05-04",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/scc-5.14.1_rhel7_sles12-15_oracle-linux7_x86_64_bundle.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "SCC 5.14.1 RHEL 8/Oracle Linux 8 Aarch64",
+      "downloadType": "STIGs, Security Content Application Protocols (SCAP), SCAP Tools",
+      "uploadDate": "2026-05-04",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/scc-5.14.1_rhel8_oracle-linux8_aarch64_bundle.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "SCC 5.14.1 RHEL 8/Oracle Linux 8 x86 64",
+      "downloadType": "STIGs, Security Content Application Protocols (SCAP), SCAP Tools",
+      "uploadDate": "2026-05-04",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/scc-5.14.1_rhel8_oracle-linux8_x86_64_bundle.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "SCC 5.14.1 RHEL 9/Oracle Linux 9 x86 64",
+      "downloadType": "STIGs, Security Content Application Protocols (SCAP), SCAP Tools",
+      "uploadDate": "2026-05-04",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/scc-5.14.1_rhel9_oracle-linux9_x86_64_bundle.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "SCC 5.14.1 RHEL 9/Oracle Linux 9 Aarch64",
+      "downloadType": "STIGs, Security Content Application Protocols (SCAP), SCAP Tools",
+      "uploadDate": "2026-05-04",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/scc-5.14.1_rhel9_oracle-linux9_aarch64_bundle.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "DoW Control Systems/Operational Technology Security Requirements Guide - Ver 2",
+      "downloadType": "STIGs, Documents, Technical Guidance",
+      "uploadDate": "2026-04-29",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/external/pdf/U_Control Systems_OT_V2_SRG.pdf",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - SUSE Linux Enterprise Server 12 STIG SCAP Benchmark - Ver 3, Rel 5",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2026-04-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SLES_12_V3R5_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Apache Server 2.4 Windows STIG",
+      "downloadType": "Web Servers, STIGs, Application Security",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Apache_Server_2-4_Windows_Y26M04_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Apache Tomcat Application Server 9 STIG - Ver 3, Rel 4",
+      "downloadType": "STIGs, Application Security, Application Servers",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Apache_Tomcat_Application_Server_9_V3R4_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Apple macOS 15 (Sequoia) STIG - Ver 1, Rel 7",
+      "downloadType": "Operating Systems, STIGs, Mac OS",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Apple_macOS_15_V1R7_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Central Log Server SRG - Ver 3, Rel 4",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Central_Log_Server_V3R4_SRG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Cisco IOS XE Router NDM STIG SCAP Benchmark - Ver 3, Rel 5",
+      "downloadType": "SCAP 1.3, Security Content Application Protocols (SCAP)",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Cisco_IOS-XE_Router_NDM_V3R5_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Cisco IOS XE Router RTR STIG SCAP Benchmark - Ver 3, Rel 5",
+      "downloadType": "STIGs, SCAP 1.3, Security Content Application Protocols (SCAP)",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Cisco_IOS-XE_Router_RTR_V3R5_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Cisco IOS XE Router STIG",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Cisco_IOS-XE_Router_Y26M04_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Cisco IOS XE Switch STIG",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Cisco_IOS-XE_Switch_Y26M04_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Cisco IOS XR Router STIG",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Cisco_IOS-XR_Router_Y26M04_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Database SRG - Ver 4, Rel 5",
+      "downloadType": "STIGs, Application Security, Database",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Database_V4R5_SRG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Dell OS10 Switch STIG",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Dell_OS10_Switch_Y26M04_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Dragos Platform 2.x STIG - Ver 1, Rel 6",
+      "downloadType": "STIGs, Application Security",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Dragos_Platform_2-x_V1R6_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "HPE Aruba Networking AOS STIG",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_HPE_Aruba_Networking_AOS_Y26M04_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "IBM WebSphere Liberty Server STIG - Ver 2, Rel 4",
+      "downloadType": "STIGs, Application Security, Application Servers",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_IBM_WebSphere_Liberty_Server_V2R4_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "IBM WebSphere Traditional V9.x STIG - Ver 2, Rel 1",
+      "downloadType": "STIGs, Application Security, Application Servers",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_IBM_WebSphere_Traditional_V9-x_V2R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Kubernetes STIG - Ver 2, Rel 6",
+      "downloadType": "STIGs, Application Security, Container Platform",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Kubernetes_V2R6_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Layer 2 Switch SRG - Ver 3, Rel 4",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Layer_2_Switch_V3R4_SRG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "MariaDB Enterprise 10.x STIG - Ver 2, Rel 5",
+      "downloadType": "STIGs, Application Security, Database",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MariaDB_Enterprise_10-x_V2R5_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Edge STIG - Ver 2, Rel 5",
+      "downloadType": "STIGs, Application Security, Browser Guidance",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Edge_V2R5_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Edge STIG Benchmark - Ver 2, Rel 5",
+      "downloadType": "SCAP 1.3, Security Content Application Protocols (SCAP)",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Edge_V2R5_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Microsoft Internet Explorer 11 STIG - Ver 2, Rel 7",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_IE11_V2R7_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Office 365 ProPlus STIG - Ver 3, Rel 5",
+      "downloadType": "STIGs, Application Security, Office Automation",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Office_365_ProPlus_V3R5_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Office 365 ProPlus STIG SCAP Benchmark - Ver 3, Rel 8",
+      "downloadType": "SCAP 1.3, Security Content Application Protocols (SCAP)",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Office_365_ProPlus_V3R8_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft SQL Server 2016 STIG",
+      "downloadType": "STIGs, Application Security, Database",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_SQL_Server_2016_Y26M04_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft SQL Server 2022 STIG",
+      "downloadType": "STIGs, Application Security, Database",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_SQL_Server_2022_Y26M04_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Windows PAW STIG - Ver 3, Rel 3",
+      "downloadType": "Operating Systems, STIGs, Windows",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_PAW_V3R3_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Oracle Database 19c STIG - Ver 1, Rel 5",
+      "downloadType": "STIGs, Application Security, Database",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Oracle_Database_19c_V1R5_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Palo Alto Networks Prisma Cloud Compute STIG - Ver 2, Rel 3",
+      "downloadType": "STIGs, Application Security, Container Platform",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_PAN_Prisma_Cloud_Compute_V2R3_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Samsung Android 14 BYOAD STIG",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SS_Android_14_BYOAD_Y26M04_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Samsung Android 15 BYOAD STIG",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SS_Android_15_BYOAD_Y26M04_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Samsung Android OS 14 with Knox 3.x STIG",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SS_Android_OS_14_KPE_3-x_Y26M04_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Samsung Android OS 15 with Knox 3.x STIG",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SS_Android_15_KPE_3-x_Y26M04_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "SUSE Linux Enterprise Micro 5 STIG - Ver 1, Rel 4",
+      "downloadType": "Operating Systems, STIGs, UNIX/Linux",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SLEM_5_V1R4_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - SUSE Linux Enterprise Server 12 STIG - Ver 3, Rel 5",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SLES_12_V3R5_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Microsoft Internet Explorer 11 STIG SCAP Benchmark - Ver 2, Rel 9",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_IE11_V2R9_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Symantec Edge SWG STIG",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SYM_Edge_SWG_Y26M04_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Active Directory Domain STIG - Ver 3, Rel 7",
+      "downloadType": "Operating Systems, Windows",
+      "uploadDate": "2026-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Active_Directory_Domain_V3R7_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Tri-Lab Operating System Stack (TOSS) 5 STIG - Ver 1, Rel 1",
+      "downloadType": "Operating Systems, General Purpose OS",
+      "uploadDate": "2026-04-03",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_TOSS_5_V1R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "DOD Annex for Mobile Device Fundamentals Protection Profile V4.0 - Ver 1, Rel 1",
+      "downloadType": "NIAP Protection Profiles",
+      "uploadDate": "2026-04-03",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/pdf/U_DOD_Annex_for+MDF_PP_V4-0_V1R1.pdf",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Soaring Software Solutions TCMax 9.x STIG - Ver 1, Rel 1",
+      "downloadType": "STIGs, Application Security",
+      "uploadDate": "2026-03-16",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SSS_TCMax_9-x_V1R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "HPE Alletra Storage ArcusOS STIG",
+      "downloadType": "STIGs, Network/Perimeter/Wireless, Network Other",
+      "uploadDate": "2026-03-16",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_HPE_Alletra_Storage_ArcusOS_Y26M02_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "MongoDB Enterprise Advanced 8.x STIG - Ver 1, Rel 1",
+      "downloadType": "STIGs, Application Security, Database",
+      "uploadDate": "2026-02-27",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MDB_Enterprise_Advanced_8-x_V1R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Nutanix Acropolis STIG",
+      "downloadType": "STIGs, Network/Perimeter/Wireless",
+      "uploadDate": "2026-02-27",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_NTX_Acropolis_Y26M01_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Infoblox 7.x DNS STIG - Ver 2, Rel 2",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-01-29",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Infoblox_7-x_DNS_V2R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Microsoft Access 2016 STIG - Ver 2, Rel 1",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-01-29",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Access_2016_V2R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Microsoft Excel 2016 STIG - Ver 2, Rel 2",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-01-29",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Excel_2016_V2R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Microsoft Office System 2016 STIG - Ver 2, Rel 5",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-01-29",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Office_System_2016_V2R5_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Microsoft OneNote 2016 STIG - Ver 2, Rel 1",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-01-29",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_OneNote_2016_V2R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Microsoft Outlook 2016 STIG - Ver 2, Rel 4",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-01-29",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Outlook_2016_V2R4_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Microsoft PowerPoint 2016 STIG - Ver 2, Rel 1",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-01-29",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_PowerPoint_2016_V2R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Microsoft Publisher 2016 STIG - Ver 2, Rel 1",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-01-29",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Publisher_2016_V2R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Microsoft Windows 10 STIG SCAP Benchmark - Ver 3, Rel 7",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-01-29",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_10_V3R7_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Microsoft Visio 2016 STIG - Ver 2, Rel 1",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2026-01-23",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Visio_2016_V2R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset-Microsoft Windows 10 STIG - Ver 3, Rel 6",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-01-23",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_10_V3R6_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset-Microsoft Word 2016 STIG - Ver 2, Rel 1",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-01-23",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Word_2016_V2R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Okta IDaaS STIG - Ver 1, Rel 2",
+      "downloadType": "STIGs, Cloud Security",
+      "uploadDate": "2026-01-23",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Okta_IDaaS_V1R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Rancher Government Solutions Multi-Cluster Manager STIG - Ver 2, Rel 2",
+      "downloadType": "STIGs, Application Security, Container Platform",
+      "uploadDate": "2026-01-23",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RGS_MCM_V2R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Red Hat Ansible Automation Controller STIG",
+      "downloadType": "STIGs, Application Security, Container Platform",
+      "uploadDate": "2026-01-23",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RH_Ansible_Automation_Controller_Y26M01_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Oracle Linux 7 STIG - Ver 3, Rel 5",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2026-01-23",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Oracle_Linux_7_V3R5_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Fortinet FortiGate Firewall STIG",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2026-01-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_FN_FortiGate_Firewall_Y26M01_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset-Microsoft Skype for Business 2016 STIG - Ver 2, Rel 1",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-01-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Skype_for_Business_2016_V2R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "SUSE Linux Enterprise Server 12 STIG - Ver 3, Rel 4",
+      "downloadType": "Operating Systems, STIGs, UNIX/Linux",
+      "uploadDate": "2026-01-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SLES_12_V3R4_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Xylok Security Suite 20.x STIG - Ver 1, Rel 2",
+      "downloadType": "STIGs, Application Security",
+      "uploadDate": "2026-01-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Xylok_Security_Suite_20-x_V1R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset-Zebra Android 11 COBO STIG - Ver 1, Rel 4",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-01-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Zebra_Android_11_COBO_V1R4_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Defender for Endpoint STIG, Ver 1, Rel 2",
+      "downloadType": "STIGs, Endpoint Security Solutions (ESS)",
+      "uploadDate": "2026-01-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Defender_Endpoint_V1R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Cisco ACI STIG",
+      "downloadType": "STIGs",
+      "uploadDate": "2026-01-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Cisco_ACI_Y26M01_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Axonius Federal Systems Ax-OS STIG - Ver 1, Rel 2",
+      "downloadType": "STIGs",
+      "uploadDate": "2026-01-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_AFS_Ax-OS_V1R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Oracle Linux 7 STIG Benchmark - Ver 3, Rel 3",
+      "downloadType": "Sunset",
+      "uploadDate": "2026-01-21",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Oracle_Linux_7_V3R3_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Rev. 4 Sunset STIGs Compilation",
+      "downloadType": "STIGs, STIG Compilations",
+      "uploadDate": "2026-01-21",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Rev_4_SRG-STIG_Sunset_Compilation.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Container Platform SRG - Ver 2, Rel 4",
+      "downloadType": "STIGs, Application Security, Container Platform",
+      "uploadDate": "2026-01-08",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Container_Platform_V2R4_SRG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Domain Name System SRG\u200b - Ver 4, Rel 2",
+      "downloadType": "STIGs, Network/Perimeter/Wireless, Network Other",
+      "uploadDate": "2026-01-08",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Domain_Name_System_V4R2_SRG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "General Purpose Operating System SRG - Ver 3, Rel 3",
+      "downloadType": "Operating Systems, STIGs, General Purpose OS",
+      "uploadDate": "2026-01-08",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_GPOS_V3R3_SRG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Intrusion Detection and Prevention System SRG - Ver 3, Rel 4",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2026-01-08",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_IDPS_V3R4_SRG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Router SRG - Ver 5, Rel 2",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2026-01-08",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Router_V5R2_SRG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "F5 NGINX STIG - Ver 1, Rel 1",
+      "downloadType": "STIGs, Application Security, Application Servers",
+      "uploadDate": "2026-01-08",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_F5_NGINX_V1R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Canonical Ubuntu 20.04 LTS STIG SCAP Benchmark - Ver 2, Rel 5",
+      "downloadType": "Sunset",
+      "uploadDate": "2025-12-03",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_CAN_Ubuntu_20-04_LTS_V2R5_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Riverbed NetIM STIG",
+      "downloadType": "STIGs, Network",
+      "uploadDate": "2025-12-03",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RB_NetIM_Y25M09_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Azure SQL Managed Instance STIG - Ver 1, Rel 1",
+      "downloadType": "STIGs",
+      "uploadDate": "2025-12-01",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Azure_SQL_MI_V1R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Anduril NixOS STIG - Ver 1, Rel 2",
+      "downloadType": "Operating Systems, UNIX/Linux",
+      "uploadDate": "2025-11-26",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Anduril_NixOS_V1R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Application Security and Development STIG - Ver 6, Rel 4",
+      "downloadType": "STIGs, Application Security, Application Security and Development",
+      "uploadDate": "2025-11-26",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_ASD_V6R4_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Google Android 14 BYOAD STIG",
+      "downloadType": "STIGs, Mobility, Smartphone",
+      "uploadDate": "2025-11-26",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Google_Android_14_BYOAD_Y25M10_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Ivanti Connect Secure STIG",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2025-11-26",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Ivanti_Connect_Secure_Y25M10_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Samsung Android OS 13 with Knox 3.x STIG",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2025-11-26",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SS_Android_OS_13_KPE_3-x_Y25M10_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - SDN Controller SRG - Ver 2, Rel 2",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2025-11-26",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SDN_Controller_V2R2_SRG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Software-Defined Networking (SDN) Using Network Virtualization (NV) STIG - Ver 1, Rel 2",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2025-11-26",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SDN_NV_V1R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Canonical Ubuntu 20.04 LTS STIG - Ver 2, Rel 4",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2025-11-25",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_CAN_Ubuntu_20-04_LTS_V2R4_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Google Android 13 BYOAD STIG",
+      "downloadType": "STIGs, Sunset, Rev 4",
+      "uploadDate": "2025-11-25",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Google_Android_13_BYOAD_Y25M10_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Application Programming Interface (API) SRG - Ver 1, Rel 1",
+      "downloadType": "STIGs, Application Security",
+      "uploadDate": "2025-11-25",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_API_V1R1_SRG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Active Directory Forest STIG - Ver 3, Rel 2",
+      "downloadType": "Operating Systems, STIGs, Windows",
+      "uploadDate": "2025-08-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Active_Directory_Forest_V3R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Arista MLS EOS 4.X STIG",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2025-08-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Arista_MLS_EOS_4-X_Y25M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Google Chrome STIG - Ver 2, Rel 11",
+      "downloadType": "STIGs, Application Security, Browser Guidance",
+      "uploadDate": "2025-08-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Google_Chrome_V2R11_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Google Chrome STIG Benchmark - Ver 2, Rel 11",
+      "downloadType": "STIGs, SCAP 1.3, Security Content Application Protocols (SCAP)",
+      "uploadDate": "2025-08-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Google_Chrome_V2R11_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "HP FlexFabric Switch STIG",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2025-08-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_HP_FlexFabric_Switch_Y25M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Azure SQL Database STIG - Ver 2, Rel 3",
+      "downloadType": "STIGs, Application Security, Database",
+      "uploadDate": "2025-08-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Azure_SQL_DB_V2R3_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Exchange 2019 STIG",
+      "downloadType": "STIGs, Application Security, Application Servers",
+      "uploadDate": "2025-08-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Exchange_2019_Y25M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Oracle Database 12c STIG - Ver 3, Rel 5",
+      "downloadType": "STIGs, Application Security, Database",
+      "uploadDate": "2025-08-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Oracle_Database_12c_V3R5_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Q3 Release Summary",
+      "downloadType": "STIGs",
+      "uploadDate": "2025-08-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/pdf/July+2025+STIGs+to+Be+Released.pdf",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Tanium 7.x STIG - Ver 2, Rel 3",
+      "downloadType": "STIGs, Application Security, Application Servers",
+      "uploadDate": "2025-08-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Tanium_7-x_V2R3_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Splunk Enterprise 8.x for Linux STIG - Ver 2, Rel 3",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2025-08-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Splunk_Enterprise_8-x_for Linux_V2R3_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Splunk Enterprise 7.x for Windows STIG - Ver 3, Rel 2",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2025-08-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Splunk_Enterprise_7-x_for_Windows_V3R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Microsoft OneDrive STIG - Ver 2, Rel 4",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2025-08-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_OneDrive_V2R4_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Citrix XenDesktop 7.x STIG",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2025-08-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Citrix_XenDesktop_7-x_Y25M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Citrix Virtual Apps and Desktops (VAD) 7.x STIG",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2025-08-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Citrix_VAD_7-x_Y25M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Apple iOS/iPadOS 16 BYOAD STIG",
+      "downloadType": "Sunset",
+      "uploadDate": "2025-08-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Apple_iOS-iPadOS_16_BYOAD_Y25M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Apple iOS/iPadOS 16 STIG - Ver 2, Rel 2",
+      "downloadType": "Sunset",
+      "uploadDate": "2025-08-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Apple_iOS-iPadOS_16_V2R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Apple iOS/iPadOS 17 BYOAD STIG",
+      "downloadType": "Sunset",
+      "uploadDate": "2025-08-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Apple_iOS-iPadOS_17_BYOAD_Y25M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Apple iOS/iPadOS 17 STIG - Ver 2, Rel 2",
+      "downloadType": "Sunset",
+      "uploadDate": "2025-08-07",
+      "url": "https://s3.us-gov-west-1.amazonaws.com/dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Apple_iOS-iPadOS_17_V2R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Arctic Wolf CylanceON-PREM - Ver 1, Rel 1",
+      "downloadType": "Application Security",
+      "uploadDate": "2025-08-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_AW_CylanceON-PREM_V1R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Trellix Application Control 8.x STIG - Ver 3, Rel 2",
+      "downloadType": "STIGs, Endpoint Security Solutions (ESS), Trellix",
+      "uploadDate": "2025-08-06",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Trellix_Application_Control_8-x_V3R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "RUCKUS ICX STIG",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2025-08-06",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RUCKUS_ICX_Y25M05_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Honeywell Android 13 STIG",
+      "downloadType": "STIGs, Mobility, Smartphone",
+      "uploadDate": "2025-05-09",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_HW_Android_13_Y25M04_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "IBM zSecure Suite STIG - Ver 1, Rel 3",
+      "downloadType": "Operating Systems, STIGs, Mainframe",
+      "uploadDate": "2025-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_IBM_zSecure_Suite_V1R3_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "JBoss Enterprise Application Platform 6.3 STIG - Ver 2, Rel 6",
+      "downloadType": "STIGs, Application Security, Application Servers",
+      "uploadDate": "2025-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_JBoss_EAP_6-3_V2R6_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Motorola Solutions Android 13 STIG",
+      "downloadType": "STIGs, Mobility, Smartphone",
+      "uploadDate": "2025-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MOT_Solutions_Android_13_Y25M03_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Microsoft SCOM STIG - Ver 1, Rel 2",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2025-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_SCOM_V1R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Tanium 7.0 STIG - Ver 2, Rel 1",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2025-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Tanium_7-0_V2R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Tanium 7.3 STIG - Ver 2, Rel 3",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2025-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Tanium_7-3_V2R3_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Tanium 7.x TanOS STIG",
+      "downloadType": "STIGs, Application Security, Application Services",
+      "uploadDate": "2025-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Tanium_7-x_TanOS_Y25M04_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Trend MicroTippingPoint STIG",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2025-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_TM_TippingPoint_Y25M04_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "VMware vSphere 7.0 STIG",
+      "downloadType": "Operating Systems, STIGs, Virtualization",
+      "uploadDate": "2025-04-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_VMW_vSphere_7-0_Y25M04_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Entra ID STIG \u2013 Ver 1, Rel 1",
+      "downloadType": "STIGs, Cloud Security",
+      "uploadDate": "2025-04-02",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Entra_ID_V1R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Oracle HTTP Server 12.1.3 STIG - Ver 2, Rel 3",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2025-02-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Oracle_HTTP_Server_12-1-3_V2R3_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Authentication, Authorization, and Accounting Services (AAA) SRG - Ver 2, Rel 2",
+      "downloadType": "STIGs, Network/Perimeter/Wireless, Network Other",
+      "uploadDate": "2025-01-28",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_AAA_Services_V2R2_SRG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Juniper Router STIG",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2025-01-28",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Juniper_Router_Y25M01_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Juniper SRX Services Gateway STIG",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2025-01-28",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Juniper_SRX_SG_Y25M01_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Exchange 2016 STIG",
+      "downloadType": "STIGs, Application Security, Application Servers",
+      "uploadDate": "2025-01-28",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Exchange_2016_Y25M01_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Apple macOS 13 (Ventura) STIG - Ver 1, Rel 5",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2025-01-28",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Apple_macOS_13_V1R5_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - F5 BIG-IP STIG",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2025-01-28",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_F5_BIG-IP_Y25M01_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - IBM Aspera Platform 4.2 STIG - Ver 1, Rel 3",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2025-01-28",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_IBM_Aspera_Platform_4-2_V1R3_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - McAfee Application Control 7.x STIG - Ver 1, Rel 4",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2025-01-28",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_McAfee_Application_Control_7-x_V1R4_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Oracle WebLogic Server 12c STIG - Ver 2, Rel 2",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2025-01-28",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Oracle_WebLogic_Server_12c_V2R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Storage Area Network STIG - Ver 2, Rel 5",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2025-01-28",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Storage_Area_Network_V2R5_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "VMware NSX 4.x STIG",
+      "downloadType": "STIGs, Network/Perimeter/Wireless",
+      "uploadDate": "2025-01-28",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_VMW_NSX_4-x_Y25M01_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Microsoft Windows Server 2016 STIG - Ver 2, Rel 10",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2025-01-23",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_Server_2016_V2R10_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Microsoft Windows Server 2016 STIG Benchmark - Ver 2, Rel 8",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2025-01-23",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_Server_2016_V2R8_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Microsoft Windows Server 2016 STIG for Chef - Ver 1, Rel 3",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2025-01-23",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_Server_2016_V1R3_STIG_Chef.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "IBM Hardware Management Console (HMC) STIG - Ver 2, Rel 1",
+      "downloadType": "Operating Systems, STIGs, Mainframe",
+      "uploadDate": "2024-10-23",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_IBM_HMC_V2R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "ISEC7 Sphere STIG - Ver 3, Rel 1",
+      "downloadType": "STIGs, Mobility, MDM/EMM Server",
+      "uploadDate": "2024-10-23",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_ISEC7_Sphere_V3R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Ivanti EPMM Server STIG - Ver 3, Rel 1",
+      "downloadType": "STIGs, Mobility, MDM/EMM Server",
+      "uploadDate": "2024-10-23",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Ivanti_EPMM_Server_V3R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Ivanti Sentry 9.x STIG",
+      "downloadType": "STIGs, Mobility, MDM/EMM Server",
+      "uploadDate": "2024-10-23",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Ivanti_Sentry_9-x_Y24M10_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "MarkLogic Server v9 STIG - Ver 3, Rel 2",
+      "downloadType": "STIGs, Application Security, Database",
+      "uploadDate": "2024-10-23",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MarkLogic_Server_v9_V3R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Network Infrastructure Policy STIG - Ver 10, Rel 7",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2024-10-23",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Network_Infrastructure_Policy_V10R7_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Oracle MySQL 8.0 STIG - Ver 2, Rel 2",
+      "downloadType": "STIGs, Application Security, Database",
+      "uploadDate": "2024-10-23",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Oracle_MySQL_8-0_V2R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Redis Enterprise 6.x STIG - Ver 2, Rel 2",
+      "downloadType": "STIGs, Application Security, Database",
+      "uploadDate": "2024-10-23",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Redis_Enterprise_6-x_V2R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "MongoDB 7.x STIG - Ver 1, Rel 1",
+      "downloadType": "STIGs, Application Security, Database",
+      "uploadDate": "2024-10-01",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MongoDB_Enterprise_Advanced_7-x_V1R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - ForeScout CounterACT ALG STIG - Ver 1, Rel 3",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-08-13",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_ForeScout_CounterACT_ALG_V1R3_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - ForeScout CounterACT NDM STIG - Ver 1, Rel 2",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-08-13",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_ForeScout_CounterACT_NDM_V1R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - MS SQL Server 2014 STIG",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-08-13",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_SQL_Server_2014_Y24M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Nutanix AOS 5.20.x STIG",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-08-13",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Nutanix_AOS_5-20-x_Y24M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Compilation - SRG-STIG Library - READ ME",
+      "downloadType": "STIGs, STIG Compilations",
+      "uploadDate": "2024-08-08",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/pdf/U_STIG_Library-zip_Readme_V2R1.pdf",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "EnterpriseDB Postgres Advanced Server (EPAS) STIG - Ver 2, Rel 1",
+      "downloadType": "STIGs, Application Security, Database",
+      "uploadDate": "2024-07-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_EPAS_V2R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "HPE Nimble Storage Array STIG",
+      "downloadType": "STIGs, Network/Perimeter/Wireless, Network Other",
+      "uploadDate": "2024-07-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_HPE_Nimble_Storage_Array_V2R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Jamf Pro v10.x EMM STIG - Ver 3, Rel 1",
+      "downloadType": "STIGs, Mobility, MDM/EMM Server",
+      "uploadDate": "2024-07-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Jamf_Pro_v10-x_EMM_V3R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Mirantis Kubernetes Engine STIG - Ver 2, Rel 1",
+      "downloadType": "STIGs, Application Security, Container Platform",
+      "uploadDate": "2024-07-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Mirantis_Kubernetes_Engine_V2R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Riverbed NetProfiler STIG - Ver 2, Rel 1",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2024-07-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RB_NetProfiler_V2R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - A10 Networks ADC STIG",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-07-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_A10_Networks_ADC_Y24M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Apple macOS 12 STIG - Ver 1, Rel 9",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-07-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Apple_macOS_12_V1R9_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Arista MultiLayer Switch DCS 7000 Series STIG",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-07-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Arista_MLS_DCS-7000_Series_Y24M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - CA API Gateway STIG",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-07-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_CA_API_Gateway_Y24M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Canonical Ubuntu 18.04 LTS STIG - Ver 2, Rel 15",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-07-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_CAN_Ubuntu_18-04_LTS_V2R15_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Canonical Ubuntu 18.04 LTS STIG Benchmark - Ver 2, Rel 12",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-07-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_CAN_Ubuntu_18-04_V2R12_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - DBN 6300 STIG",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-07-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_DBN-6300_Y24M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Docker Enterprise 2.x Linux/Unix STIG - Ver 2, Rel 2",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-07-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Docker_Enterprise_2-x_Linux-Unix_V2R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - EDB Postgres Advanced Server v11 on Windows STIG - Ver 2, Rel 4",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-07-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_EDB_PGS_Advanced_Server_v11_Windows_V2R4_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - IBM MQ Appliance V9-0 STIG",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-07-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_IBM_MQ_Appliance_v9-0_Y24M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Microsoft Windows 2012 Server Domain Name System STIG - Ver 2, Rel 7",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-07-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_2012_Server_DNS_V2R7_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - MongoDB 3.x STIG - Ver 2, Rel 3",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-07-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MDB_Enterprise_Advanced_3-x_V2R3_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - MongoDB 4.x STIG - Ver 1, Rel 4",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-07-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MDB_Enterprise_Advanced_4-x_V1R4_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Oracle Database 11.2g STIG - Ver 2, Rel 5",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-07-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Oracle_Database_11-2g_V2R5_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - PostgreSQL 9.x STIG - Ver 2, Rel 5",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-07-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_PGS_SQL_9-x_V2R5_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Red Hat Enterprise Linux 7 STIG - Ver 3, Rel 15",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-07-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RHEL_7_V3R15_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Red Hat Enterprise Linux 7 STIG Benchmark - Ver 3, Rel 15",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-07-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RHEL_7_V3R15_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Riverbed Steelhead CX v8 STIG",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-07-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Riverbed_SteelHead_CX_v8_Y24M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - VMware Workspace ONE UEM STIG - Ver 2, Rel 2",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-07-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_VMW_WS1_UEM_V2R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Microsoft Windows 10 STIG - Ver 2, Rel 9",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-05-02",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_10_V2R9_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Apple iOS/iPadOS 15 - Ver 1, Rel 4",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-04-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Apple_iOS-iPadOS_15_V1R4_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - VMware Horizon 7.13 STIG",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-04-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_VMW_Horizon_7-13_Y24M04_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "DOD Annex for Mobile Device Fundamentals Protection Profile V3.3 - Ver 1, Rel 2",
+      "downloadType": "STIGs, NIAP Protection Profiles",
+      "uploadDate": "2024-04-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/pdf/U_DOD_Annex_for_MDF_PP_V3-3_V1R2.pdf",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Red Hat Enterprise Linux 9 Benchmark - Ver 1, Rel 1",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-02-21",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RHEL_9_V1R1_STIG_SCAP_1-3_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - MongoDB 3.x STIG - Ver 2, Rel 2",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-01-25",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MDB_Enterprise_Advanced_3-x_V2R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "BlackBerry CylancePROTECT Mobile for UEM STIG - Ver 1, Rel 2",
+      "downloadType": "STIGs, Mobility, MDM/EMM Server",
+      "uploadDate": "2024-01-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_BB_CylancePROTECT_Mobile_for_UEM_V1R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Canonical Ubuntu 20.04 LTS STIG for Ansible - Ver 1, Rel 11",
+      "downloadType": "STIGs, Ansible, Supplemental Automation Content",
+      "uploadDate": "2024-01-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_CAN_Ubuntu_20-04_LTS_V1R11_STIG_Ansible.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Red Hat Enterprise Linux 8 STIG for Chef - Ver 1, Rel 13",
+      "downloadType": "STIGs, Supplemental Automation Content, Chef",
+      "uploadDate": "2024-01-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RHEL_8_V1R13_STIG_Chef.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Oracle Database 12c STIG - Ver 2, Rel 9",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-01-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Oracle_Database_12c_V2R9_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Canonical Ubuntu 18.04 LTS STIG Benchmark - Ver 2, Rel 11",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-01-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_CAN_Ubuntu_18-04_V2R11_STIG_SCAP_1-2_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Canonical Ubuntu 18.04 LTS STIG for Ansible - Ver 2, Rel 13",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-01-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_CAN_Ubuntu_18-04_LTS_V2R13_STIG_Ansible.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - EDB Postgres Advanced Server v9.6 STIG - Ver 2, Rel 3",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-01-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_EDB_PGS_Advanced_Server_v9-6_V2R3_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Honeywell Android 9.x STIG",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-01-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_HW_Android_9-x_Y24M01_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - MongoDB 4.x STIG - Ver 1, Rel 3",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-01-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MDB_Enterprise_Advanced_4-x_V1R3_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Oracle Linux 8 STIG Benchmark - Ver 1, Rel 8",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-01-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Oracle_Linux_8_V1R8_STIG_SCAP_1-2_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Red Hat Enterprise Linux 7 STIG for Ansible - Ver 3, Rel 14",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-01-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RHEL_7_V3R14_STIG_Ansible.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Red Hat Enterprise Linux 8 STIG Benchmark - Ver 1, Rel 12",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-01-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RHEL_8_V1R12_STIG_SCAP_1-2_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - SUSE Linux Enterprise Server 15 STIG Benchmark - Ver 1, Rel 6",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-01-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SLES_15_V1R6_STIG_SCAP_1-2_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - TOSS 4 STIG Benchmark - Ver 1, Rel 3",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-01-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_TOSS_4_V1R3_STIG_SCAP_1-2_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Trend Micro Deep Security 9.x STIG - Ver 2, Rel 1",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2024-01-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Trend_Micro_Deep_Security_9-x_V2R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Stig Viewer 3 CKLB JSON Schema",
+      "downloadType": "STIGs, STIG Viewer 3.x",
+      "uploadDate": "2024-01-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/SV3_CKLB_1_0_JSON_SCHEMA.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Windows Defender Firewall with Advanced Security STIG - Ver 2, Rel 2",
+      "downloadType": "Operating Systems, STIGs, Windows",
+      "uploadDate": "2023-10-30",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_Defender_Firewall_V2R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Windows Defender Firewall with Advanced Security STIG Benchmark - Ver 2, Rel 3",
+      "downloadType": "STIGs, Security Content Application Protocols (SCAP), SCAP 1.2",
+      "uploadDate": "2023-10-30",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_Defender_Firewall_V2R3_STIG_SCAP_1-2_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Network WLAN STIG",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2023-10-23",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Network_WLAN_Y23M10_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Kubernetes STIG Benchmark - Ver 1, Rel 3",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2023-10-23",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Kubernetes_V1R3_STIG_SCAP_1-2_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - VMware vRealize Automation 7.x STIG",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2023-10-23",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_VMW_vRealize_Automation_7-x_Y23M10_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - VMware vRealize Operations Manager Cassandra STIG - Ver 1, Rel 2",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2023-10-23",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_VMW_vRealize_Ops_Mgr_Cassandra_V1R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - VMware vRealize Ops 6.x STIG",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2023-10-23",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_VMW_vRealize_Ops_6-x_Y23M10_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Windows 11 STIG for Chef - Ver 1, Rel 3",
+      "downloadType": "STIGs, Supplemental Automation Content, Chef",
+      "uploadDate": "2023-08-17",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_11_V1R3_STIG_Chef.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Cloud Service Providers in FedRAMP Process",
+      "downloadType": "STIGs",
+      "uploadDate": "2023-08-04",
+      "url": "https://marketplace.fedramp.gov/products",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "BlackBerry Enterprise Mobility Server (BEMS) 3.x STIG - Ver 1, Rel 2",
+      "downloadType": "STIGs, Mobility, MDM/EMM Server",
+      "uploadDate": "2023-07-20",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_BEMS_3-x_V1R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Esri ArcGIS for Server 10.3 STIG - Ver 2, Rel 1",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2023-07-20",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_ArcGIS_Server_10-3_V2R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "VMware NSX-T Data Center STIG",
+      "downloadType": "STIGs, Network/Perimeter/Wireless",
+      "uploadDate": "2023-07-20",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_VMW_NSX-T_Y23M07_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Solaris 11 SPARC STIG Benchmark - Ver 2, Rel 4",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2023-04-24",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SOL_11_SPARC_V2R4_STIG_SCAP_1-2_Benchmark.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "AvePoint Compliance Guardian STIG - Ver 1, Rel 1",
+      "downloadType": "STIGs, Application Security",
+      "uploadDate": "2023-03-07",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_AP_Compliance_Guardian_V1R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Windows Server 2022 STIG with Ansible - Ver 1, Rel 1",
+      "downloadType": "STIGs, Ansible, Supplemental Automation Content",
+      "uploadDate": "2023-02-08",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_Server_2022_V1R1_STIG_Ansible.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Windows Server 2022 STIG for Chef - Ver 1, Rel 1",
+      "downloadType": "STIGs, Supplemental Automation Content, Chef",
+      "uploadDate": "2023-02-03",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_Server_2022_V1R1_STIG_Chef.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "IBM zVM Using CA VMSecure STIG - Ver 2, Rel 2",
+      "downloadType": "Operating Systems, STIGs, Mainframe",
+      "uploadDate": "2022-10-21",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_IBM_zVM_Using_CA_VMSecure_V2R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "SPEC Innovations Innoslate 4.x STIG - Ver 1, Rel 1",
+      "downloadType": "STIGs, Application Security",
+      "uploadDate": "2022-09-28",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SPEC_Innovations_Innoslate_4-x_V1R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "AvePoint DocAve 6 STIG - Ver 1, Rel 2",
+      "downloadType": "STIGs, Application Security",
+      "uploadDate": "2022-08-24",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_AvePoint_DocAve_6_V1R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Samsung SDS EMM STIG - Ver 1, Rel 3",
+      "downloadType": "STIGs, Mobility, MDM/EMM Server",
+      "uploadDate": "2022-07-27",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SS_SDS_EMM_V1R3_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Sunset - Red Hat Enterprise Linux 7 STIG for Chef - Ver 3, Rel 8",
+      "downloadType": "STIGs, Sunset",
+      "uploadDate": "2022-07-27",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RHEL_7_V3R8_STIG_Chef.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "CCI List Readme",
+      "downloadType": "STIGs, Control Correlation Identifier (CCI)",
+      "uploadDate": "2022-03-30",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/txt/CCI_List_Readme.txt",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "NIAP Approved Protection Profiles",
+      "downloadType": "STIGs, NIAP Protection Profiles",
+      "uploadDate": "2022-02-15",
+      "url": "https://www.niap-ccevs.org/Profile/PP.cfm",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Palo Alto Networks STIG for Ansible - Ver 1, Rel 4",
+      "downloadType": "STIGs, Ansible, Supplemental Automation Content",
+      "uploadDate": "2022-01-04",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Palo_Alto_Networks_V1R4_STIG_Ansible.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Cisco IOS XE Router NDM RTR STIG for Ansible - Ver 2, Rel 3",
+      "downloadType": "STIGs, Ansible, Supplemental Automation Content",
+      "uploadDate": "2021-10-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Cisco_IOS_XE_Router_NDM_RTR_V2R3_STIG_Ansible.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Adobe Acrobat Professional DC Continuous Track STIG - Ver 2, Rel 1",
+      "downloadType": "STIGs, Application Security, Desktop",
+      "uploadDate": "2021-07-26",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Adobe_Acrobat_Pro_DC_Continuous_V2R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Adobe Acrobat Reader DC Continuous Track STIG - Ver 2, Rel 1",
+      "downloadType": "STIGs, Application Security, Desktop",
+      "uploadDate": "2021-07-26",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Adobe_Acrobat_Reader_DC_Continuous_V2R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "How to Create and SRG-STIG ID Mapping Spreadsheet",
+      "downloadType": "STIGs",
+      "uploadDate": "2021-02-03",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/doc/U_How_to_Create_an_SRG-STIG_ID_Mapping_Spreadsheet.docx",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "DoD Annex for MDM Protection Profile V4.0 - Ver 1, Rel 3",
+      "downloadType": "STIGs, NIAP Protection Profiles",
+      "uploadDate": "2021-01-29",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/pdf/U_DoD_Annex_for_MDM_PP_Server_V4-0_V1R3.pdf",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "DoD Annex for PP - Module for MDM Agents V1.0 - Ver 1, Rel 3",
+      "downloadType": "STIGs, NIAP Protection Profiles",
+      "uploadDate": "2021-01-29",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/pdf/U_DoD_Annex_for_PP-Module_for_MDM_Agents_V1-0_V1R3.pdf",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Blackberry UEM STIG - Ver 2, Rel 1",
+      "downloadType": "STIGs, Mobility, MDM/EMM Server",
+      "uploadDate": "2021-01-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_BB_UEM_MDM_V2R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Juniper SRX SG STIG for Ansible - Ver 1, Rel 1",
+      "downloadType": "STIGs, Ansible, Supplemental Automation Content",
+      "uploadDate": "2020-11-19",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Juniper_SRX_SG_V1R1_STIG_Ansible.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "BlackBerry Enterprise Mobility Server (BEMS) 2.x STIG - Ver 1, Rel 3",
+      "downloadType": "STIGs, Mobility, MDM/EMM Server",
+      "uploadDate": "2020-07-28",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_BEMS_2-x_V1R3_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Windows Server 2016 STIG for PowerShell DSC - Ver 1, Rel 3",
+      "downloadType": "STIGs, Supplemental Automation Content, Powershell DSC",
+      "uploadDate": "2020-06-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_Server_2016_V1R3_STIG_PowerShell_DSC.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Windows Server 2019 STIG for Chef - Ver 1, Rel 2",
+      "downloadType": "STIGs, Supplemental Automation Content, Chef",
+      "uploadDate": "2020-06-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MS_Windows_Server_2019_V1R2_STIG_Chef.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Symantec ProxySG STIG",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2020-04-23",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SYM_ProxySG_Y20M04_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Vendor STIG Acronym List",
+      "downloadType": "STIGs",
+      "uploadDate": "2020-01-16",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/pdf/U_Vendor_STIG_Acronym_List_V1R1.pdf",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "IBM MaaS360 with Watson v10-x MDM STIG - Ver1, Rel 2",
+      "downloadType": "STIGs, Mobility, MDM/EMM Server",
+      "uploadDate": "2019-08-15",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_IBM_MaaS360_with_Watson_v10-x_MDM_V1R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "IBM WebSphere Traditional V9.x STIG Version 1 Release Memo",
+      "downloadType": "STIGs, Application Security, Application Servers",
+      "uploadDate": "2019-06-26",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/pdf/U_IBM_Websphere_Traditional_V9-x_STIG_V1__Release_Memo_signed.pdf",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "MobileIron Core v10.x MDM STIG Ver 1 Rel 1",
+      "downloadType": "STIGs, Mobility, MDM/EMM Server",
+      "uploadDate": "2019-06-06",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_MobileIron_Core_v10-x_MDM_V1R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "SEL-2740S STIG Ver 1 Rel 1",
+      "downloadType": "STIGs, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2019-06-06",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SEL-2740S_V1R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "VMware NSX STIG, Ver 1 Release Memo",
+      "downloadType": "Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2019-03-11",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/pdf/U_VMware-NSX_STIG_V1_Memo_signed.pdf",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "DoD Annex for Application Software Extended Package for Web Browsers - Ver 1, Rel 1",
+      "downloadType": "NIAP Protection Profiles",
+      "uploadDate": "2019-03-10",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/pdf/U_DoD_Browser_Annex_for_AppSoftware_Extended_Package_V1R1.pdf",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Windows Lifecycle Support",
+      "downloadType": "Operating Systems, STIGs, Windows",
+      "uploadDate": "2019-03-09",
+      "url": "https://support.microsoft.com/en-us/help/13853/windows-lifecycle-fact-sheet",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Windows Lifecycle Support Information\u200b\u200b",
+      "downloadType": "Operating Systems, Windows",
+      "uploadDate": "2019-03-09",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/doc/U_Windows_10_Lifecycle_Support-2018-09-25.docx",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Network Management Security Guidance At-a-Glance\u200b",
+      "downloadType": "Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2019-03-09",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/pdf/U_Network_Management_Security_Guidance_At-a-Glance_V9R1.pdf",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "SLES V11 for System z STIG - Ver 1, Rel 12",
+      "downloadType": "Operating Systems, Mainframe",
+      "uploadDate": "2019-03-09",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_SLES_V11_for_System_z_V1R12_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "IBM DataPower NDM STIG - Ver 1, Rel 2\u200b",
+      "downloadType": "Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2018-12-01",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_IBM_DataPower_NDM_V1R2_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "IBM DataPower STIG ALG STIG Ver 1",
+      "downloadType": "Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2018-12-01",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_IBM_DataPower_ALG_V1R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "IBM DataPower STIG Overview, Ver 1",
+      "downloadType": "Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2018-12-01",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_IBM_DataPower_V1R1_Overview.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft Project 2016 STIG - Ver 1, Rel 1",
+      "downloadType": "Application Security, Office Automation",
+      "uploadDate": "2018-12-01",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Microsoft_Project_2016_V1R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "VMware NSX Distributed Logical Router STIG, Ver 1",
+      "downloadType": "Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2018-12-01",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_VMware_NSX_Distributed_Logical_Router_V1R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "VMware NSX Manager STIG, Ver 1",
+      "downloadType": "Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2018-12-01",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_VMware_NSX_Manager_V1R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "VMware NSX STIG Overview, Ver 1",
+      "downloadType": "Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2018-12-01",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_VMware_NSX_V1R1_Overview.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "\u200bDoD CIO Memo - Migration to Microsoft Windows 10 Secure Host Baseline",
+      "downloadType": "Operating Systems, Windows",
+      "uploadDate": "2018-11-30",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/pdf/U_DoD_CIO_Memo_Migration_to_Windows_10_Secure_Host_Baseline.pdf",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "2016-04-21 DoD CIO Memo - Use of Wearable Devices DoD Accredited Spaces with FAQ",
+      "downloadType": "STIG Policy",
+      "uploadDate": "2018-11-30",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/pdf/2016-04-21_DoD_CIO_Memo-Use_of_Wearable_Devices_DoD_Accredited_Spaces_with_FAQ.pdf",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "IBM DataPower STIG Ver 1 Release Memo",
+      "downloadType": "Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2018-11-30",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/pdf/U_IBM_DataPower_STIG_Ver1_memo_signed.pdf",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Interim Guidance for the Use of Canonical Names (CNAME) in Cloud Computing",
+      "downloadType": "Network/Perimeter/Wireless, Network Other",
+      "uploadDate": "2018-11-30",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/doc/U_CNAME_for_DNS.docx",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "CCI Specification",
+      "downloadType": "STIGs, Control Correlation Identifier (CCI)",
+      "uploadDate": "2018-11-09",
+      "url": "https://dl.cyber.mil/wp-content/uploads/stigs/zip/u_draft_cci_specification_v2r0.2.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Akamai KSD Service IL2 ALG STIG Version 1\u200b\u200b\u200b",
+      "downloadType": "STIGs, Cloud Security, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2017-10-23",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Akamai_KSD_Service_IL2_ALG_V1R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Akamai KSD Service IL2 NDM STIG Version 1\u200b\u200b\u200b\u200b",
+      "downloadType": "STIGs, Cloud Security, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2017-10-23",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Akamai_KSD_Service_IL2_NDM_V1R1_STIG.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Akamai KSD Service IL2 STIG Overview\u200b\u200b",
+      "downloadType": "STIGs, Cloud Security, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2017-10-23",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_Akamai_KSD_Service_IL2_V1R1_Overview.zip",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Akamai KSD Service IL2 STIG Ver 1 Release Memo\u200b\u200b\u200b\u200b",
+      "downloadType": "STIGs, Cloud Security, Network Infrastructure, Network/Perimeter/Wireless",
+      "uploadDate": "2017-10-09",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/pdf/U_Akamai_KSD_STIG_Ver1_Release_Memo.pdf",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "Microsoft .Net Framework Security Checklist - Ver 1, Rel 3",
+      "downloadType": "Application Security, Application Services",
+      "uploadDate": "2016-04-22",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/pdf/U_Microsoft_DotNet_V1R3_Checklist.pdf",
+      "classification": "Unclassified"
+    },
+    {
+      "name": "CCI Process",
+      "downloadType": "STIGs, Control Correlation Identifier (CCI)",
+      "uploadDate": "2011-02-28",
+      "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/pdf/u_cci_process_v1r0.1.pdf",
+      "classification": "Unclassified"
+    }
+  ],
+  "rawEntriesSha256": "febfb22ba5aeb450affec8fd0968c48cc5fff5a22d47ba65781ee65f1c2adf7a"
+}
