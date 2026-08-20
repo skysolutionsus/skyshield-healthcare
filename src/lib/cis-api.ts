@@ -12,6 +12,9 @@ export interface CISBenchmark {
         status: string;
         statusDate: string;
     };
+    workbenchStatus?: {
+        status: string;
+    };
     assessmentStatus: string;
     availableFormats: string[];
     profile: Array<{ profileId: string; profileTitle: string }>;

@@ -72,6 +72,8 @@ export interface SCSEMUpdaterClientSession {
         signals: string[];
     };
     status: SCSEMUpdaterSession["status"];
+    workspaceMode: "official_update" | "unverified_update" | "cis_bootstrap";
+    analysisScope: "full" | "compliance_only";
     summary?: string;
     scsem: {
         subject: string | null;
@@ -99,10 +101,10 @@ export interface SCSEMUpdaterClientSession {
         };
         benchmarkLookupError?: string;
         supplementalComparison?: {
-            mode: "ai" | "deterministic_fallback" | "no_delta" | "failed";
+            mode: "ai" | "deterministic_fallback" | "no_delta" | "not_requested" | "failed";
             complete: boolean;
             candidateOnly: true;
-            applicabilityStatus: "review_required";
+            applicabilityStatus: "review_required" | "not_requested";
             directSourceCount: number;
             comparedDirectSourceCount: number;
             candidateCount: number;
@@ -137,6 +139,27 @@ export interface SCSEMUpdaterClientSession {
         cisSources?: SCSEMUpdaterClientAuditSource[];
         stigSources?: SCSEMUpdaterClientAuditSource[];
         adjacentSources?: SCSEMUpdaterClientAuditSource[];
+        cisBootstrap?: {
+            workbenchId: number;
+            benchmarkTitle: string;
+            benchmarkVersion: string;
+            selectedProfile: string;
+            recommendationCount: number;
+            structuralBaseline: {
+                sourceFileName: string;
+                sourceUrl: string;
+                sourceSha256: string;
+                sourceVersion: string | null;
+                targetSheet: string;
+            };
+        };
+        structuralAdmission?: {
+            trust: "unverified_structural_draft";
+            totalControls: number;
+            testCaseSheets: string[];
+            issueCodeCount: number;
+            blocker: string;
+        };
     };
 }
 
@@ -288,6 +311,8 @@ export function clientSafeSCSEMUpdaterSession(
             }
             : {}),
         status: session.status,
+        workspaceMode: session.workspaceMode || "official_update",
+        analysisScope: session.analysisScope || "full",
         ...(benchmarkNarrative.summary !== undefined
             ? { summary: benchmarkNarrative.summary }
             : {}),
@@ -394,6 +419,29 @@ export function clientSafeSCSEMUpdaterSession(
                 : {}),
             ...(session.audit.adjacentSources !== undefined
                 ? { adjacentSources: clientAuditSourceList(session.audit.adjacentSources) }
+                : {}),
+            ...(session.audit.cisBootstrap !== undefined
+                ? {
+                    cisBootstrap: {
+                        workbenchId: session.audit.cisBootstrap.workbenchId,
+                        benchmarkTitle: session.audit.cisBootstrap.benchmarkTitle,
+                        benchmarkVersion: session.audit.cisBootstrap.benchmarkVersion,
+                        selectedProfile: session.audit.cisBootstrap.selectedProfile,
+                        recommendationCount: session.audit.cisBootstrap.recommendationCount,
+                        structuralBaseline: { ...session.audit.cisBootstrap.structuralBaseline },
+                    },
+                }
+                : {}),
+            ...(session.audit.structuralAdmission !== undefined
+                ? {
+                    structuralAdmission: {
+                        trust: session.audit.structuralAdmission.trust,
+                        totalControls: session.audit.structuralAdmission.totalControls,
+                        testCaseSheets: [...session.audit.structuralAdmission.testCaseSheets],
+                        issueCodeCount: session.audit.structuralAdmission.issueCodeCount,
+                        blocker: session.audit.structuralAdmission.blocker,
+                    },
+                }
                 : {}),
         },
     };

@@ -386,6 +386,35 @@ export function validateChanges(rawChanges: any[], controls: SCSEMControlEvidenc
         .slice(0, maxChanges);
 }
 
+export function buildSheetScopedComparisonCandidates(
+    controls: SCSEMControlEvidence[],
+    recommendations: CISBenchmarkRecommendation[],
+    matchedSheets: string[],
+    options: {
+        maxUpdateCandidates?: number;
+        maxNewControlCandidates?: number;
+    } = {}
+): Array<{
+    sheetName: string;
+    updateCandidates: Array<{
+        control: SCSEMControlEvidence;
+        recommendation: CISBenchmarkRecommendation;
+        score: number;
+    }>;
+    newControlCandidates: CISBenchmarkRecommendation[];
+    totalUpdateCandidates: number;
+    totalNewControlCandidates: number;
+}> {
+    return matchedSheets.flatMap((sheetName) => {
+        const sheetControls = controls.filter((control) => control.sourceSheet === sheetName);
+        if (sheetControls.length === 0) return [];
+        return [{
+            sheetName,
+            ...buildComparisonCandidates(sheetControls, recommendations, options),
+        }];
+    });
+}
+
 export async function downloadAndParseBenchmark(
     token: string,
     benchmark: CISBenchmark,

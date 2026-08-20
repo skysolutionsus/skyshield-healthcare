@@ -7,7 +7,8 @@ The SCSEM Updater is for authorized Office of Safeguards personnel who maintain 
 ## Core Capabilities
 
 - AI Compliance Agent: Ask questions about Publication 1075 and related guidance with retrieved source context, citations, and audit metadata.
-- SCSEM Updater: Start from a pinned, hash-identified IRS Safeguards SCSEM source; compare it with pinned Publication 1075 and NIST material plus reviewer-confirmed CIS Benchmark/CIS-STIG evidence from CIS WorkBench; and export a reviewer-approved candidate XLSX.
+- SCSEM Updater: Start from a pinned, hash-identified IRS Safeguards SCSEM source; choose a Publication 1075/NIST-only or full CIS WorkBench review; compare every version/provider tab independently; and export a reviewer-approved candidate XLSX.
+- CIS Bootstrap Drafts: Start a new, explicitly non-official SCSEM working draft from an accepted licensed CIS WorkBench Excel artifact and exact profile. SkyShield uses the pinned Generic Application SCSEM only as a controlled blank structural shell; every generated control remains reviewer-gated and requires Publication 1075/NIST mapping, IRS issue-code selection, applicability review, and separate release approval.
 - Workbook Fidelity: Candidate exports preserve the canonical workbook's structure and formulas while limiting edits to approved template-content fields. Agency-entered responses, evidence, observed findings, remediation, status, and risk values are never imported or carried forward by this workflow; template-owned standard finding text is canonical control metadata.
 - Audit Log Drilldowns: Audit entries are clickable and show structured details such as input, output, retrieval context, action metadata, and raw JSON.
 - Incident Tracking: Capture, triage, and document incidents including PII/FTI detection events from the agent.
@@ -75,7 +76,8 @@ flowchart LR
 Primary API calls for the stewardship flow:
 
 - `POST /api/scsem-updater/upload` validates the workbook against the pinned IRS source manifest, stores it, parses metadata, creates a steward-scoped updater session, and logs the upload.
-- `POST /api/scsem-updater/[id]/analyze` compares the pinned IRS baseline with the pinned Publication 1075 and NIST snapshots, evaluates licensed CIS Benchmark and CIS-STIG candidates returned by CIS WorkBench, and logs both resolved evidence and unresolved source/applicability conditions.
+- `POST /api/scsem-updater/[id]/analyze` accepts `analysisScope: "compliance_only" | "full"`. Both scopes compare the pinned IRS baseline with Publication 1075 first and NIST only as fallback. Full scope additionally authenticates to CIS WorkBench and evaluates licensed CIS Benchmark and CIS-STIG candidates. Version/provider tabs keep exact sheet identity throughout batching, matching, review, and export.
+- `POST /api/scsem-updater/bootstrap` accepts an explicit numeric CIS WorkBench ID and exact profile, downloads and snapshots the licensed accepted benchmark Excel artifact, and creates a blank non-official working draft with source-bound candidate controls.
 - `PATCH /api/scsem-updater/[id]/changes` records reviewer edits, approvals, rejections, and batch decisions.
 - `POST /api/scsem-updater/[id]/undo` restores the most recent approve/reject action.
 - `GET /api/scsem-updater/[id]/export` applies reviewer-approved template changes and returns a candidate XLSX; it does not publish an official release.
@@ -104,13 +106,13 @@ The SCSEM Updater route is `/scsems`. The navigation label is "SCSEM Updater".
 This page replaces the old static SCSEM browser as the internal canonical-template stewardship workflow. Agencies do not submit system implementations, evidence, findings, or control status here.
 
 1. An authorized Office of Safeguards steward selects an IRS SCSEM workbook named like `Safeguards-SCSEM (Technology).xlsx`.
-2. The server verifies the workbook against the pinned official-source manifest, records its SHA-256 hash and provenance, stores it under runtime storage, and creates a creator- and steward-organization-scoped updater session. A file that cannot be tied to a pinned IRS source is not silently treated as canonical. The snapshot pins the 58 individual XLSX links on the IRS page. It intentionally does not allowlist the separately linked package ZIP: the audited package contains 60 older/conflicting copies, includes three package-only templates, and omits the individually listed Windows Server 2012 template. Package files remain a compatibility/reconciliation corpus, not interchangeable canonical bytes.
+2. The server verifies the workbook against the pinned official-source manifest, records its SHA-256 hash and provenance, stores it under runtime storage, and creates a creator- and steward-organization-scoped updater session. The August 20, 2026 snapshot pins all 60 individual XLSX links on the IRS page. The separately linked 62-workbook package ZIP is audited but not treated as interchangeable canonical bytes because all 59 subject/version pairs differ at the raw-file level, it includes three package-only templates, and it omits the individually listed Windows Server 2012 template. A new or program-supplied workbook whose hash is not yet pinned may proceed only when it has recognizable SCSEM test-case schemas, controls, an Issue Code Table, and no populated actual-result/status responses. It is visibly and permanently gated as an unverified incomplete working draft until an authorized reviewer verifies provenance and release status.
 3. The workbook is parsed to identify sheets, test-case rows, headers, template-content fields, NIST IDs, CIS references, recommendation numbers, formulas, and existing release/change-log sheets.
 4. The app infers the target technology from workbook content before using subject metadata or the filename. A multi-provider Cloud workbook stays multi-provider instead of being collapsed to the first AWS/Azure/Google signal.
 5. The app resolves the workbook to the corresponding pinned entry in the current IRS SCSEM source set and records whether a newer official structural baseline is required for candidate drafting.
 6. The pinned Publication 1075 source is the governing policy reference. The pinned NIST SP 800-53 Rev. 5 OSCAL snapshot provides secondary control mapping only where the SCSEM references a control without a mapped Publication 1075 section. Neither mapping is a compliance certification.
-7. CIS access uses an authorized SecureSuite license and calls `POST /license`, `GET /benchmarks`, and `GET /excel`, followed by `GET /excel/{workbenchId}` for candidates. Catalog matching is local; license access and title similarity do not establish that a benchmark is applicable.
-8. CIS Benchmark and CIS-STIG candidates are checked for product generation, benchmark revision, profile, sheet scope, and control overlap. Cross-major matches such as RHEL 8 to RHEL 9 or ESXi 7 to ESXi 8 are rejected. An authorized reviewer must still confirm applicability and permitted use of licensed material.
+7. The reviewer chooses either Publication 1075/NIST-only scope or full scope. Compliance-only scope never authenticates to CIS WorkBench and does not require SecureSuite credentials for that run. Full scope uses an authorized SecureSuite license and calls `POST /license`, `GET /benchmarks`, and `GET /excel`, followed by `GET /excel/{workbenchId}` for candidates. Catalog matching is local; license access and title similarity do not establish that a benchmark is applicable.
+8. CIS Benchmark and CIS-STIG candidates are checked per test-case tab for product family, product generation, benchmark revision, profile, sheet scope, and control overlap. DB2 v11 and DB2 v13 for z/OS, for example, remain separate queries and cannot fall back to a broad DB2 query that competes across generations. Cross-major matches such as RHEL 8 to RHEL 9 or ESXi 7 to ESXi 8 are rejected. An authorized reviewer must still confirm applicability and permitted use of licensed material.
 9. Downloaded benchmark artifacts are stored as audit snapshots with source kind, title, version, release date, filename, workbench/source ID, local path, retrieval time, and SHA-256 hash.
 10. The comparison engine creates reviewer-gated candidate changes. Publication 1075/NIST mappings provide policy/control context; CIS Benchmark and CIS-STIG workbooks provide supplemental configuration-hardening evidence. Conflicts and missing sources remain visible instead of being resolved by source precedence alone.
 11. Missing AI configuration, timeouts, malformed output, unavailable licenses, unmatched benchmarks, or unresolved CIS-STIG applicability are recorded as incomplete source coverage. Deterministic suggestions may still be shown, but the session must not be described as a complete review or release-ready result.
@@ -135,7 +137,7 @@ New controls can be proposed when a CIS Benchmark or CIS-STIG recommendation app
 
 #### Workbook Export Behavior
 
-Export uses the hash-validated IRS workbook or its newer pinned official structural baseline as the base file. The result is always a candidate draft.
+Export uses the hash-validated IRS workbook, its newer pinned official structural baseline, or the admitted unverified workbook itself as the base file. An unverified source remains analysis-incomplete regardless of otherwise successful comparisons. Every result is a candidate draft.
 
 - Existing reviewer-approved template-content updates are written into the matching test-case row and column.
 - Reviewer-approved updates and new controls are routed to the exact matched version/provider sheet, with copied row formatting for appended rows.
@@ -251,6 +253,7 @@ Retrieval combines:
 | `/api/admin/knowledge/[id]` | GET, DELETE | Knowledge document detail and delete |
 | `/api/admin/knowledge/search` | POST | Admin knowledge search testing |
 | `/api/scsem-updater/upload` | POST | Upload SCSEM workbook and create updater session |
+| `/api/scsem-updater/bootstrap` | POST | Create a blank, non-official SCSEM working draft from an explicit accepted CIS WorkBench ID and profile |
 | `/api/scsem-updater/[id]` | GET | Load updater session |
 | `/api/scsem-updater/[id]/analyze` | POST | Generate source-attributed candidate template changes and unresolved-source diagnostics |
 | `/api/scsem-updater/[id]/changes` | PATCH | Approve, reject, edit, or batch-review proposed changes |
@@ -274,7 +277,7 @@ Retrieval combines:
 | `data/pub1075/p1075-full-text.md` | Extracted Publication 1075 text used by SCSEM analysis and fallback context |
 | `data/scsem-index.json` | Metadata for bundled IRS SCSEM templates |
 | `data/scsem-manifest.json` | Pinned official IRS SCSEM source URLs, filenames, versions, retrieval metadata, and SHA-256 hashes |
-| `data/scsems/current/` | Flat, hash-pinned corpus of all 58 current IRS SCSEM workbooks |
+| `data/scsems/current/` | Flat, hash-pinned corpus of all 60 current individual IRS SCSEM workbooks |
 | `public/` | Static assets and bundled interim guidance text |
 
 CIS SecureSuite credentials and license material are operational secrets and must be provisioned outside source control using the deployment's approved secret-management process. Access to a licensed artifact does not establish its applicability to an SCSEM; the authorized reviewer must document that determination.

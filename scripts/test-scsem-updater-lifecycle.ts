@@ -307,9 +307,9 @@ async function main() {
     assert.deepEqual(
         Object.keys(projectedClientSession).sort(),
         [
-            "analysisLeasePresent", "audit", "changes", "history", "id",
+            "analysisLeasePresent", "analysisScope", "audit", "changes", "history", "id",
             "inferredTechnology", "originalFileName", "revision", "scsem",
-            "status", "summary", "technologyInference",
+            "status", "summary", "technologyInference", "workspaceMode",
         ].sort()
     );
     assert.deepEqual(
@@ -1207,7 +1207,7 @@ async function main() {
     assert.ok(
         updaterUi.includes('"Recover stale analysis"') &&
         updaterUi.includes("staleAnalysisRecoverable") &&
-        updaterUi.includes("disabled={analysisBusy || activeAnalysisProtected}") &&
+        updaterUi.includes("disabled={analysisBusy || activeAnalysisProtected || session.workspaceMode === \"cis_bootstrap\"}") &&
         updaterUi.includes('setBusy(recoveringStaleLease ? "recover-analysis" : "analyze")'),
         "Only an explicitly stale lease may expose the audited recovery action"
     );

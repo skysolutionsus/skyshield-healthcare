@@ -13,7 +13,7 @@ XLSX.set_fs(fs);
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const ROOT = path.resolve(path.dirname(SCRIPT_PATH), "..");
-const EXPECTED_WORKBOOK_COUNT = 58;
+const EXPECTED_WORKBOOK_COUNT = 60;
 const DEFAULT_ROUNDTRIP_ROOT =
     "/Users/jamesgalang/Documents/Mac Mini/skyshield-retest-20260721/native-excel-roundtrip";
 const DEFAULT_REPORT_PATH =

@@ -202,6 +202,16 @@ function firstMatch(value: string, patterns: RegExp[]): string | null {
 export function identifyCISProduct(value: string): CISProductIdentity {
     const text = productIdentityText(value);
 
+    if (/\b(?:ibm\s+)?db2\b/.test(text)) {
+        const isZos = /\bz\s*\/?\s*os\b|\bzos\b/.test(text);
+        return {
+            family: isZos ? "ibm-db2-zos" : "ibm-db2-distributed",
+            productGeneration: firstMatch(text, [
+                /\bdb2\s+(?:version\s+|v\s*)?(\d{1,2}(?:\.\d+)?)\b/,
+            ]),
+        };
+    }
+
     if (
         /\brhel\s*\d*\b.*\bibm z\b/.test(text) ||
         /\bibm z\b.*\brhel\s*\d*\b/.test(text) ||
@@ -467,6 +477,7 @@ export function rankCISBenchmarkCandidatesForTechnology(
         const rejectionReasons: string[] = [];
         const isStig = /\bSTIG\b/i.test(titleText);
         const publicationStatus = (benchmark.benchmarkStatus?.status || "").trim().toLowerCase();
+        const workbenchStatus = (benchmark.workbenchStatus?.status || "").trim().toLowerCase();
 
         if (!excel) rejectionReasons.push("no CIS Excel workbook is available");
         if (publicationStatus !== "accepted") {
@@ -475,6 +486,9 @@ export function rankCISBenchmarkCandidatesForTechnology(
                     ? `benchmark publication status is ${publicationStatus}, not accepted`
                     : "benchmark publication status is missing"
             );
+        }
+        if (workbenchStatus && workbenchStatus !== "published") {
+            rejectionReasons.push(`CIS WorkBench status is ${workbenchStatus}, not published`);
         }
         if (kind === "benchmark" && EXCLUDED_TITLE_PATTERNS.some((pattern) => pattern.test(titleText))) {
             rejectionReasons.push(isStig ? "STIG benchmark requested separately" : "excluded benchmark variant");

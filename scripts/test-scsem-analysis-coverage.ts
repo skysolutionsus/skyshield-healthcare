@@ -113,4 +113,40 @@ const noDirectCoverage = coverage(noDirectSource);
 assert.equal(noDirectCoverage.complete, false);
 assert.match(noDirectCoverage.blockers.join(" "), /No direct applicable/);
 
+const notRequested: SCSEMSupplementalComparison = {
+    mode: "not_requested",
+    complete: true,
+    candidateOnly: true,
+    applicabilityStatus: "not_requested",
+    directSourceCount: 0,
+    comparedDirectSourceCount: 0,
+    candidateCount: 0,
+    comparedCandidateCount: 0,
+    rawProposalCount: 0,
+    evidenceBoundProposalCount: 0,
+    reason: "Reviewer selected Pub 1075 and NIST only.",
+};
+assert.equal(isSupplementalComparisonComplete(notRequested), true);
+assert.equal(coverage(notRequested).complete, true);
+const unverifiedSourceCoverage = buildSCSEMAnalysisCoverage({
+    totalRows: 50,
+    compliance,
+    uncoveredControlIdCount: 0,
+    supplementalComparison: notRequested,
+    additionalBlockers: ["Unverified SCSEM source working draft"],
+});
+assert.equal(unverifiedSourceCoverage.complete, false);
+assert.match(unverifiedSourceCoverage.blockers.join(" "), /Unverified SCSEM source/);
+assert.equal(buildSCSEMAnalysisCoverage({
+    totalRows: 50,
+    compliance,
+    uncoveredControlIdCount: 0,
+    benchmarkLookupError: "CIS credentials should not be consulted in this scope",
+    supplementalComparison: notRequested,
+}).blockers.some((blocker) => blocker.includes("CIS")), false);
+assert.equal(isSupplementalComparisonComplete({
+    ...notRequested,
+    candidateCount: 1,
+}), false);
+
 process.stdout.write("SCSEM supplemental comparison coverage tests passed.\n");

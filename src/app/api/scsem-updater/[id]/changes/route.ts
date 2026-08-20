@@ -172,6 +172,15 @@ export async function PATCH(
             let updated = { ...edited, status: resolvedStatus };
             if (resolvedStatus === "APPROVED") {
                 const errors = approvedProposalValidationErrors(updated);
+                if (
+                    updaterSession.workspaceMode === "cis_bootstrap" &&
+                    updated.action === "addControl" &&
+                    !updated.newControl?.nistId?.trim()
+                ) {
+                    errors.push(
+                        "CIS bootstrap controls require an exact reviewer-confirmed NIST ID before approval"
+                    );
+                }
                 if (updated.action === "addControl" && issueCodeCatalog) {
                     const targetSheet = updated.targetSheet?.trim() || "";
                     const targetSchema = targetSchemas.get(targetSheet);

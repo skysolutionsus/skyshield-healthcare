@@ -124,11 +124,12 @@ function formatRetryWindow(milliseconds: number): string {
 }
 
 function supplementalComparisonLabel(
-    mode: "ai" | "deterministic_fallback" | "no_delta" | "failed"
+    mode: "ai" | "deterministic_fallback" | "no_delta" | "not_requested" | "failed"
 ): string {
     if (mode === "ai") return "AI evidence comparison";
     if (mode === "deterministic_fallback") return "Deterministic evidence comparison";
     if (mode === "no_delta") return "Direct sources checked — no material delta";
+    if (mode === "not_requested") return "CIS WorkBench excluded by reviewer scope";
     return "Supplemental comparison failed or unavailable";
 }
 
@@ -182,6 +183,10 @@ export function SCSEMUpdater() {
     const [error, setError] = useState<string | null>(null);
     const [leaseClockMs, setLeaseClockMs] = useState<number | null>(null);
     const [analysisRetryNotBeforeMs, setAnalysisRetryNotBeforeMs] = useState<number | null>(null);
+    const [requestedAnalysisScope, setRequestedAnalysisScope] = useState<"full" | "compliance_only">("full");
+    const [bootstrapWorkbenchId, setBootstrapWorkbenchId] = useState("");
+    const [bootstrapProfile, setBootstrapProfile] = useState("");
+    const [bootstrapProfiles, setBootstrapProfiles] = useState<string[]>([]);
 
     const sessionStatus = session?.status || null;
     const analysisLeasePresent = session?.analysisLeasePresent || false;
@@ -300,6 +305,7 @@ export function SCSEMUpdater() {
         );
         if (!latestResponse.ok || !latest.session) return false;
         setSession(latest.session);
+        setRequestedAnalysisScope(latest.session.analysisScope);
         setAnalysisRetryNotBeforeMs(null);
         return true;
     }
@@ -366,9 +372,47 @@ export function SCSEMUpdater() {
             const data = await readApiJson<{ error?: string; session: UpdaterSession }>(res, "Upload failed");
             if (!res.ok) throw new Error(data.error || "Upload failed.");
             setSession(data.session);
+            setRequestedAnalysisScope(data.session.analysisScope);
             setExpandedChangeId(null);
         } catch (err: any) {
             setError(err.message || "Upload failed.");
+        } finally {
+            setBusy(null);
+        }
+    }
+
+    async function createCISBootstrapDraft() {
+        setBusy("cis-bootstrap");
+        setError(null);
+        try {
+            const res = await fetch("/api/scsem-updater/bootstrap", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    workbenchId: bootstrapWorkbenchId,
+                    ...(bootstrapProfile ? { profile: bootstrapProfile } : {}),
+                }),
+            });
+            const data = await readApiJson<{
+                error?: string;
+                code?: string;
+                profiles?: string[];
+                session?: UpdaterSession;
+            }>(res, "Could not create the CIS bootstrap draft");
+            if (!res.ok) {
+                if (data.profiles?.length) {
+                    setBootstrapProfiles(data.profiles);
+                    if (!data.profiles.includes(bootstrapProfile)) setBootstrapProfile("");
+                }
+                throw new Error(data.error || "Could not create the CIS bootstrap draft.");
+            }
+            if (!data.session) throw new Error("The bootstrap request returned no SCSEM session.");
+            setSession(data.session);
+            setRequestedAnalysisScope(data.session.analysisScope);
+            setBootstrapProfiles([]);
+            setExpandedChangeId(data.session.changes[0]?.id || null);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Could not create the CIS bootstrap draft.");
         } finally {
             setBusy(null);
         }
@@ -382,7 +426,11 @@ export function SCSEMUpdater() {
         try {
             const res = await fetch(`/api/scsem-updater/${session.id}/analyze`, {
                 method: "POST",
-                headers: { "If-Match": `"${session.revision}"` },
+                headers: {
+                    "Content-Type": "application/json",
+                    "If-Match": `"${session.revision}"`,
+                },
+                body: JSON.stringify({ analysisScope: requestedAnalysisScope }),
             });
             const data = await readApiJson<{
                 error?: string;
@@ -395,6 +443,7 @@ export function SCSEMUpdater() {
             if (!data.session) throw new Error("Analysis completed without returning the updated session.");
             setAnalysisRetryNotBeforeMs(null);
             setSession(data.session);
+            setRequestedAnalysisScope(data.session.analysisScope);
             setExpandedChangeId(data.session?.changes?.[0]?.id || null);
         } catch (err: any) {
             setError(err.message || "Analysis failed.");
@@ -672,12 +721,12 @@ export function SCSEMUpdater() {
                     </div>
                     <div>
                         <p className="max-w-full break-all text-sm font-semibold text-white">
-                            {session ? session.originalFileName : "Drop official IRS SCSEM template"}
+                            {session ? session.originalFileName : "Drop an IRS or structurally valid SCSEM template"}
                         </p>
                         <p className="mt-1 text-xs text-[var(--sky-text-muted)]">
                             {session
                                 ? `${session.inferredTechnology} - ${session.scsem.totalControls} controls`
-                                : "Pinned Safeguards-SCSEM XLSX source only"}
+                                : "Current IRS downloads are verified by hash; new valid templates open as gated working drafts"}
                         </p>
                     </div>
                     <input
@@ -697,33 +746,147 @@ export function SCSEMUpdater() {
                         className="inline-flex items-center gap-2 rounded-lg bg-[var(--sky-royal)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[var(--sky-blue)] disabled:opacity-50"
                     >
                         {busy === "upload" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                        Choose Official Template
+                        Choose SCSEM Workbook
                     </button>
+                </div>
+            </section>
+
+            <section className="mb-6 rounded-xl border border-[var(--sky-border)] bg-[var(--sky-surface)] p-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                    <div className="max-w-3xl">
+                        <h2 className="text-base font-semibold text-white">Create blank draft from CIS WorkBench</h2>
+                        <p className="mt-1 text-sm leading-6 text-[var(--sky-text-secondary)]">
+                            Enter the numeric WorkBench ID from an accepted CIS Benchmark URL. SkyShield downloads the licensed Excel artifact, requires an exact profile when the workbook has more than one, and creates reviewer-gated controls in a controlled blank SCSEM working-draft shell.
+                        </p>
+                        <p className="mt-2 text-xs leading-5 text-amber-200">
+                            The result is not an official IRS SCSEM. Every control still requires Publication 1075/NIST mapping, an exact IRS issue code, applicability review, and separate release approval.
+                        </p>
+                    </div>
+                    <div className="grid w-full gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:w-auto">
+                        <label className="block">
+                            <span className="mb-1 block text-[10px] font-semibold uppercase text-[var(--sky-text-muted)]">
+                                WorkBench ID
+                            </span>
+                            <input
+                                inputMode="numeric"
+                                value={bootstrapWorkbenchId}
+                                onChange={(event) => setBootstrapWorkbenchId(event.target.value.replace(/\D/g, ""))}
+                                placeholder="e.g. 1234"
+                                className="w-full rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                            />
+                        </label>
+                        <label className="block">
+                            <span className="mb-1 block text-[10px] font-semibold uppercase text-[var(--sky-text-muted)]">
+                                CIS Profile
+                            </span>
+                            {bootstrapProfiles.length > 0 ? (
+                                <select
+                                    value={bootstrapProfile}
+                                    onChange={(event) => setBootstrapProfile(event.target.value)}
+                                    className="w-full rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                                >
+                                    <option value="">Select exact profile</option>
+                                    {bootstrapProfiles.map((profile) => (
+                                        <option key={profile} value={profile}>{profile}</option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <input
+                                    value={bootstrapProfile}
+                                    onChange={(event) => setBootstrapProfile(event.target.value)}
+                                    placeholder="Prompted if required"
+                                    className="w-full rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                                />
+                            )}
+                        </label>
+                        <button
+                            onClick={() => void createCISBootstrapDraft()}
+                            disabled={!bootstrapWorkbenchId || busy === "cis-bootstrap"}
+                            className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50 sm:self-end"
+                        >
+                            {busy === "cis-bootstrap"
+                                ? <Loader2 className="h-4 w-4 animate-spin" />
+                                : <PlusCircle className="h-4 w-4" />}
+                            Create Draft
+                        </button>
+                    </div>
                 </div>
             </section>
 
             {session && (
                 <section className="mb-6 rounded-xl border border-[var(--sky-border)] bg-[var(--sky-surface)] p-5">
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-4 lg:flex-1">
                             <Stat label="Technology" value={session.inferredTechnology} />
                             <Stat label="SCSEM Version" value={session.scsem.version || "Unknown"} />
                             <Stat label="Effective Date" value={session.scsem.effectiveDate || "Unknown"} />
                             <Stat label="Controls" value={String(session.scsem.totalControls)} />
                         </div>
-                        <button
-                            onClick={runAnalysis}
-                            disabled={analysisBusy || activeAnalysisProtected}
-                            type="button"
-                            className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
-                        >
-                            {analysisBusy || activeAnalysisProtected
-                                ? <Loader2 className="h-4 w-4 animate-spin" />
-                                : staleAnalysisRecoverable
-                                    ? <RotateCcw className="h-4 w-4" />
-                                    : <SearchCheck className="h-4 w-4" />}
-                            {analysisButtonLabel}
-                        </button>
+                        <div className="w-full space-y-2 lg:w-80">
+                            <label className="block">
+                                <span className="mb-1 block text-[10px] font-semibold uppercase text-[var(--sky-text-muted)]">
+                                    Analysis Sources
+                                </span>
+                                <select
+                                    value={requestedAnalysisScope}
+                                    onChange={(event) => setRequestedAnalysisScope(event.target.value as "full" | "compliance_only")}
+                                    disabled={analysisBusy || activeAnalysisProtected || session.workspaceMode === "cis_bootstrap"}
+                                    className="w-full rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 disabled:opacity-50"
+                                >
+                                    <option value="full">Pub 1075 + NIST + CIS WorkBench</option>
+                                    <option value="compliance_only">Pub 1075 + NIST only</option>
+                                </select>
+                            </label>
+                            <p className="text-xs leading-5 text-[var(--sky-text-muted)]">
+                                {session.workspaceMode === "cis_bootstrap"
+                                    ? "This blank CIS bootstrap draft is already populated with source-bound candidates. Complete mappings and review them below instead of rerunning existing-SCSEM analysis."
+                                    : requestedAnalysisScope === "full"
+                                    ? "Runs the governing compliance review, then retrieves licensed CIS Benchmark/CIS-STIG evidence from CIS WorkBench."
+                                    : "Does not authenticate to CIS WorkBench or require CIS SecureSuite credentials for this run."}
+                            </p>
+                            <button
+                                onClick={runAnalysis}
+                                disabled={analysisBusy || activeAnalysisProtected || session.workspaceMode === "cis_bootstrap"}
+                                type="button"
+                                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
+                            >
+                                {analysisBusy || activeAnalysisProtected
+                                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                                    : staleAnalysisRecoverable
+                                        ? <RotateCcw className="h-4 w-4" />
+                                        : <SearchCheck className="h-4 w-4" />}
+                                {session.workspaceMode === "cis_bootstrap" ? "Bootstrap Draft Ready for Review" : analysisButtonLabel}
+                            </button>
+                        </div>
+                    </div>
+                    {session.audit.structuralAdmission && (
+                        <div className="mt-4 flex items-start gap-3 rounded-lg border border-amber-500/35 bg-amber-500/10 p-4 text-sm text-amber-100">
+                            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+                            <div>
+                                <p className="font-semibold">Unverified SCSEM source — working draft only</p>
+                                <p className="mt-1 leading-6 text-amber-100/85">
+                                    {session.audit.structuralAdmission.blocker}
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                    <div className="mt-3 rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-3">
+                        <p className="text-[10px] font-semibold uppercase text-[var(--sky-text-muted)]">
+                            Parsed version/provider tabs
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                            {session.scsem.testCaseSheets.map((sheetName) => (
+                                <span
+                                    key={sheetName}
+                                    className="rounded border border-blue-500/20 bg-blue-500/10 px-2 py-1 text-xs text-blue-200"
+                                >
+                                    {sheetName}
+                                </span>
+                            ))}
+                        </div>
+                        <p className="mt-2 text-xs leading-5 text-[var(--sky-text-muted)]">
+                            SkyShield parses every listed test-case tab. Compliance batches retain the exact source tab, and full reviews resolve CIS WorkBench candidates independently for each version/provider tab.
+                        </p>
                     </div>
                     {session.status === "analyzing" && (
                         <div
@@ -817,7 +980,7 @@ export function SCSEMUpdater() {
                                 </p>
                             </article>
                         )}
-                        {cisAuditSources.length > 0
+                        {session.audit.supplementalComparison?.mode !== "not_requested" && (cisAuditSources.length > 0
                             ? cisAuditSources.map((source, index) => (
                                 <AuditSourceCard
                                     key={`cis-${source.workbenchId}-${index}`}
@@ -831,8 +994,8 @@ export function SCSEMUpdater() {
                                 emptyMessage={session.audit.benchmarkLookupError
                                     ? `CIS source unresolved: ${session.audit.benchmarkLookupError}. Reviewer disposition is required before release.`
                                     : `${cisResolutionMessage || "No direct workbook passed content/profile validation."} CIS applicability remains unresolved until a reviewer records a disposition.`}
-                            />}
-                        {stigAuditSources.length > 0
+                            />)}
+                        {session.audit.supplementalComparison?.mode !== "not_requested" && (stigAuditSources.length > 0
                             ? stigAuditSources.map((source, index) => (
                                 <AuditSourceCard
                                     key={`stig-${source.workbenchId}-${index}`}
@@ -840,7 +1003,7 @@ export function SCSEMUpdater() {
                                     source={source}
                                 />
                             ))
-                            : <AuditSourceCard title="CIS-STIG Workbook" source={null} emptyMessage="No direct CIS-STIG workbook from CIS WorkBench passed content/profile validation. Applicability remains unresolved until a reviewer records a disposition; independent DISA STIG validation is not implemented." />}
+                            : <AuditSourceCard title="CIS-STIG Workbook" source={null} emptyMessage="No direct CIS-STIG workbook from CIS WorkBench passed content/profile validation. Applicability remains unresolved until a reviewer records a disposition; independent DISA STIG validation is not implemented." />)}
                         {adjacentAuditSources.map((source, index) => (
                             <AuditSourceCard
                                 key={`adjacent-${source.workbenchId}-${index}`}
@@ -919,7 +1082,10 @@ export function SCSEMUpdater() {
                             <StatusPill status="REJECTED" count={counts.rejected} />
                             <button
                                 onClick={() => batchStatus("APPROVED")}
-                                disabled={counts.pending === 0 || busy === "batch:APPROVED"}
+                                disabled={counts.pending === 0 || busy === "batch:APPROVED" || session.workspaceMode === "cis_bootstrap"}
+                                title={session.workspaceMode === "cis_bootstrap"
+                                    ? "Map each bootstrap control to an exact NIST ID and IRS issue code before approving it individually."
+                                    : undefined}
                                 className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm font-medium text-emerald-200 transition hover:bg-emerald-500/20 disabled:opacity-50"
                             >
                                 {busy === "batch:APPROVED" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}

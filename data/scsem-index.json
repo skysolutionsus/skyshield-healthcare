@@ -24,10 +24,10 @@
     "name": "Application Server v3.0"
   },
   {
-    "id": "official-ba7e19cc8a79e37c4040",
-    "file": "data/scsems/current/safeguards-scsem-apache24-iis-10-webserver-v6-1.xlsx",
+    "id": "official-d9b2f247de995c29ac65",
+    "file": "data/scsems/current/safeguards-scsem-apache24-iis-10-webserver-v6-2.xlsx",
     "category": "Web",
-    "name": "Web Server v6.1"
+    "name": "Web Server v6.2"
   },
   {
     "id": "official-5a628c9286a98dfa5274",
@@ -40,6 +40,18 @@
     "file": "data/scsems/current/safeguards-scsem-application-v4-1.xlsx",
     "category": "Application",
     "name": "Generic Application v4.1"
+  },
+  {
+    "id": "official-407690f0060cb9b0ae54",
+    "file": "data/scsems/current/safeguards-scsem-aws-cloud-services-scsem-v1-0.xlsx",
+    "category": "Application",
+    "name": "Amazon Web Services (AWS) v1.0"
+  },
+  {
+    "id": "official-7d79900df34286f13adb",
+    "file": "data/scsems/current/safeguards-scsem-azure-cloud-services-scsem-v1-0.xlsx",
+    "category": "Application",
+    "name": "Microsoft Azure Services v1.0"
   },
   {
     "id": "official-26c788823f7e196f1315",
@@ -144,10 +156,10 @@
     "name": "Macintosh OS X 10.15, 11.0, 12.0, and 13.0. v8.0"
   },
   {
-    "id": "official-064f76de388b5d015e5d",
-    "file": "data/scsems/current/Safeguards-SCSEM-MOT-v6-1.xlsx",
+    "id": "official-f451bae18a2372262ed7",
+    "file": "data/scsems/current/safeguards-scsem-mot-v6-2.xlsx",
     "category": "MOT",
-    "name": "Management, Operational and Technical Controls v6.1"
+    "name": "Management, Operational and Technical Controls v6.2"
   },
   {
     "id": "official-8cbc7928bb01533bb0fe",
@@ -162,10 +174,10 @@
     "name": "MySQL 5.6,  5.7, and 8.0 v2.4"
   },
   {
-    "id": "official-376a64a06bf0de5a5c46",
-    "file": "data/scsems/current/safeguards-scsem-network-assessment-v4-0.xlsx",
+    "id": "official-53d361076d7f85fbdf66",
+    "file": "data/scsems/current/safeguards-scsem-network-assessment-v4-1.xlsx",
     "category": "Network",
-    "name": "Network Assessment v4.0"
+    "name": "Network Assessment v4.1"
   },
   {
     "id": "official-f7485ed79a6d914fcd6d",
@@ -336,10 +348,10 @@
     "name": "Microsoft Server 2022 v2.0"
   },
   {
-    "id": "official-a139c9d0ce80a08f36cd",
-    "file": "data/scsems/current/safeguards-scsem-windows-server-2025-v1-0.xlsx",
+    "id": "official-da75cc24ecd038bdb59b",
+    "file": "data/scsems/current/safeguards-scsem-windows-server- 2025-v1-1.xlsx",
     "category": "Windows",
-    "name": "Microsoft Server 2025 v1.0"
+    "name": "Microsoft Server 2025 v1.1"
   },
   {
     "id": "official-10952ff5c5a76a8da6e3",

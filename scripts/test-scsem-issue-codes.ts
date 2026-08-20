@@ -17,12 +17,12 @@ const corpusDirectory = path.join(process.cwd(), "data", "scsems", "current");
 const files = fs.readdirSync(corpusDirectory)
     .filter((fileName) => fileName.toLowerCase().endsWith(".xlsx"))
     .sort();
-assert.equal(files.length, 58, "Expected the 58 pinned individual IRS SCSEM files");
+assert.equal(files.length, 60, "Expected the 60 pinned individual IRS SCSEM files");
 
 for (const fileName of files) {
     const catalog = readSCSEMIssueCodeCatalog(path.join(corpusDirectory, fileName));
     assert.ok(catalog.size >= 547, `${fileName}: issue-code catalog is unexpectedly small`);
-    assert.ok(catalog.size <= 566, `${fileName}: issue-code catalog is unexpectedly large`);
+    assert.ok(catalog.size <= 571, `${fileName}: issue-code catalog is unexpectedly large`);
 
     const other = resolveSCSEMIssueCodeSelection(catalog, "hac100");
     assert.equal(other.issueCode, "HAC100");

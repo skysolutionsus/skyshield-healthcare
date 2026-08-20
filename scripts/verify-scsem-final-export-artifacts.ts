@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { officialSCSEMManifest } from "../src/lib/scsem-official-manifest";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const EXPECTED_WORKBOOK_COUNT = 58;
+const EXPECTED_WORKBOOK_COUNT = 60;
 const OPERATIONS = ["update", "add"] as const;
 
 type Operation = typeof OPERATIONS[number];
@@ -97,7 +97,7 @@ for (const operation of OPERATIONS) {
         .filter((entry) => entry.isFile() && !entry.name.startsWith("~$") && /\.xls(?:x|m)$/i.test(entry.name))
         .map((entry) => entry.name)
         .sort((left, right) => left.localeCompare(right));
-    assert.equal(actualOutputNames.length, EXPECTED_WORKBOOK_COUNT, `${operation} must retain exactly 58 exports`);
+    assert.equal(actualOutputNames.length, EXPECTED_WORKBOOK_COUNT, `${operation} must retain exactly 60 exports`);
     assert.equal(new Set(actualOutputNames.map((name) => name.toLocaleLowerCase("en-US"))).size, EXPECTED_WORKBOOK_COUNT);
 
     const reportPath = path.join(reportDirectory, `scsem-${operation}-corpus-report.json`);

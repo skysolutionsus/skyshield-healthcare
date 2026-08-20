@@ -9,6 +9,7 @@ import {
 } from "@/lib/scsem-official-manifest";
 import type { SCSEMUpdaterSession } from "@/lib/scsem-updater-store";
 import { resolveRuntimeFilePath } from "@/lib/runtime-storage";
+import { admitUnrecognizedSCSEMBuffer } from "@/lib/scsem-structural-admission";
 
 export class SCSEMSourceIntegrityError extends Error {
     readonly code = "SCSEM_SOURCE_INTEGRITY_FAILURE";
@@ -23,7 +24,8 @@ export type VerifiedSCSEMSource = {
     absolutePath: string;
     sha256: string;
     sizeBytes: number;
-    officialSource: OfficialSCSEMManifestEntry;
+    officialSource?: OfficialSCSEMManifestEntry;
+    sourceTrust: "official_individual_xlsx" | "unverified_structural_draft";
 };
 
 const PINNED_SCSEM_DIRECTORY = path.join(process.cwd(), "data", "scsems", "current");
@@ -80,9 +82,11 @@ function assertRecordedOfficialIdentity(
 
 /**
  * Revalidate the creator-scoped upload immediately before analysis or export.
- * The bytes must agree with the session audit record and with a current pinned
- * manifest entry; trusting the session JSON alone would make its provenance
- * claim stale if the runtime workbook were overwritten after upload.
+ * The bytes must agree with the session audit record. Official uploads must
+ * still match the current pinned manifest. Unverified working drafts are
+ * reparsed and must reproduce their structural-admission record exactly;
+ * trusting the session JSON alone would make either provenance claim stale if
+ * the runtime workbook were overwritten after upload.
  */
 export function assertSCSEMUpdaterSourceIntegrity(
     session: SCSEMUpdaterSession
@@ -100,12 +104,56 @@ export function assertSCSEMUpdaterSourceIntegrity(
     }
 
     const canonical = matchOfficialSCSEM(buffer);
-    if (!canonical) {
+    if (canonical) {
+        assertRecordedOfficialIdentity(session.audit.officialSource, canonical, session.originalFileName);
+        return {
+            absolutePath,
+            sha256,
+            sizeBytes,
+            officialSource: canonical,
+            sourceTrust: "official_individual_xlsx",
+        };
+    }
+
+    const recordedAdmission = session.audit.structuralAdmission;
+    if (
+        session.workspaceMode !== "unverified_update" ||
+        session.audit.officialSource ||
+        !recordedAdmission
+    ) {
         integrityFailure("The stored uploaded SCSEM workbook no longer matches a pinned IRS source workbook.");
     }
-    assertRecordedOfficialIdentity(session.audit.officialSource, canonical, session.originalFileName);
 
-    return { absolutePath, sha256, sizeBytes, officialSource: canonical };
+    let currentAdmission: ReturnType<typeof admitUnrecognizedSCSEMBuffer>;
+    try {
+        currentAdmission = admitUnrecognizedSCSEMBuffer(session.originalFileName, buffer);
+    } catch {
+        return integrityFailure(
+            "The stored unverified SCSEM workbook no longer satisfies the structural working-draft admission rules."
+        );
+    }
+    if (
+        currentAdmission.trust !== recordedAdmission.trust ||
+        currentAdmission.sha256 !== recordedAdmission.sha256 ||
+        currentAdmission.totalControls !== recordedAdmission.totalControls ||
+        currentAdmission.issueCodeCount !== recordedAdmission.issueCodeCount ||
+        currentAdmission.blocker !== recordedAdmission.blocker ||
+        currentAdmission.testCaseSheets.length !== recordedAdmission.testCaseSheets.length ||
+        currentAdmission.testCaseSheets.some((sheet, index) =>
+            sheet !== recordedAdmission.testCaseSheets[index]
+        )
+    ) {
+        integrityFailure(
+            "The stored unverified SCSEM workbook no longer matches its recorded structural-admission evidence."
+        );
+    }
+
+    return {
+        absolutePath,
+        sha256,
+        sizeBytes,
+        sourceTrust: "unverified_structural_draft",
+    };
 }
 
 /** Verify a selected official rebase workbook against both session metadata and the manifest. */
@@ -128,5 +176,11 @@ export function assertOfficialSCSEMReferenceIntegrity(
         integrityFailure("The selected official SCSEM rebase workbook failed its pinned size or SHA-256 check.");
     }
 
-    return { absolutePath, sha256, sizeBytes, officialSource: canonical };
+    return {
+        absolutePath,
+        sha256,
+        sizeBytes,
+        officialSource: canonical,
+        sourceTrust: "official_individual_xlsx",
+    };
 }

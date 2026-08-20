@@ -10,6 +10,7 @@ import {
     SCSEMSourceIntegrityError,
 } from "../src/lib/scsem-source-integrity";
 import type { SCSEMUpdaterSession } from "../src/lib/scsem-updater-store";
+import { admitUnrecognizedSCSEMBuffer } from "../src/lib/scsem-structural-admission";
 
 function sessionFor(
     originalFilePath: string,
@@ -56,6 +57,7 @@ function main() {
         const verified = assertSCSEMUpdaterSourceIntegrity(session);
         assert.equal(verified.sha256, entry.sha256);
         assert.equal(verified.sizeBytes, entry.sizeBytes);
+        assert.equal(verified.sourceTrust, "official_individual_xlsx");
 
         assert.throws(
             () => assertSCSEMUpdaterSourceIntegrity({
@@ -70,6 +72,45 @@ function main() {
                 audit: { ...session.audit, officialSource: undefined },
             }),
             /missing its pinned IRS source identity/
+        );
+
+        const unverifiedPath = path.join(tempDir, "Safeguards-SCSEM-PostgreSQL17.xlsx");
+        const unverifiedBuffer = Buffer.concat([
+            fs.readFileSync(sourcePath),
+            Buffer.from("SkyShield PostgreSQL17 structural-admission regression"),
+        ]);
+        fs.writeFileSync(unverifiedPath, unverifiedBuffer);
+        const structuralAdmission = admitUnrecognizedSCSEMBuffer(
+            path.basename(unverifiedPath),
+            unverifiedBuffer
+        );
+        const unverifiedSession: SCSEMUpdaterSession = {
+            ...session,
+            originalFileName: path.basename(unverifiedPath),
+            originalFilePath: unverifiedPath,
+            workspaceMode: "unverified_update",
+            audit: {
+                uploadedSha256: structuralAdmission.sha256,
+                uploadedSizeBytes: unverifiedBuffer.length,
+                structuralAdmission,
+            },
+        };
+        const verifiedUnrecognized = assertSCSEMUpdaterSourceIntegrity(unverifiedSession);
+        assert.equal(verifiedUnrecognized.sha256, structuralAdmission.sha256);
+        assert.equal(verifiedUnrecognized.sourceTrust, "unverified_structural_draft");
+        assert.equal(verifiedUnrecognized.officialSource, undefined);
+        assert.throws(
+            () => assertSCSEMUpdaterSourceIntegrity({
+                ...unverifiedSession,
+                audit: {
+                    ...unverifiedSession.audit,
+                    structuralAdmission: {
+                        ...structuralAdmission,
+                        totalControls: structuralAdmission.totalControls + 1,
+                    },
+                },
+            }),
+            /no longer matches its recorded structural-admission evidence/
         );
 
         fs.appendFileSync(uploadedPath, Buffer.from([0]));

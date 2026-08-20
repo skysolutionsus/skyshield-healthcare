@@ -261,7 +261,7 @@ BRAVE_SEARCH_API_KEY=... (for web search, if available)
 ```
 /data/pub1075/          — Publication 1075 full text (for AI context)
 /data/scsem-manifest.json — Pinned official IRS SCSEM source metadata and hashes
-/data/scsems/current/   — Flat, hash-pinned corpus of all 58 current IRS SCSEM XLSX files
+/data/scsems/current/   — Flat, hash-pinned corpus of all 60 current individual IRS SCSEM XLSX files
 /src/app/               — Next.js App Router pages
 /src/components/        — Shared UI components
 /src/lib/               — Utilities, AI client, PII detection, etc.

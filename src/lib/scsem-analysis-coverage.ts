@@ -2,13 +2,14 @@ export type SCSEMSupplementalComparisonMode =
     | "ai"
     | "deterministic_fallback"
     | "no_delta"
+    | "not_requested"
     | "failed";
 
 export interface SCSEMSupplementalComparison {
     mode: SCSEMSupplementalComparisonMode;
     complete: boolean;
     candidateOnly: true;
-    applicabilityStatus: "review_required";
+    applicabilityStatus: "review_required" | "not_requested";
     directSourceCount: number;
     comparedDirectSourceCount: number;
     candidateCount: number;
@@ -63,6 +64,15 @@ export function isSupplementalComparisonComplete(
     comparison: SCSEMSupplementalComparison
 ): boolean {
     if (!comparison.complete || comparison.mode === "failed") return false;
+    if (comparison.mode === "not_requested") {
+        return comparison.applicabilityStatus === "not_requested" &&
+            comparison.directSourceCount === 0 &&
+            comparison.comparedDirectSourceCount === 0 &&
+            comparison.candidateCount === 0 &&
+            comparison.comparedCandidateCount === 0 &&
+            comparison.rawProposalCount === 0 &&
+            comparison.evidenceBoundProposalCount === 0;
+    }
     if (comparison.directSourceCount <= 0) return false;
     if (
         comparison.candidateCount < 0 ||
@@ -95,12 +105,14 @@ export function buildSCSEMAnalysisCoverage({
     uncoveredControlIdCount,
     benchmarkLookupError,
     supplementalComparison,
+    additionalBlockers = [],
 }: {
     totalRows: number;
     compliance: ComplianceBatchCoverage;
     uncoveredControlIdCount: number;
     benchmarkLookupError?: string;
     supplementalComparison: SCSEMSupplementalComparison;
+    additionalBlockers?: string[];
 }): SCSEMAnalysisCoverage {
     const supplementalComparisonComplete = isSupplementalComparisonComplete(
         supplementalComparison
@@ -115,13 +127,16 @@ export function buildSCSEMAnalysisCoverage({
         uncoveredControlIdCount > 0
             ? `${uncoveredControlIdCount} requested control identifier(s) lack exact Pub 1075 or NIST coverage`
             : null,
-        benchmarkLookupError ? `CIS Benchmark/CIS-STIG lookup unavailable: ${benchmarkLookupError}` : null,
-        supplementalComparison.directSourceCount === 0
+        supplementalComparison.mode !== "not_requested" && benchmarkLookupError
+            ? `CIS Benchmark/CIS-STIG lookup unavailable: ${benchmarkLookupError}`
+            : null,
+        supplementalComparison.mode !== "not_requested" && supplementalComparison.directSourceCount === 0
             ? "No direct applicable CIS Benchmark or CIS-STIG workbook was validated; a reviewer has not recorded a not-applicable determination"
             : null,
-        supplementalComparison.directSourceCount > 0 && !supplementalComparisonComplete
+        supplementalComparison.mode !== "not_requested" && supplementalComparison.directSourceCount > 0 && !supplementalComparisonComplete
             ? `Supplemental CIS Benchmark/CIS-STIG comparison did not complete: ${supplementalComparison.reason}`
             : null,
+        ...additionalBlockers.map((blocker) => blocker.trim()).filter(Boolean),
     ].filter((value): value is string => Boolean(value));
 
     return {

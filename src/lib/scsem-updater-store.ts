@@ -24,6 +24,8 @@ import {
 
 export type SCSEMUpdaterStatus = "uploaded" | "analyzing" | "analysis_incomplete" | "review_ready" | "error";
 export type SCSEMUpdaterChangeStatus = "PENDING" | "APPROVED" | "REJECTED";
+export type SCSEMAnalysisScope = "full" | "compliance_only";
+export type SCSEMWorkspaceMode = "official_update" | "unverified_update" | "cis_bootstrap";
 
 export const SCSEM_UPDATER_LOCK_STALE_MS = 10 * 60 * 1000;
 export const SCSEM_ANALYSIS_LEASE_MIN_TIMEOUT_MS = 60 * 1000;
@@ -213,6 +215,8 @@ export interface SCSEMUpdaterSession {
         signals: string[];
     };
     status: SCSEMUpdaterStatus;
+    workspaceMode?: SCSEMWorkspaceMode;
+    analysisScope?: SCSEMAnalysisScope;
     summary?: string;
     error?: string;
     scsem: {
@@ -267,11 +271,34 @@ export interface SCSEMUpdaterSession {
         cisSources?: SCSEMUpdaterAuditSource[];
         stigSources?: SCSEMUpdaterAuditSource[];
         adjacentSources?: SCSEMUpdaterAuditSource[];
+        cisBootstrap?: {
+            workbenchId: number;
+            benchmarkTitle: string;
+            benchmarkVersion: string;
+            selectedProfile: string;
+            recommendationCount: number;
+            structuralBaseline: {
+                sourceFileName: string;
+                sourceUrl: string;
+                sourceSha256: string;
+                sourceVersion: string | null;
+                targetSheet: string;
+            };
+        };
+        structuralAdmission?: {
+            trust: "unverified_structural_draft";
+            totalControls: number;
+            testCaseSheets: string[];
+            issueCodeCount: number;
+            sha256: string;
+            blocker: string;
+        };
     };
 }
 
 export type SCSEMUpdaterMutationAction =
     | "SCSEM_UPDATER_UPLOAD"
+    | "SCSEM_UPDATER_CIS_BOOTSTRAP"
     | "SCSEM_UPDATER_ANALYZE_START"
     | "SCSEM_UPDATER_ANALYZE_RESTART"
     | "SCSEM_UPDATER_ANALYZE_FINALIZE"
@@ -1066,7 +1093,11 @@ async function createSCSEMUpdaterSessionWithPersistence(
     owner: { organizationId: string; userId: string },
     officialSource: OfficialSCSEMManifestEntry | undefined,
     mutation: SCSEMUpdaterDurableMutation,
-    persistence: SCSEMUpdaterAuditPersistence
+    persistence: SCSEMUpdaterAuditPersistence,
+    admission?: {
+        workspaceMode: SCSEMWorkspaceMode;
+        structuralAdmission?: NonNullable<SCSEMUpdaterSession["audit"]["structuralAdmission"]>;
+    }
 ): Promise<SCSEMUpdaterSession> {
     const id = randomUUID();
     const dir = sessionDir(id);
@@ -1095,6 +1126,7 @@ async function createSCSEMUpdaterSessionWithPersistence(
             signals: technologyInference.signals,
         },
         status: "uploaded",
+        workspaceMode: admission?.workspaceMode || "official_update",
         scsem: {
             subject: parsed.metadata.subject,
             version: parsed.metadata.version,
@@ -1110,6 +1142,9 @@ async function createSCSEMUpdaterSessionWithPersistence(
             uploadedSha256: sha256(workbookBuffer),
             uploadedSizeBytes: workbookBuffer.length,
             ...(officialSource ? { officialSource } : {}),
+            ...(admission?.structuralAdmission
+                ? { structuralAdmission: admission.structuralAdmission }
+                : {}),
         },
     };
 
@@ -1127,7 +1162,11 @@ export async function createSCSEMUpdaterSession(
     workbookBuffer: Buffer,
     owner: { organizationId: string; userId: string },
     officialSource: OfficialSCSEMManifestEntry | undefined,
-    mutation: SCSEMUpdaterDurableMutation
+    mutation: SCSEMUpdaterDurableMutation,
+    admission?: {
+        workspaceMode: SCSEMWorkspaceMode;
+        structuralAdmission?: NonNullable<SCSEMUpdaterSession["audit"]["structuralAdmission"]>;
+    }
 ): Promise<SCSEMUpdaterSession> {
     return createSCSEMUpdaterSessionWithPersistence(
         originalFileName,
@@ -1135,7 +1174,8 @@ export async function createSCSEMUpdaterSession(
         owner,
         officialSource,
         mutation,
-        productionAuditPersistence
+        productionAuditPersistence,
+        admission
     );
 }
 

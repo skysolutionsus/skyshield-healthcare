@@ -18,15 +18,15 @@ import { evaluateOfficialSCSEMReference } from "../src/lib/scsem-official-refere
 
 XLSX.set_fs(fs);
 
-const CURRENT_CORPUS_CIS_SECTION_HEADER_COUNT = 67;
+const CURRENT_CORPUS_CIS_SECTION_HEADER_COUNT = 72;
 const CURRENT_CORPUS_CIS_RECOMMENDATION_HEADER_COUNT = 21;
-const CURRENT_CORPUS_ISSUE_CODE_HEADER_COUNT = 120;
-const CURRENT_CORPUS_ISSUE_CODE_DESCRIPTION_HEADER_COUNT = 120;
-const CURRENT_CORPUS_CRITICALITY_HEADER_COUNT = 120;
-const CURRENT_CORPUS_RISK_RATING_HEADER_COUNT = 120;
-const CURRENT_CORPUS_FINDING_STATEMENT_HEADER_COUNT = 67;
-const CURRENT_CORPUS_REMEDIATION_STATEMENT_HEADER_COUNT = 68;
-const CURRENT_CORPUS_CAP_REQUEST_STATEMENT_HEADER_COUNT = 64;
+const CURRENT_CORPUS_ISSUE_CODE_HEADER_COUNT = 125;
+const CURRENT_CORPUS_ISSUE_CODE_DESCRIPTION_HEADER_COUNT = 125;
+const CURRENT_CORPUS_CRITICALITY_HEADER_COUNT = 125;
+const CURRENT_CORPUS_RISK_RATING_HEADER_COUNT = 125;
+const CURRENT_CORPUS_FINDING_STATEMENT_HEADER_COUNT = 72;
+const CURRENT_CORPUS_REMEDIATION_STATEMENT_HEADER_COUNT = 73;
+const CURRENT_CORPUS_CAP_REQUEST_STATEMENT_HEADER_COUNT = 69;
 
 function testCaseHeaderDetails(worksheet: XLSX.WorkSheet): {
     headers: string[];
@@ -251,28 +251,28 @@ function main() {
         manifest.conflictingPackageAudit.status,
         "excluded_conflicting_snapshot"
     );
-    assert.equal(manifest.conflictingPackageAudit.workbookCount, 60);
-    assert.equal(manifest.conflictingPackageAudit.totalControls, 11_252);
-    assert.equal(manifest.conflictingPackageAudit.pairedWorkbookCount, 57);
-    assert.equal(manifest.conflictingPackageAudit.pairedControlCount, 10_470);
+    assert.equal(manifest.conflictingPackageAudit.workbookCount, 62);
+    assert.equal(manifest.conflictingPackageAudit.totalControls, 11_564);
+    assert.equal(manifest.conflictingPackageAudit.pairedWorkbookCount, 59);
+    assert.equal(manifest.conflictingPackageAudit.pairedControlCount, 10_782);
     assert.equal(manifest.conflictingPackageAudit.packageOnly.length, 3);
     assert.equal(manifest.conflictingPackageAudit.directOnly.length, 1);
     assert.equal(manifest.conflictingPackageAudit.allPairedRawHashesDiffer, true);
-    assert.equal(manifest.conflictingPackageAudit.allPairedDirectCoreModifiedLater, true);
+    assert.equal(manifest.conflictingPackageAudit.allPairedDirectCoreModifiedLater, false);
     assert.match(manifest.conflictingPackageAudit.sha256, /^[a-f0-9]{64}$/);
-    assert.equal(manifest.expectedWorkbookCount, 58);
-    assert.equal(manifest.workbooks.length, 58);
-    assert.equal(new Set(manifest.workbooks.map((entry) => entry.sha256)).size, 58);
-    assert.equal(new Set(manifest.workbooks.map((entry) => entry.sourceUrl)).size, 58);
-    assert.equal(new Set(manifest.workbooks.map((entry) => entry.file)).size, 58);
+    assert.equal(manifest.expectedWorkbookCount, 60);
+    assert.equal(manifest.workbooks.length, 60);
+    assert.equal(new Set(manifest.workbooks.map((entry) => entry.sha256)).size, 60);
+    assert.equal(new Set(manifest.workbooks.map((entry) => entry.sourceUrl)).size, 60);
+    assert.equal(new Set(manifest.workbooks.map((entry) => entry.file)).size, 60);
     const index = JSON.parse(
         fs.readFileSync(path.join(process.cwd(), "data/scsem-index.json"), "utf8")
     ) as Array<{ id?: string; file: string; name: string }>;
-    assert.equal(index.length, 58);
-    assert.equal(new Set(index.map((entry) => entry.id)).size, 58, "SCSEM seed IDs must be unique");
+    assert.equal(index.length, 60);
+    assert.equal(new Set(index.map((entry) => entry.id)).size, 60, "SCSEM seed IDs must be unique");
     assert.ok(index.every((entry) => entry.id?.startsWith("official-")), "Every SCSEM needs a pinned seed ID");
-    assert.equal(new Set(index.map((entry) => entry.file)).size, 58);
-    assert.equal(new Set(index.map((entry) => entry.name)).size, 58, "SCSEM display names must be unique");
+    assert.equal(new Set(index.map((entry) => entry.file)).size, 60);
+    assert.equal(new Set(index.map((entry) => entry.name)).size, 60, "SCSEM display names must be unique");
 
     let totalControls = 0;
     let cisSectionHeaders = 0;
@@ -377,7 +377,8 @@ function main() {
         global.gc?.();
     }
 
-    assert.equal(totalControls, 10_743);
+
+    assert.equal(totalControls, 11_055);
     assert.equal(
         cisSectionHeaders,
         CURRENT_CORPUS_CIS_SECTION_HEADER_COUNT,
@@ -423,10 +424,10 @@ function main() {
         CURRENT_CORPUS_CAP_REQUEST_STATEMENT_HEADER_COUNT,
         "Current SCSEM corpus CAP Request Statement header coverage changed"
     );
-    assert.equal(schemaFindingUnique, 67, "Finding Statement target-schema coverage changed");
+    assert.equal(schemaFindingUnique, 72, "Finding Statement target-schema coverage changed");
     assert.equal(schemaFindingAbsent, 53, "Finding Statement-free target-schema coverage changed");
     assert.equal(schemaFindingAmbiguous, 0, "Finding Statement target schema became ambiguous");
-    assert.equal(workbooksWithFindingColumn, 36, "Workbook Finding Statement coverage changed");
+    assert.equal(workbooksWithFindingColumn, 38, "Workbook Finding Statement coverage changed");
     process.stdout.write(`Verified all ${manifest.workbooks.length} pinned IRS SCSEMs (${totalControls} controls).\n`);
 }
 

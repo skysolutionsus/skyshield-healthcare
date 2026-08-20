@@ -168,12 +168,16 @@ function aliasesForText(value: string): string[] {
     const aliases: string[] = [];
 
     if (compact.includes("db2")) {
-        if (compact.includes("13") && (compact.includes("zos") || normalized.includes("z os"))) {
-            aliases.push("IBM Db2 13 for z/OS");
+        const db2Generation = matchedVersion(normalized, [
+            /\bdb2\s*v(?:ersion\s*)?(\d{1,2}(?:\.\d+)?)\b/,
+            /\bdb2\s+(\d{1,2}(?:\.\d+)?)\b/,
+        ]);
+        const isZos = compact.includes("zos") || normalized.includes("z os");
+        if (db2Generation) {
+            aliases.push(`IBM Db2 ${db2Generation}${isZos ? " for z/OS" : ""}`);
+        } else {
+            aliases.push(`IBM Db2${isZos ? " for z/OS" : ""}`);
         }
-        if (compact.includes("121") || compact.includes("12.1")) aliases.push("IBM Db2 12.1");
-        if (compact.includes("11")) aliases.push("IBM Db2 11");
-        aliases.push("IBM Db2");
     }
 
     if (compact.includes("apache24") || /apache.*2\s*\.?\s*4/.test(normalized)) {
@@ -386,6 +390,19 @@ function sheetQueries(sheetName: string, technology: string, parsed: ParsedSCSEM
         ...aliasesForText(sheetName),
         ...workbookLevelQueries(technology, parsed),
     ]).filter((query) => !unsafeBroadQuery(query));
+}
+
+/**
+ * Returns the exact WorkBench lookup queries used for one SCSEM tab. Keeping
+ * this visible to tests prevents a version-specific tab from silently gaining
+ * a broad family fallback that can select a different product generation.
+ */
+export function scsemBenchmarkQueriesForSheet(
+    sheetName: string,
+    technology: string,
+    parsed: ParsedSCSEM
+): string[] {
+    return sheetQueries(sheetName, technology, parsed);
 }
 
 function sourceKey(kind: ResolvedBenchmarkKind, downloaded: DownloadedBenchmark, profile: string): string {

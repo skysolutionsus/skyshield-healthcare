@@ -31,6 +31,7 @@ import {
     scsemUpdaterRevisionETag,
     writeSCSEMUpdaterSession,
     type SCSEMUpdaterAuditSource,
+    type SCSEMAnalysisScope,
 } from "@/lib/scsem-updater-store";
 import { parseSCSEMFile, type ParsedSCSEM } from "@/lib/xlsx-parser";
 import { evaluateOfficialSCSEMReference } from "@/lib/scsem-official-reference";
@@ -44,7 +45,7 @@ import {
 import { clientSafeSCSEMUpdaterSession } from "@/lib/scsem-updater-client-session";
 import { scsemBenchmarkLookupFailureDetails } from "@/lib/scsem-benchmark-failure";
 import {
-    buildComparisonCandidates,
+    buildSheetScopedComparisonCandidates,
     buildControlSummary,
     buildNewControlEvidence,
     isMaterialTextDelta,
@@ -1371,9 +1372,29 @@ export async function POST(
         if (!access.ok) return access.response;
         user = access.user;
 
+        let requestedScope: SCSEMAnalysisScope = "full";
+        try {
+            const requestBody = await request.json() as { analysisScope?: unknown };
+            if (requestBody.analysisScope !== undefined) {
+                if (requestBody.analysisScope !== "full" && requestBody.analysisScope !== "compliance_only") {
+                    return NextResponse.json({
+                        error: "analysisScope must be full or compliance_only.",
+                        code: "INVALID_ANALYSIS_SCOPE",
+                    }, { status: 400 });
+                }
+                requestedScope = requestBody.analysisScope;
+            }
+        } catch {
+            // Backwards compatibility for existing clients that send an empty POST.
+        }
+
         const expectedRevision = requireSCSEMUpdaterExpectedRevision(request);
         const updaterSession = readSCSEMUpdaterSessionForUser(id, user);
         assertSCSEMUpdaterRevision(updaterSession, expectedRevision);
+        updaterSession.analysisScope = requestedScope;
+        const sourceCoverageBlockers = updaterSession.audit.structuralAdmission
+            ? [updaterSession.audit.structuralAdmission.blocker]
+            : [];
         const previousStatus = updaterSession.status;
         const leaseClaim = claimSCSEMAnalysisLease(
             updaterSession,
@@ -1415,6 +1436,7 @@ export async function POST(
                 after: {
                     status: updaterSession.status,
                     error: null,
+                    analysisScope: requestedScope,
                     analysisLease: leaseClaim.lease,
                     timeoutMs: SCSEM_ANALYSIS_LEASE_TIMEOUT_MS,
                 },
@@ -1473,30 +1495,32 @@ export async function POST(
         let resolvedSources: ResolvedBenchmarkSource[] = [];
         let benchmarkResolutionDiagnostics: BenchmarkQueryResolutionDiagnostic[] = [];
 
-        try {
-            cisToken = await getCISToken();
-            [allBenchmarks, allExcelFiles] = await Promise.all([
-                fetchAllBenchmarks(cisToken),
-                fetchAllBenchmarkExcelFiles(cisToken),
-            ]);
-            const benchmarkResolution = await resolveSCSEMBenchmarkSourcesDetailed({
-                token: cisToken,
-                technology: updaterSession.inferredTechnology,
-                parsed,
-                benchmarks: allBenchmarks,
-                excelFiles: allExcelFiles,
-                downloadedBenchmarks,
-            });
-            resolvedSources = benchmarkResolution.sources;
-            benchmarkResolutionDiagnostics = benchmarkResolution.diagnostics;
-        } catch (error: unknown) {
-            const failure = scsemBenchmarkLookupFailureDetails(error, "direct");
-            benchmarkLookupError = failure.message;
-            benchmarkLookupErrorCode = failure.code;
-            console.warn(
-                "SCSEM updater benchmark lookup failed; continuing with compliance-first analysis.",
-                error
-            );
+        if (requestedScope === "full") {
+            try {
+                cisToken = await getCISToken();
+                [allBenchmarks, allExcelFiles] = await Promise.all([
+                    fetchAllBenchmarks(cisToken),
+                    fetchAllBenchmarkExcelFiles(cisToken),
+                ]);
+                const benchmarkResolution = await resolveSCSEMBenchmarkSourcesDetailed({
+                    token: cisToken,
+                    technology: updaterSession.inferredTechnology,
+                    parsed,
+                    benchmarks: allBenchmarks,
+                    excelFiles: allExcelFiles,
+                    downloadedBenchmarks,
+                });
+                resolvedSources = benchmarkResolution.sources;
+                benchmarkResolutionDiagnostics = benchmarkResolution.diagnostics;
+            } catch (error: unknown) {
+                const failure = scsemBenchmarkLookupFailureDetails(error, "direct");
+                benchmarkLookupError = failure.message;
+                benchmarkLookupErrorCode = failure.code;
+                console.warn(
+                    "SCSEM updater benchmark lookup failed; continuing with compliance-first analysis.",
+                    error
+                );
+            }
         }
 
         const updateCandidates: AnalysisUpdateCandidate[] = [];
@@ -1506,40 +1530,39 @@ export async function POST(
         let comparedDirectSourceCount = 0;
 
         for (const source of resolvedSources) {
-            const scopedControls = controls.filter((control) =>
-                source.matchedSheets.includes(control.sourceSheet || "")
-            );
-            if (scopedControls.length === 0) continue;
-
-            const candidates = buildComparisonCandidates(
-                scopedControls,
+            const sheetComparisons = buildSheetScopedComparisonCandidates(
+                controls,
                 source.selectedProfile.recommendations,
+                source.matchedSheets,
                 UPDATER_CANDIDATE_LIMITS
             );
-            totalUpdateCandidateCount += candidates.totalUpdateCandidates;
-            totalNewControlCandidateCount += candidates.totalNewControlCandidates;
+            if (sheetComparisons.length === 0) continue;
             comparedDirectSourceCount++;
             const label = sourceLabel(source);
 
-            updateCandidates.push(...candidates.updateCandidates.map((candidate) => ({
-                ...candidate,
-                sourceKind: source.kind,
-                sourceRelationship: "direct" as const,
-                sourceLabel: label,
-                sourceProfile: source.selectedProfile.profile,
-                sourceWorkbenchId: source.downloaded.snapshot.workbenchId,
-                sourceBenchmarkTitle: source.downloaded.snapshot.benchmarkTitle,
-            })));
-            newControlCandidates.push(...candidates.newControlCandidates.map((recommendation) => ({
-                recommendation,
-                sourceKind: source.kind,
-                sourceRelationship: "direct" as const,
-                sourceLabel: label,
-                sourceProfile: source.selectedProfile.profile,
-                sourceWorkbenchId: source.downloaded.snapshot.workbenchId,
-                sourceBenchmarkTitle: source.downloaded.snapshot.benchmarkTitle,
-                targetSheet: source.matchedSheets[0],
-            })));
+            for (const candidates of sheetComparisons) {
+                totalUpdateCandidateCount += candidates.totalUpdateCandidates;
+                totalNewControlCandidateCount += candidates.totalNewControlCandidates;
+                updateCandidates.push(...candidates.updateCandidates.map((candidate) => ({
+                    ...candidate,
+                    sourceKind: source.kind,
+                    sourceRelationship: "direct" as const,
+                    sourceLabel: label,
+                    sourceProfile: source.selectedProfile.profile,
+                    sourceWorkbenchId: source.downloaded.snapshot.workbenchId,
+                    sourceBenchmarkTitle: source.downloaded.snapshot.benchmarkTitle,
+                })));
+                newControlCandidates.push(...candidates.newControlCandidates.map((recommendation) => ({
+                    recommendation,
+                    sourceKind: source.kind,
+                    sourceRelationship: "direct" as const,
+                    sourceLabel: label,
+                    sourceProfile: source.selectedProfile.profile,
+                    sourceWorkbenchId: source.downloaded.snapshot.workbenchId,
+                    sourceBenchmarkTitle: source.downloaded.snapshot.benchmarkTitle,
+                    targetSheet: candidates.sheetName,
+                })));
+            }
         }
 
         updateCandidates.sort((a, b) => b.score - a.score);
@@ -1638,6 +1661,95 @@ export async function POST(
             adjacentSources: adjacentAuditSources,
         };
 
+        if (requestedScope === "compliance_only") {
+            const compliancePayload = await compliancePayloadPromise;
+            const supplementalComparison: SCSEMSupplementalComparison = {
+                mode: "not_requested",
+                complete: true,
+                candidateOnly: true,
+                applicabilityStatus: "not_requested",
+                directSourceCount: 0,
+                comparedDirectSourceCount: 0,
+                candidateCount: 0,
+                comparedCandidateCount: 0,
+                rawProposalCount: 0,
+                evidenceBoundProposalCount: 0,
+                reason: "The reviewer requested a Publication 1075 and NIST-only analysis, so SkyShield did not authenticate to CIS WorkBench or retrieve licensed benchmark material.",
+            };
+            updaterSession.audit.supplementalComparison = supplementalComparison;
+            const analysisCoverage = buildSCSEMAnalysisCoverage({
+                totalRows: controls.length,
+                compliance: compliancePayload,
+                uncoveredControlIdCount: compliance.uncoveredControlIds.length,
+                supplementalComparison,
+                additionalBlockers: sourceCoverageBlockers,
+            });
+            updaterSession.audit.analysisCoverage = analysisCoverage;
+            const validChanges = addIdsToChanges(validateChanges(
+                dedupeProposedChanges(addUnambiguousTargetSheets(
+                    compliancePayload.changes || [],
+                    controls
+                )),
+                controls,
+                MAX_UPDATER_CHANGES
+            ));
+            const completedAnalysisLease = clearSCSEMAnalysisLease(
+                updaterSession,
+                analysisOperationId
+            );
+            updaterSession.status = analysisCoverage.complete ? "review_ready" : "analysis_incomplete";
+            updaterSession.summary = [
+                compliancePayload.summary,
+                "CIS Benchmark and CIS-STIG sources were intentionally excluded from this requested analysis scope.",
+                analysisCoverage.complete ? null : "Analysis remains incomplete; see coverage blockers before treating this draft as release-ready.",
+            ].filter(Boolean).join(" ");
+            updaterSession.changes = validChanges;
+            updaterSession.history.push({
+                at: new Date().toISOString(),
+                action: "analyze",
+                description:
+                    `Publication 1075/NIST-only analysis ran across ${compliancePayload.batchCount} bounded compliance batch(es), ` +
+                    `skipped CIS WorkBench by reviewer request, and generated ${validChanges.length} proposed change(s).`,
+            });
+            await writeSCSEMUpdaterSession(updaterSession, updaterSession.revision, {
+                action: "SCSEM_UPDATER_ANALYZE_FINALIZE",
+                analysisOperationId: completedAnalysisLease.operationId,
+                affectedPayload: {
+                    input: {
+                        fileName: updaterSession.originalFileName,
+                        inferredTechnology: updaterSession.inferredTechnology,
+                        parsedControls: controls.length,
+                        analysisScope: requestedScope,
+                        testCaseSheets: parsed.sheets
+                            .filter((sheet) => sheet.sheetType === "test_cases")
+                            .map((sheet) => sheet.sheetName),
+                    },
+                    output: {
+                        completedAnalysisLease,
+                        analysisLeaseCleared: true,
+                        summary: updaterSession.summary,
+                        changeCount: validChanges.length,
+                        changes: validChanges,
+                        candidateCounts: {
+                            cisUpdates: 0,
+                            cisNewControls: 0,
+                            stigUpdates: 0,
+                            stigNewControls: 0,
+                            complianceBatches: compliancePayload.batchCount,
+                            completedComplianceBatches: compliancePayload.completedBatchCount,
+                            complianceChanges: compliancePayload.changes.length,
+                        },
+                        auditSources: updaterSession.audit,
+                    },
+                },
+                ...auditRequestContext(request),
+            });
+            return NextResponse.json(
+                { session: clientSafeSCSEMUpdaterSession(updaterSession) },
+                { headers: { ETag: scsemUpdaterRevisionETag(updaterSession) } }
+            );
+        }
+
         if (resolvedSources.length === 0) {
             const adjacentCandidates = buildAdjacentRecommendationCandidates(adjacentSources);
             const compliancePayload = await compliancePayloadPromise;
@@ -1674,6 +1786,7 @@ export async function POST(
                 uncoveredControlIdCount: compliance.uncoveredControlIds.length,
                 benchmarkLookupError,
                 supplementalComparison,
+                additionalBlockers: sourceCoverageBlockers,
             });
             updaterSession.audit.analysisCoverage = analysisCoverage;
             const boundAdjacentChanges = bindBenchmarkChangesToResolvedEvidence(
@@ -1780,6 +1893,7 @@ export async function POST(
                 uncoveredControlIdCount: compliance.uncoveredControlIds.length,
                 benchmarkLookupError,
                 supplementalComparison,
+                additionalBlockers: sourceCoverageBlockers,
             });
             updaterSession.audit.analysisCoverage = analysisCoverage;
             const validChanges = addIdsToChanges(validateChanges(

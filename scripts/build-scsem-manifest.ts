@@ -7,25 +7,25 @@ const SOURCE_PAGE_URL =
     "https://www.irs.gov/privacy-disclosure/computer-security-compliance-references-and-related-topics-scsem-updates";
 
 const CONFLICTING_PACKAGE_AUDIT = {
-    sourceUrl: "https://www.irs.gov/pub/safeguard/SCSEM-Package-02182026-Current.zip",
-    auditedAt: "2026-07-21",
-    httpLastModified: "2026-04-03T17:56:18Z",
-    sha256: "f491a560ed3de0369526240f46661badcd569d8f3f6935f37faee4afb1c781d6",
-    sizeBytes: 13_258_698,
+    sourceUrl: "https://www.irs.gov/pub/safeguard/scsem-package-05262026-current.zip",
+    auditedAt: "2026-08-20",
+    httpLastModified: "2026-08-04T00:38:02Z",
+    sha256: "62f43d9fcf2af8cfc92c7c90393d012edb8fcbe4aa2d27ce15b2ee8b3ce4ecd0",
+    sizeBytes: 13_860_534,
     status: "excluded_conflicting_snapshot",
-    workbookCount: 60,
-    totalControls: 11_252,
-    pairedWorkbookCount: 57,
-    pairedControlCount: 10_470,
+    workbookCount: 62,
+    totalControls: 11_564,
+    pairedWorkbookCount: 59,
+    pairedControlCount: 10_782,
     allPairedRawHashesDiffer: true,
-    allPairedDirectCoreModifiedLater: true,
+    allPairedDirectCoreModifiedLater: false,
     packageOnly: [
         { subject: "SQL Server", version: "5.0", controls: 243 },
         { subject: "Oracle Solaris", version: "3.4", controls: 486 },
         { subject: "NGINX Web Server", version: "1.0", controls: 53 },
     ],
     directOnly: [
-        { subject: "Microsoft Windows Server 2012", version: "3.6", controls: 273 },
+        { subject: "Microsoft Server 2012", version: "3.6", controls: 273 },
     ],
 } as const;
 
@@ -108,14 +108,14 @@ function sha256(buffer: Buffer): string {
 function main() {
     const pagePath = argument("page");
     const downloadsPath = argument("downloads");
-    const reviewedAt = optionalArgument("page-reviewed-at", "2026-06-27");
-    const acquiredAt = optionalArgument("acquired-at", "2026-07-21");
+    const reviewedAt = optionalArgument("page-reviewed-at", "2026-08-20");
+    const acquiredAt = optionalArgument("acquired-at", "2026-08-20");
     const root = process.cwd();
     const destination = path.join(root, "data", "scsems", "current");
 
     const links = workbookLinks(fs.readFileSync(pagePath, "utf8"));
-    if (links.length !== 58) {
-        throw new Error(`Expected 58 current IRS workbook links, found ${links.length}.`);
+    if (links.length !== 60) {
+        throw new Error(`Expected 60 current IRS workbook links, found ${links.length}.`);
     }
 
     const downloads = fs.readdirSync(downloadsPath)
@@ -123,10 +123,11 @@ function main() {
     const downloadByName = new Map(
         downloads.map((fileName) => [normalizedFileName(fileName), fileName])
     );
-    if (downloadByName.size !== 58) {
-        throw new Error(`Expected 58 unique downloaded workbooks, found ${downloadByName.size}.`);
+    if (downloadByName.size !== 60) {
+        throw new Error(`Expected 60 unique downloaded workbooks, found ${downloadByName.size}.`);
     }
 
+    fs.rmSync(destination, { recursive: true, force: true });
     fs.mkdirSync(destination, { recursive: true });
     const entries: ManifestEntry[] = [];
 
@@ -169,7 +170,7 @@ function main() {
         snapshotAcquiredAt: acquiredAt,
         sourcePolicy: "individual_xlsx_links",
         conflictingPackageAudit: CONFLICTING_PACKAGE_AUDIT,
-        expectedWorkbookCount: 58,
+        expectedWorkbookCount: 60,
         workbooks: entries,
     };
     fs.writeFileSync(

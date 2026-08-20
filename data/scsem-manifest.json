@@ -1,32 +1,48 @@
 {
   "schemaVersion": 1,
   "sourcePageUrl": "https://www.irs.gov/privacy-disclosure/computer-security-compliance-references-and-related-topics-scsem-updates",
-  "sourcePageReviewedAt": "2026-06-27",
-  "snapshotAcquiredAt": "2026-07-21",
+  "sourcePageReviewedAt": "2026-08-20",
+  "snapshotAcquiredAt": "2026-08-20",
   "sourcePolicy": "individual_xlsx_links",
   "conflictingPackageAudit": {
-    "sourceUrl": "https://www.irs.gov/pub/safeguard/SCSEM-Package-02182026-Current.zip",
-    "auditedAt": "2026-07-21",
-    "httpLastModified": "2026-04-03T17:56:18Z",
-    "sha256": "f491a560ed3de0369526240f46661badcd569d8f3f6935f37faee4afb1c781d6",
-    "sizeBytes": 13258698,
+    "sourceUrl": "https://www.irs.gov/pub/safeguard/scsem-package-05262026-current.zip",
+    "auditedAt": "2026-08-20",
+    "httpLastModified": "2026-08-04T00:38:02Z",
+    "sha256": "62f43d9fcf2af8cfc92c7c90393d012edb8fcbe4aa2d27ce15b2ee8b3ce4ecd0",
+    "sizeBytes": 13860534,
     "status": "excluded_conflicting_snapshot",
-    "workbookCount": 60,
-    "totalControls": 11252,
-    "pairedWorkbookCount": 57,
-    "pairedControlCount": 10470,
+    "workbookCount": 62,
+    "totalControls": 11564,
+    "pairedWorkbookCount": 59,
+    "pairedControlCount": 10782,
     "allPairedRawHashesDiffer": true,
-    "allPairedDirectCoreModifiedLater": true,
+    "allPairedDirectCoreModifiedLater": false,
     "packageOnly": [
-      { "subject": "SQL Server", "version": "5.0", "controls": 243 },
-      { "subject": "Oracle Solaris", "version": "3.4", "controls": 486 },
-      { "subject": "NGINX Web Server", "version": "1.0", "controls": 53 }
+      {
+        "subject": "SQL Server",
+        "version": "5.0",
+        "controls": 243
+      },
+      {
+        "subject": "Oracle Solaris",
+        "version": "3.4",
+        "controls": 486
+      },
+      {
+        "subject": "NGINX Web Server",
+        "version": "1.0",
+        "controls": 53
+      }
     ],
     "directOnly": [
-      { "subject": "Microsoft Windows Server 2012", "version": "3.6", "controls": 273 }
+      {
+        "subject": "Microsoft Server 2012",
+        "version": "3.6",
+        "controls": 273
+      }
     ]
   },
-  "expectedWorkbookCount": 58,
+  "expectedWorkbookCount": 60,
   "workbooks": [
     {
       "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-acf2.xlsx",
@@ -93,15 +109,15 @@
       ]
     },
     {
-      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-apache24-iis-10-webserver-v6-1.xlsx",
-      "sha256": "ba7e19cc8a79e37c4040457fc467ab0711734165a5a120e0415a8a7ec4531e09",
-      "sizeBytes": 241032,
-      "fileName": "safeguards-scsem-apache24-iis-10-webserver-v6-1.xlsx",
-      "file": "data/scsems/current/safeguards-scsem-apache24-iis-10-webserver-v6-1.xlsx",
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-apache24-iis-10-webserver-v6-2.xlsx",
+      "sha256": "d9b2f247de995c29ac655afdb967af74916a3e954866357d8488ff66da1233d8",
+      "sizeBytes": 311294,
+      "fileName": "safeguards-scsem-apache24-iis-10-webserver-v6-2.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-apache24-iis-10-webserver-v6-2.xlsx",
       "category": "Web",
       "subject": "Web Server",
-      "version": "6.1",
-      "effectiveDate": "1/26/2025",
+      "version": "6.2",
+      "effectiveDate": "4/24/2026",
       "totalControls": 119,
       "testCaseSheets": [
         "General Test Cases",
@@ -138,6 +154,39 @@
       "testCaseSheets": [
         "General App Test Cases",
         "Web App Test Cases"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-aws-cloud-services-scsem-v1-0.xlsx",
+      "sha256": "407690f0060cb9b0ae546789c0faa0940c8c1fad3d5f5db04aa9db0258c5675c",
+      "sizeBytes": 447069,
+      "fileName": "safeguards-scsem-aws-cloud-services-scsem-v1-0.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-aws-cloud-services-scsem-v1-0.xlsx",
+      "category": "Application",
+      "subject": "Amazon Web Services (AWS)",
+      "version": "1.0",
+      "effectiveDate": "March 31, 2026",
+      "totalControls": 225,
+      "testCaseSheets": [
+        "AWS Foundation Services",
+        "AWS Compute Services",
+        "AWS Database Services",
+        "AWS End User Compute Services"
+      ]
+    },
+    {
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-azure-cloud-services-scsem-v1-0.xlsx",
+      "sha256": "7d79900df34286f13adb7b521fd438a1c1314ec3a4072a6fa74317215758f99d",
+      "sizeBytes": 241841,
+      "fileName": "safeguards-scsem-azure-cloud-services-scsem-v1-0.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-azure-cloud-services-scsem-v1-0.xlsx",
+      "category": "Application",
+      "subject": "Microsoft Azure Services",
+      "version": "1.0",
+      "effectiveDate": "March 31, 2026",
+      "totalControls": 87,
+      "testCaseSheets": [
+        "Azure Foundation Services"
       ]
     },
     {
@@ -414,15 +463,15 @@
       ]
     },
     {
-      "sourceUrl": "https://www.irs.gov/pub/safeguard/Safeguards-SCSEM-MOT-v6-1.xlsx",
-      "sha256": "064f76de388b5d015e5d1d4d4fcea3f7beaf846d66afb9edc4bb9d2f45a42e3c",
-      "sizeBytes": 195308,
-      "fileName": "Safeguards-SCSEM-MOT-v6-1.xlsx",
-      "file": "data/scsems/current/Safeguards-SCSEM-MOT-v6-1.xlsx",
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-mot-v6-2.xlsx",
+      "sha256": "f451bae18a2372262ed7cc4471f57fa09aaa36545c6edb7dced7bfcaf65d771e",
+      "sizeBytes": 301183,
+      "fileName": "safeguards-scsem-mot-v6-2.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-mot-v6-2.xlsx",
       "category": "MOT",
       "subject": "Management, Operational and Technical Controls",
-      "version": "6.1",
-      "effectiveDate": "2/18/2026",
+      "version": "6.2",
+      "effectiveDate": "5/6/2026",
       "totalControls": 121,
       "testCaseSheets": [
         "MOT",
@@ -465,15 +514,15 @@
       ]
     },
     {
-      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-network-assessment-v4-0.xlsx",
-      "sha256": "376a64a06bf0de5a5c46a6cd806ad624a6d041b3d8c35032fffb0869c3854a9b",
-      "sizeBytes": 98290,
-      "fileName": "safeguards-scsem-network-assessment-v4-0.xlsx",
-      "file": "data/scsems/current/safeguards-scsem-network-assessment-v4-0.xlsx",
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-network-assessment-v4-1.xlsx",
+      "sha256": "53d361076d7f85fbdf669c9328d275e04919ff787a1575ba6900eccecdd27e65",
+      "sizeBytes": 200277,
+      "fileName": "safeguards-scsem-network-assessment-v4-1.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-network-assessment-v4-1.xlsx",
       "category": "Network",
       "subject": "Network Assessment",
-      "version": "4.0",
-      "effectiveDate": "December 31, 2025",
+      "version": "4.1",
+      "effectiveDate": "May 6, 2026",
       "totalControls": 51,
       "testCaseSheets": [
         "Network Test Cases"
@@ -930,15 +979,15 @@
       ]
     },
     {
-      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-windows-server-2025-v1-0.xlsx",
-      "sha256": "a139c9d0ce80a08f36cd18e188de54c2491f1a143ae34b15da65f9cd336b6a45",
-      "sizeBytes": 370397,
-      "fileName": "safeguards-scsem-windows-server-2025-v1-0.xlsx",
-      "file": "data/scsems/current/safeguards-scsem-windows-server-2025-v1-0.xlsx",
+      "sourceUrl": "https://www.irs.gov/pub/safeguard/safeguards-scsem-windows-server-%202025-v1-1.xlsx",
+      "sha256": "da75cc24ecd038bdb59b971d18309348bc34eed7c7cd492e3ba1a4103b563daf",
+      "sizeBytes": 422055,
+      "fileName": "safeguards-scsem-windows-server- 2025-v1-1.xlsx",
+      "file": "data/scsems/current/safeguards-scsem-windows-server- 2025-v1-1.xlsx",
       "category": "Windows",
       "subject": "Microsoft Server 2025",
-      "version": "1.0",
-      "effectiveDate": "September 30, 2025",
+      "version": "1.1",
+      "effectiveDate": "April 24, 2026",
       "totalControls": 360,
       "testCaseSheets": [
         "Common System Test Cases",

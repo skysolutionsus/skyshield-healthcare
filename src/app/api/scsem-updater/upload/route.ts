@@ -5,7 +5,8 @@ import {
     scsemUpdaterRevisionETag,
 } from "@/lib/scsem-updater-store";
 import { requireScsemSteward } from "@/lib/scsem-steward-auth";
-import { matchOfficialSCSEM, officialSCSEMManifest } from "@/lib/scsem-official-manifest";
+import { matchOfficialSCSEM } from "@/lib/scsem-official-manifest";
+import { admitUnrecognizedSCSEMBuffer } from "@/lib/scsem-structural-admission";
 import { scsemUpdaterRouteFailureDetails } from "@/lib/scsem-updater-route-failure";
 import { clientSafeSCSEMUpdaterSession } from "@/lib/scsem-updater-client-session";
 
@@ -58,44 +59,54 @@ export async function POST(request: Request) {
         }
 
         const officialSource = matchOfficialSCSEM(buffer);
+        let structuralAdmission: ReturnType<typeof admitUnrecognizedSCSEMBuffer> | undefined;
         if (!officialSource) {
-            const manifest = officialSCSEMManifest();
-            return NextResponse.json({
-                error:
-                    `Workbook does not match any of the ${manifest.expectedWorkbookCount} ` +
-                    "current individual IRS-listed SCSEM source files. Use the template's " +
-                    "individual XLSX link on the IRS SCSEM updates page; the separately linked " +
-                    "package ZIP is not a canonical input because its workbook copies conflict " +
-                    "with the current individual downloads.",
-                code: "UNRECOGNIZED_SCSEM_SOURCE",
-                sourcePageUrl: manifest.sourcePageUrl,
-                sourcePageReviewedAt: manifest.sourcePageReviewedAt,
-            }, { status: 422 });
+            try {
+                structuralAdmission = admitUnrecognizedSCSEMBuffer(file.name, buffer);
+            } catch (error) {
+                return NextResponse.json({
+                    error: error instanceof Error
+                        ? error.message
+                        : "Workbook is not a recognizable blank SCSEM template.",
+                    code: "UNRECOGNIZED_SCSEM_STRUCTURE",
+                }, { status: 422 });
+            }
         }
 
-        // Canonical identity comes from the pinned manifest, not the browser's
-        // user-controlled filename (the exact workbook hash has already matched).
+        // Exact manifest matches use canonical identity. A structurally valid
+        // non-match keeps the sanitized uploaded name and is permanently gated
+        // as an unverified working draft rather than being misrepresented as an
+        // official current IRS source.
         const updaterSession = await createSCSEMUpdaterSession(
-            officialSource.fileName,
+            officialSource?.fileName || file.name,
             buffer,
             {
                 organizationId: user.organizationId,
                 userId: user.id,
             },
-            officialSource,
+            officialSource || undefined,
             {
                 action: "SCSEM_UPDATER_UPLOAD",
                 affectedPayload: {
                     fileName: file.name,
-                    canonicalFileName: officialSource.fileName,
+                    canonicalFileName: officialSource?.fileName || null,
                     sizeBytes: buffer.length,
                     extension,
-                    uploadedSha256: officialSource.sha256,
-                    officialSourceUrl: officialSource.sourceUrl,
-                    officialSourceSha256: officialSource.sha256,
+                    uploadedSha256: officialSource?.sha256 || structuralAdmission?.sha256,
+                    officialSourceUrl: officialSource?.sourceUrl || null,
+                    officialSourceSha256: officialSource?.sha256 || null,
+                    sourceTrust: officialSource ? "official_individual_xlsx" : structuralAdmission?.trust,
+                    testCaseSheets: structuralAdmission?.testCaseSheets,
+                    totalControls: structuralAdmission?.totalControls,
                 },
                 ...auditRequestContext(request),
-            }
+            },
+            structuralAdmission
+                ? {
+                    workspaceMode: "unverified_update",
+                    structuralAdmission,
+                }
+                : { workspaceMode: "official_update" }
         );
         return NextResponse.json(
             { session: clientSafeSCSEMUpdaterSession(updaterSession) },

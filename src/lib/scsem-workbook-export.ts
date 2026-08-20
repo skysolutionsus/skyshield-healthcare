@@ -362,6 +362,7 @@ const VERIFIED_STRUCTURAL_FOOTER_PROFILES = new Map<string, {
     ["6cecf61c875c3ca673ed50d38779b42bbf2635fa827c6d551ee5293ba3649aa4", { sheetName: "HP-UX 11i Test Cases", row: 54 }],
     ["71e7f2f298d9fcaabf9a0fc9ef76e00c22b7a82fb2c35972690e6ae4b19abae7", { sheetName: "OSX 12.0", row: 79 }],
     ["376a64a06bf0de5a5c46a6cd806ad624a6d041b3d8c35032fffb0869c3854a9b", { sheetName: "Network Test Cases", row: 53 }],
+    ["53d361076d7f85fbdf669c9328d275e04919ff787a1575ba6900eccecdd27e65", { sheetName: "Network Test Cases", row: 53 }],
     ["49db7ceaa69c57ed6c647672dcb3a12639c520471b2fce791f5f87c7a47adc0e", { sheetName: "Solaris 10 Test Cases", row: 124 }],
     ["e868666306dafbc43ac681ef417c3d90528841d785535893fc93e2423dacc304", { sheetName: "Test Cases", row: 40 }],
     ["da689bdd8f3f04d36552062d36144e2350063f649bd1f0703f51762a16ebf333", { sheetName: "SUSE12 Test Cases", row: 181 }],
@@ -374,6 +375,7 @@ const VERIFIED_STRUCTURAL_FOOTER_PROFILES = new Map<string, {
     ["f13e1d3c6074fb66291a560997a6bf74e70727f007be0e5d698b2e795aac4b1f", { sheetName: "Test Cases", row: 320 }],
     ["e43942b8c598aec075f8d8aa937f31b26179118fa618c8a3e74c61c31cd2192a", { sheetName: "Test Cases Server 2019", row: 327 }],
     ["a139c9d0ce80a08f36cd18e188de54c2491f1a143ae34b15da65f9cd336b6a45", { sheetName: "Test Cases Server 2025", row: 349 }],
+    ["da75cc24ecd038bdb59b971d18309348bc34eed7c7cd492e3ba1a4103b563daf", { sheetName: "Test Cases Server 2025", row: 349 }],
     ["dce856e0f534bbd9207f47c7510e927a90dc13348378f0575317a49e100dbfe3", {
         sheetName: "AIX7 Test Cases",
         row: 209,
@@ -467,6 +469,11 @@ const EXACT_APPEND_PROFILES = new Map<string, ExactAppendProfile>([
                 formula: `IF(OR(H${row}=\"Fail\",ISBLANK(H${row})),INDEX('Issue Code Table'!C:C,MATCH(K:K,'Issue Code Table'!A:A,0)),IF(J${row}=\"Critical\",6,IF(J${row}=\"Significant\",5,IF(J${row}=\"Moderate\",3,2))))`,
             })),
         ],
+    }],
+    ["f451bae18a2372262ed7cc4471f57fa09aaa36545c6edb7dced7bfcaf65d771e", {
+        sheetName: "MOT",
+        row: 116,
+        losslessDescriptionComposite: true,
     }],
     ["658d726e6fadb25ceb98f15602e8109a670040ea91d5014ffcd175a2393e8ea1", {
         sheetName: "Gen Firewall Test Cases",
@@ -1419,10 +1426,19 @@ function buildApprovedChangePlan(
             // insertion anchor is structural, so it must follow the last physical
             // Test ID regardless of row visibility (for example Palo Alto 10).
             const lastControlRow = lastPhysicalControlRow(rowByTestId);
-            if (lastControlRow === null) {
+            const cisBootstrapBlank =
+                session.workspaceMode === "cis_bootstrap" &&
+                parsed.totalControls === 0 &&
+                !session.audit.officialSource;
+            const blankAnchorRow = header.headerRow + 1;
+            if (
+                lastControlRow === null &&
+                (!cisBootstrapBlank || header.range.e.r < blankAnchorRow)
+            ) {
                 throw approvedChangeError(change, `target sheet ${targetSheet.sheetName} has no control row to anchor a safe addition`);
             }
-            const row = nextAdditionRowBySheet.get(targetSheet.sheetName) ?? lastControlRow + 1;
+            const row = nextAdditionRowBySheet.get(targetSheet.sheetName) ??
+                (lastControlRow === null ? blankAnchorRow + 1 : lastControlRow + 1);
             nextAdditionRowBySheet.set(targetSheet.sheetName, row + 1);
             if (exactAppendProfile && exactAppendProfile.row !== row) {
                 throw approvedChangeError(
@@ -1504,11 +1520,13 @@ function buildApprovedChangePlan(
             const issueCodeAddress = XLSX.utils.encode_cell({ r: row, c: issueCodeCol });
             const riskRatingAddress = XLSX.utils.encode_cell({ r: row, c: riskRatingCol });
             const missingTargetCells = [...cells.keys()].filter((address) => !worksheet[address]);
-            const cloneSourceRow = insertBeforeFooter
-                ? structuralFooterProfile?.cloneSourceRow ?? row - 1
-                : (missingTargetCells.length === cells.size && cells.size > 0)
-                    ? row - 1
-                    : undefined;
+            const cloneSourceRow = cisBootstrapBlank
+                ? blankAnchorRow
+                : insertBeforeFooter
+                    ? structuralFooterProfile?.cloneSourceRow ?? row - 1
+                    : (missingTargetCells.length === cells.size && cells.size > 0)
+                        ? row - 1
+                        : undefined;
 
             plan.additions.push({
                 change,
@@ -1521,9 +1539,11 @@ function buildApprovedChangePlan(
                 assessmentCells,
                 issueCodeAddress,
                 riskRatingAddress,
-                riskFormulaSourceRow: structuralProfileMatches
-                    ? structuralFooterProfile?.riskFormulaSourceRow ?? row - 1
-                    : row - 1,
+                riskFormulaSourceRow: cisBootstrapBlank
+                    ? blankAnchorRow
+                    : structuralProfileMatches
+                        ? structuralFooterProfile?.riskFormulaSourceRow ?? row - 1
+                        : row - 1,
                 cloneSourceRow,
                 insertBeforeFooter,
                 footerCellAddress: footerCellAddress || undefined,
@@ -2535,7 +2555,8 @@ function extendWorksheetFormulaCellsForAppendedRow(
         if (!formulaSheetIsTarget && !hasExactSCSEMSheetQualifier(formula[2], appendedSheet)) {
             return cellXml;
         }
-        const formulaType = xmlAttributes(`<f${formula[1]}>`).get("t") || null;
+        const formulaAttributes = xmlAttributes(`<f${formula[1]}>`);
+        const formulaType = formulaAttributes.get("t") || null;
         const translated = extendAppendedSCSEMFormulaRanges(
             formula[2],
             sourceExcelRow,
@@ -2543,12 +2564,23 @@ function extendWorksheetFormulaCellsForAppendedRow(
             { formulaSheet, appendedSheet }
         );
         if (translated === formula[2]) return cellXml;
-        const guardedTranslation = extendAppendedSCSEMFormulaRanges(
-            formula[2],
-            sourceExcelRow,
-            targetExcelRow,
-            { formulaSheet, appendedSheet, formulaType }
-        );
+        const cellOpening = cellXml.match(/^<c\b[^>]*>/i)?.[0] || "";
+        const cellAddress = xmlAttributes(cellOpening).get("r") || null;
+        const formulaRef = formulaAttributes.get("ref") || null;
+        const isSingleCellArrayFormula = formulaType === "array" &&
+            cellAddress !== null && formulaRef === cellAddress;
+        // A legacy single-cell array formula has no compound spill/group range
+        // to resize. Updating only its expression while retaining t="array" and
+        // the exact single-cell ref is safe; multi-cell array/shared formulas
+        // still require explicit workbook-level handling and remain blocked.
+        const guardedTranslation = isSingleCellArrayFormula
+            ? translated
+            : extendAppendedSCSEMFormulaRanges(
+                formula[2],
+                sourceExcelRow,
+                targetExcelRow,
+                { formulaSheet, appendedSheet, formulaType }
+            );
         return cellXml
             .replace(formula[0], `<f${formula[1]}>${guardedTranslation}</f>`)
             .replace(/<v\b[^>]*>[\s\S]*?<\/v>/gi, "")

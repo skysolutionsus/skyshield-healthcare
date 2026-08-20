@@ -114,6 +114,9 @@ const EXACT_SPECIAL_ADD_ORACLE_PROFILES = new Map<string, ExactSpecialAddOracleP
             })),
         ],
     }],
+    ["f451bae18a2372262ed7cc4471f57fa09aaa36545c6edb7dced7bfcaf65d771e", {
+        compositeDescription: true,
+    }],
     ["658d726e6fadb25ceb98f15602e8109a670040ea91d5014ffcd175a2393e8ea1", {
         riskAddress: "Y58",
         riskFormula: "IF(OR(J58=\"Fail\",ISBLANK(J58)),INDEX('Issue Code Table'!C:C,MATCH(N:N,'Issue Code Table'!A:A,0)),IF(M58=\"Critical\",6,IF(M58=\"Significant\",5,IF(M58=\"Moderate\",3,2))))",
@@ -2903,8 +2906,8 @@ function writeCorpusReport(
 
 function runCorpus(operation: CorpusOperation) {
     const manifest = officialSCSEMManifest();
-    assert.equal(manifest.expectedWorkbookCount, 58, "Current IRS corpus must contain exactly 58 workbooks");
-    assert.equal(manifest.workbooks.length, 58, "Current IRS corpus must contain exactly 58 manifest entries");
+    assert.equal(manifest.expectedWorkbookCount, 60, "Current IRS corpus must contain exactly 60 workbooks");
+    assert.equal(manifest.workbooks.length, 60, "Current IRS corpus must contain exactly 60 manifest entries");
     const failures: string[] = [];
     const results: CorpusResult[] = [];
     let supported = 0;
