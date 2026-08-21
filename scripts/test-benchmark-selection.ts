@@ -15,7 +15,11 @@ import {
   rankCISBenchmarkCandidatesForTechnology,
   saveCISBenchmarkSnapshot,
 } from "../src/lib/cis-benchmark-xlsx";
-import { isCISBenchmarkSelectionAccepted, scsemBenchmarkQueriesForSheet } from "../src/lib/scsem-benchmark-resolver";
+import {
+  hasUnavailableApplicableBenchmarkQuery,
+  isCISBenchmarkSelectionAccepted,
+  scsemBenchmarkQueriesForSheet,
+} from "../src/lib/scsem-benchmark-resolver";
 import { parseSCSEMFile } from "../src/lib/xlsx-parser";
 import {
   buildComparisonCandidates,
@@ -240,6 +244,22 @@ function assertVersionedDatabaseQueriesStayExact() {
     isExactCISProductIdentity("Oracle Database 19c", "CIS Oracle Database 12c Benchmark v4.0.0"),
     false
   );
+
+  const sqlPath = path.join(process.cwd(), "data/scsems/current/safeguards-microsoft-sql-server-scem-v60-08252024.xlsx");
+  const sqlParsed = parseSCSEMFile(sqlPath);
+  const sql2022Queries = scsemBenchmarkQueriesForSheet(
+    "SQL 2022 Test Cases",
+    sqlParsed.metadata.subject || "Microsoft SQL Server",
+    sqlParsed
+  );
+  assert.deepEqual(sql2022Queries, ["Microsoft SQL Server 2022"]);
+  assert.equal(
+    isExactCISProductIdentity(
+      sql2022Queries[0],
+      "CIS Microsoft SQL Server 2022 Benchmark v4.0.0"
+    ),
+    true
+  );
 }
 
 function assertExactCurrentBenchmarkSurvivesRenumbering() {
@@ -284,6 +304,34 @@ function assertExactCurrentBenchmarkSurvivesRenumbering() {
     false,
     "a non-exact product identity still requires material recommendation overlap"
   );
+
+  const failedAttempt = {
+    kind: "CIS" as const,
+    query: "Microsoft SQL Server 2022",
+    sheetName: "SQL 2022 Test Cases",
+    workbenchId: 10,
+    benchmarkTitle: "CIS Microsoft SQL Server 2022 Benchmark",
+    benchmarkVersion: "4.0.0",
+    productFamily: "microsoft-sql-server",
+    productGeneration: "2022",
+    titleScore: 1000,
+    outcome: "download_failed" as const,
+    reason: "download failed",
+  };
+  assert.equal(hasUnavailableApplicableBenchmarkQuery([{
+    kind: "CIS",
+    query: failedAttempt.query,
+    sheetName: failedAttempt.sheetName,
+    catalogCandidates: [],
+    candidateAttempts: [failedAttempt],
+  }]), true);
+  assert.equal(hasUnavailableApplicableBenchmarkQuery([{
+    kind: "CIS",
+    query: failedAttempt.query,
+    sheetName: failedAttempt.sheetName,
+    catalogCandidates: [],
+    candidateAttempts: [failedAttempt, { ...failedAttempt, outcome: "accepted", reason: "accepted" }],
+  }]), false, "an accepted fallback candidate resolves the query-level availability blocker");
 }
 
 async function main() {

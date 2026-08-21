@@ -74,6 +74,15 @@ export interface ResolveSCSEMBenchmarkSourcesDetailedResult {
     diagnostics: BenchmarkQueryResolutionDiagnostic[];
 }
 
+export function hasUnavailableApplicableBenchmarkQuery(
+    diagnostics: BenchmarkQueryResolutionDiagnostic[]
+): boolean {
+    return diagnostics.some((diagnostic) =>
+        diagnostic.candidateAttempts.some((attempt) => attempt.outcome === "download_failed") &&
+        !diagnostic.candidateAttempts.some((attempt) => attempt.outcome === "accepted")
+    );
+}
+
 type CandidateSelection = {
     query: string;
     downloaded: DownloadedBenchmark;
@@ -209,8 +218,11 @@ function aliasesForText(value: string): string[] {
         const version = matchedVersion(normalized, [/\bpostgresql\s*(\d+(?:\.\d+)?)\b/]);
         aliases.push(version ? `PostgreSQL ${version}` : "PostgreSQL");
     }
-    if (normalized.includes("microsoft sql server") || /\bsql server\b/.test(normalized)) {
-        const version = matchedVersion(normalized, [/\bsql server\s*(\d{4})\b/]);
+    if (normalized.includes("microsoft sql server") || /\bsql server\b/.test(normalized) || /\bsql\s*\d{4}\b/.test(normalized)) {
+        const version = matchedVersion(normalized, [
+            /\bsql server\s*(\d{4})\b/,
+            /\bsql\s*(\d{4})\b/,
+        ]);
         aliases.push(version ? `Microsoft SQL Server ${version}` : "Microsoft SQL Server");
     }
     if (normalized.includes("oracle database") || normalized === "oracle" || (/\boracle\b/.test(normalized) && normalized.includes("rdbms"))) {

@@ -109,7 +109,7 @@ function main(): void {
         testId: "NEW-CIS-5.4.1",
         field: "newControl",
         proposedValue: "Require strong password length",
-        newControl: { sectionTitle: "Password length requirement", nistId: "IA-5" },
+        newControl: { sectionTitle: "Password length requirement", nistId: null },
     };
     const addStig = {
         ...stig,
@@ -144,6 +144,19 @@ function main(): void {
     assert.equal(fair.length, 5000);
     assert.ok(fair.some((change) => change.id === "stig"), "hard caps must not starve STIG behind CIS proposals");
 
+    const atomic = fairlyLimitSCSEMProposals([
+        ...annotatedAdds,
+        { ...pub, id: "pub-single", testId: "LINUX-43" },
+        { ...cis, id: "cis-single", testId: "LINUX-44" },
+    ], 2);
+    const retainedConflictMembers = atomic.filter((change) =>
+        change.sourceEvidence?.strictnessGroupId === annotatedAdds[0].sourceEvidence?.strictnessGroupId
+    );
+    assert.ok(
+        retainedConflictMembers.length === 0 || retainedConflictMembers.length === annotatedAdds.length,
+        "a hard cap must retain or omit a strictness group atomically"
+    );
+
     const routeSource = fs.readFileSync(
         path.join(process.cwd(), "src/app/api/scsem-updater/[id]/analyze/route.ts"),
         "utf8"
@@ -154,6 +167,11 @@ function main(): void {
         "normal analysis must not create blanket new test cases from unmatched document sections"
     );
     assert.match(routeSource, /CIS_LICENSE_NOT_CONFIGURED/);
+    assert.match(routeSource, /CIS_REQUIRED_WORKBOOK_UNAVAILABLE/);
+    assert.match(routeSource, /rawProposalCount: uncappedDirectProposalCount/);
+    assert.match(routeSource, /evidenceBoundProposalCount: retainedDirectProposalCount/);
+    assert.match(routeSource, /publicDisaEvidence\.complete/);
+    assert.match(routeSource, /all candidates were compared deterministically instead of claiming a partial AI strictness comparison/);
     assert.match(routeSource, /did not start a partial analysis under the full-source label/);
     assert.match(routeSource, /License authentication or catalog validation failed, so no partial analysis was started/);
     assert.ok(

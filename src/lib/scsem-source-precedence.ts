@@ -17,7 +17,7 @@ function semanticNewControlIdentity(change: SCSEMProposalLike): string {
         .replace(/[^a-z0-9]+/g, " ")
         .replace(/\s+/g, " ")
         .trim();
-    return `nist:${nistId || "none"}|title:${title}`;
+    return title ? `title:${title}` : `nist:${nistId || "unknown"}`;
 }
 
 function proposalTargetKey(change: SCSEMProposalLike): string {
@@ -159,30 +159,39 @@ export function strictnessApprovalErrors({
     ];
 }
 
-/** Round-robin authority classes before applying a hard proposal cap. */
+/** Round-robin authority classes without splitting strictness groups. */
 export function fairlyLimitSCSEMProposals<T extends SCSEMProposalLike>(changes: T[], limit: number): T[] {
     if (limit <= 0) return [];
     if (changes.length <= limit) return changes;
-    const buckets = new Map<string, T[]>();
-    for (const change of changes) {
-        const label = scsemProposalSourceLabel(change);
-        buckets.set(label, [...(buckets.get(label) || []), change]);
+
+    const units = new Map<string, T[]>();
+    changes.forEach((change, index) => {
+        const groupId = text(change.sourceEvidence?.strictnessGroupId);
+        const key = groupId ? `group:${groupId}` : `single:${index}`;
+        units.set(key, [...(units.get(key) || []), change]);
+    });
+
+    const buckets = new Map<string, T[][]>();
+    for (const unit of units.values()) {
+        const labels = [...new Set(unit.map(scsemProposalSourceLabel))].sort();
+        const label = labels.join(" + ");
+        buckets.set(label, [...(buckets.get(label) || []), unit]);
     }
+
     const labels = [...buckets.keys()];
     const indexes = new Map(labels.map((label) => [label, 0]));
     const selected: T[] = [];
     while (selected.length < limit) {
-        let added = false;
+        let advanced = false;
         for (const label of labels) {
-            if (selected.length >= limit) break;
             const index = indexes.get(label) || 0;
-            const candidate = buckets.get(label)?.[index];
-            if (!candidate) continue;
-            selected.push(candidate);
+            const unit = buckets.get(label)?.[index];
+            if (!unit) continue;
             indexes.set(label, index + 1);
-            added = true;
+            advanced = true;
+            if (unit.length <= limit - selected.length) selected.push(...unit);
         }
-        if (!added) break;
+        if (!advanced) break;
     }
     return selected;
 }

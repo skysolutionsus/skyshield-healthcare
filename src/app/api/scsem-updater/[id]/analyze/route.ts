@@ -12,6 +12,7 @@ import {
     type SelectedCISProfile,
 } from "@/lib/cis-benchmark-xlsx";
 import {
+    hasUnavailableApplicableBenchmarkQuery,
     resolveAdjacentSCSEMBenchmarkSources,
     resolveSCSEMBenchmarkSourcesDetailed,
     type BenchmarkQueryResolutionDiagnostic,
@@ -985,7 +986,12 @@ function deterministicComplianceGapChanges(
     return changes;
 }
 
-function buildPublicDisaProposalEvidence(changes: any[], maxChars = 18000): string {
+function buildPublicDisaProposalEvidence(changes: any[], maxChars = 18000): {
+    text: string;
+    includedCount: number;
+    totalCount: number;
+    complete: boolean;
+} {
     const blocks: string[] = [];
     let used = 0;
     for (const change of changes) {
@@ -1002,7 +1008,12 @@ function buildPublicDisaProposalEvidence(changes: any[], maxChars = 18000): stri
         blocks.push(block);
         used += block.length + 8;
     }
-    return blocks.join("\n\n---\n\n");
+    return {
+        text: blocks.join("\n\n---\n\n"),
+        includedCount: blocks.length,
+        totalCount: changes.length,
+        complete: blocks.length === changes.length,
+    };
 }
 
 function dedupeProposedChanges(changes: any[]): any[] {
@@ -1649,6 +1660,14 @@ export async function POST(
             });
             resolvedSources = benchmarkResolution.sources;
             benchmarkResolutionDiagnostics = benchmarkResolution.diagnostics;
+            const unavailableDirectQueryCount = benchmarkResolutionDiagnostics.filter((diagnostic) =>
+                hasUnavailableApplicableBenchmarkQuery([diagnostic])
+            ).length;
+            if (unavailableDirectQueryCount > 0) {
+                benchmarkLookupError =
+                    `${unavailableDirectQueryCount} applicable CIS WorkBench query or workbook could not be downloaded and validated.`;
+                benchmarkLookupErrorCode = "CIS_REQUIRED_WORKBOOK_UNAVAILABLE";
+            }
         }
 
         const updateCandidates: AnalysisUpdateCandidate[] = [];
@@ -1855,11 +1874,12 @@ export async function POST(
                 additionalBlockers: sourceCoverageBlockers,
             });
             updaterSession.audit.analysisCoverage = analysisCoverage;
+            const complianceOnlyChanges = dedupeProposedChanges(addUnambiguousTargetSheets([
+                ...(compliancePayload.changes || []),
+                ...disaStigChanges,
+            ], controls));
             const validChanges = addIdsToChanges(validateChanges(
-                dedupeProposedChanges(addUnambiguousTargetSheets([
-                    ...(compliancePayload.changes || []),
-                    ...disaStigChanges,
-                ], controls)),
+                fairlyLimitSCSEMProposals(complianceOnlyChanges, MAX_UPDATER_CHANGES),
                 controls,
                 MAX_UPDATER_CHANGES
             ));
@@ -1942,39 +1962,6 @@ export async function POST(
                 expectedDirectDisaSourceCount === 0 &&
                 requestedScope === "full" &&
                 Boolean(updaterSession.audit.officialSource);
-            const supplementalComparison: SCSEMSupplementalComparison = {
-                mode: benchmarkLookupError || disaComparisonFailed
-                    ? "failed"
-                    : disaStigChanges.length > 0
-                        ? "deterministic_fallback"
-                        : "no_delta",
-                complete: !benchmarkLookupError && !disaComparisonFailed,
-                candidateOnly: true,
-                applicabilityStatus: registryNotApplicable ? "not_applicable" : "review_required",
-                directSourceCount: expectedDirectDisaSourceCount,
-                comparedDirectSourceCount: resolvedDisaStigSources.length,
-                candidateCount: disaStigChanges.length,
-                comparedCandidateCount: disaStigChanges.length,
-                rawProposalCount: disaStigChanges.length,
-                evidenceBoundProposalCount: disaStigChanges.length,
-                reason: benchmarkLookupError
-                    ? "Configured CIS source lookup failed; public DISA results remain independently source-bound."
-                    : disaComparisonFailed
-                        ? "One or more exact public DISA STIG packages could not be downloaded and validated."
-                        : registryNotApplicable
-                            ? "The pinned IRS-workbook and sheet registry records no safe direct public DISA STIG source."
-                            : `All ${resolvedDisaStigSources.length} exact public DISA STIG source(s) and ${disaStigChanges.length} deterministic proposal(s) were compared and source-bound.`,
-            };
-            updaterSession.audit.supplementalComparison = supplementalComparison;
-            const analysisCoverage = buildSCSEMAnalysisCoverage({
-                totalRows: controls.length,
-                compliance: compliancePayload,
-                uncoveredControlIdCount: compliance.uncoveredControlIds.length,
-                benchmarkLookupError,
-                supplementalComparison,
-                additionalBlockers: sourceCoverageBlockers,
-            });
-            updaterSession.audit.analysisCoverage = analysisCoverage;
             const boundAdjacentChanges = bindBenchmarkChangesToResolvedEvidence(
                 adjacentPayload.changes || [],
                 controls,
@@ -1987,12 +1974,51 @@ export async function POST(
                 ...disaStigChanges,
                 ...boundAdjacentChanges,
             ], controls));
+            const fairlyLimitedChanges = fairlyLimitSCSEMProposals(rawChanges, MAX_UPDATER_CHANGES);
+            const retainedDirectProposalCount = fairlyLimitedChanges.filter(
+                (change) => change.sourceEvidence?.evidenceTier === "direct"
+            ).length;
+            const capOmittedDirectProposalCount = Math.max(
+                0,
+                disaStigChanges.length - retainedDirectProposalCount
+            );
+            const supplementalComparison: SCSEMSupplementalComparison = {
+                mode: benchmarkLookupError || disaComparisonFailed
+                    ? "failed"
+                    : disaStigChanges.length > 0
+                        ? "deterministic_fallback"
+                        : "no_delta",
+                complete: !benchmarkLookupError && !disaComparisonFailed && capOmittedDirectProposalCount === 0,
+                candidateOnly: true,
+                applicabilityStatus: registryNotApplicable ? "not_applicable" : "review_required",
+                directSourceCount: expectedDirectDisaSourceCount,
+                comparedDirectSourceCount: resolvedDisaStigSources.length,
+                candidateCount: disaStigChanges.length,
+                comparedCandidateCount: disaStigChanges.length,
+                rawProposalCount: disaStigChanges.length,
+                evidenceBoundProposalCount: retainedDirectProposalCount,
+                reason: benchmarkLookupError
+                    ? "Configured CIS source lookup failed; public DISA results remain independently source-bound."
+                    : disaComparisonFailed
+                        ? "One or more exact public DISA STIG packages could not be downloaded and validated."
+                        : capOmittedDirectProposalCount > 0
+                            ? `The ${MAX_UPDATER_CHANGES}-proposal safety cap omitted ${capOmittedDirectProposalCount} complete direct-source proposal(s) or strictness-group member(s).`
+                            : registryNotApplicable
+                                ? "The pinned IRS-workbook and sheet registry records no safe direct public DISA STIG source."
+                                : `All ${resolvedDisaStigSources.length} exact public DISA STIG source(s) and ${disaStigChanges.length} deterministic proposal(s) were compared and source-bound.`,
+            };
+            updaterSession.audit.supplementalComparison = supplementalComparison;
+            const analysisCoverage = buildSCSEMAnalysisCoverage({
+                totalRows: controls.length,
+                compliance: compliancePayload,
+                uncoveredControlIdCount: compliance.uncoveredControlIds.length,
+                benchmarkLookupError,
+                supplementalComparison,
+                additionalBlockers: sourceCoverageBlockers,
+            });
+            updaterSession.audit.analysisCoverage = analysisCoverage;
             const validChanges = addIdsToChanges(
-                validateChanges(
-                    fairlyLimitSCSEMProposals(rawChanges, MAX_UPDATER_CHANGES),
-                    controls,
-                    MAX_UPDATER_CHANGES
-                )
+                validateChanges(fairlyLimitedChanges, controls, MAX_UPDATER_CHANGES)
             );
 
             const completedAnalysisLease = clearSCSEMAnalysisLease(
@@ -2072,12 +2098,33 @@ export async function POST(
             const expectedDirectDisaSourceCount = disaCatalogSources.filter(
                 (source) => source.sourceRelationship === "direct"
             ).length;
+            const noLicensedDeltaChanges = dedupeProposedChanges(addUnambiguousTargetSheets([
+                ...(compliancePayload.changes || []),
+                ...disaStigChanges,
+            ], controls));
+            const fairlyLimitedChanges = fairlyLimitSCSEMProposals(
+                noLicensedDeltaChanges,
+                MAX_UPDATER_CHANGES
+            );
+            const retainedDirectProposalCount = fairlyLimitedChanges.filter(
+                (change) => change.sourceEvidence?.evidenceTier === "direct"
+            ).length;
+            const capOmittedDirectProposalCount = Math.max(
+                0,
+                disaStigChanges.length - retainedDirectProposalCount
+            );
             const supplementalComparison: SCSEMSupplementalComparison = {
-                mode: disaStigChanges.length > 0 ? "deterministic_fallback" : "no_delta",
+                mode: benchmarkLookupError
+                    ? "failed"
+                    : disaStigChanges.length > 0
+                        ? "deterministic_fallback"
+                        : "no_delta",
                 complete:
+                    !benchmarkLookupError &&
                     totalUpdateCandidateCount === 0 &&
                     totalNewControlCandidateCount === 0 &&
-                    expectedDirectDisaSourceCount === resolvedDisaStigSources.length,
+                    expectedDirectDisaSourceCount === resolvedDisaStigSources.length &&
+                    capOmittedDirectProposalCount === 0,
                 candidateOnly: true,
                 applicabilityStatus: "review_required",
                 directSourceCount: resolvedSources.length + expectedDirectDisaSourceCount,
@@ -2085,12 +2132,15 @@ export async function POST(
                 candidateCount: totalUpdateCandidateCount + totalNewControlCandidateCount + disaStigChanges.length,
                 comparedCandidateCount: disaStigChanges.length,
                 rawProposalCount: disaStigChanges.length,
-                evidenceBoundProposalCount: disaStigChanges.length,
-                reason:
-                    (disaStigChanges.length > 0
-                        ? "Current public DISA STIG sources produced deterministic reviewer-gated deltas; "
-                        : "Validated direct source candidates produced no material field or missing-recommendation deltas; ") +
-                    "the technical match remains candidate-only pending reviewer applicability confirmation.",
+                evidenceBoundProposalCount: retainedDirectProposalCount,
+                reason: benchmarkLookupError
+                    ? "One or more required CIS WorkBench sources could not be downloaded and validated."
+                    : capOmittedDirectProposalCount > 0
+                        ? `The ${MAX_UPDATER_CHANGES}-proposal safety cap omitted ${capOmittedDirectProposalCount} complete direct-source proposal(s) or strictness-group member(s).`
+                        : (disaStigChanges.length > 0
+                            ? "Current public DISA STIG sources produced deterministic reviewer-gated deltas; "
+                            : "Validated direct source candidates produced no material field or missing-recommendation deltas; ") +
+                        "the technical match remains candidate-only pending reviewer applicability confirmation.",
             };
             updaterSession.audit.supplementalComparison = supplementalComparison;
             const analysisCoverage = buildSCSEMAnalysisCoverage({
@@ -2102,12 +2152,8 @@ export async function POST(
                 additionalBlockers: sourceCoverageBlockers,
             });
             updaterSession.audit.analysisCoverage = analysisCoverage;
-            const noLicensedDeltaChanges = dedupeProposedChanges(addUnambiguousTargetSheets([
-                ...(compliancePayload.changes || []),
-                ...disaStigChanges,
-            ], controls));
             const validChanges = addIdsToChanges(validateChanges(
-                fairlyLimitSCSEMProposals(noLicensedDeltaChanges, MAX_UPDATER_CHANGES),
+                fairlyLimitedChanges,
                 controls,
                 MAX_UPDATER_CHANGES
             ));
@@ -2232,7 +2278,7 @@ POTENTIAL NEW CIS-STIG ROWS NOT PRESENT IN THE SCSEM:
 ${stigNewControlEvidence || "None"}
 
 PUBLIC DISA STIG PROPOSALS — PRESERVED INDEPENDENTLY:
-${publicDisaEvidence || "No directly applicable public DISA STIG proposal was generated."}
+${publicDisaEvidence.text || "No directly applicable public DISA STIG proposal was generated."}
 
 COMPLIANCE EVIDENCE — PUBLICATION 1075 WITH NIST MAPPING/ASSESSMENT SUPPORT:
 ${pub1075.excerpts || "No Publication 1075 or NIST mapping/assessment excerpts were found for the candidate controls."}
@@ -2317,7 +2363,9 @@ Rules:
         const availableCandidateCount = updateCandidates.length + newControlCandidates.length;
         const totalCandidateCount = totalUpdateCandidateCount + totalNewControlCandidateCount;
         const aiWithinInteractiveLimits =
-            controls.length <= AI_CONTROL_LIMIT && prompt.length <= AI_PROMPT_CHAR_LIMIT;
+            controls.length <= AI_CONTROL_LIMIT &&
+            prompt.length <= AI_PROMPT_CHAR_LIMIT &&
+            publicDisaEvidence.complete;
         const aiConfigured = hasConfiguredBifrostApiKey(process.env.BIFROST_API_KEY);
         const deterministicFallback = (reason: string) => buildFallbackPayload({
             technology: updaterSession.inferredTechnology,
@@ -2339,8 +2387,9 @@ Rules:
 
         if (!aiWithinInteractiveLimits) {
             comparisonMode = "deterministic_fallback";
-            comparisonReason =
-                `the ${controls.length}-row workbook or ${prompt.length}-character evidence set exceeded the bounded interactive AI limits`;
+            comparisonReason = !publicDisaEvidence.complete
+                ? `the bounded AI context included ${publicDisaEvidence.includedCount} of ${publicDisaEvidence.totalCount} public DISA proposals, so all candidates were compared deterministically instead of claiming a partial AI strictness comparison`
+                : `the ${controls.length}-row workbook or ${prompt.length}-character evidence set exceeded the bounded interactive AI limits`;
             payload = deterministicFallback(comparisonReason);
         } else if (!aiConfigured) {
             comparisonMode = "deterministic_fallback";
@@ -2404,7 +2453,7 @@ Rules:
             ...preservedBoundBenchmarkChanges,
         ]);
 
-        const rawProposalCount = payload.changes.length + preservationPayload.changes.length;
+        const rawEmissionCount = payload.changes.length + preservationPayload.changes.length;
         const comparedCandidateCount = comparisonMode === "ai"
             ? availableCandidateCount
             : Number(payload.examinedCandidateCount || 0);
@@ -2413,10 +2462,15 @@ Rules:
         ).length;
         const disaComparisonComplete = expectedDirectDisaSourceCount === resolvedDisaStigSources.length;
         let comparisonComplete =
+            !benchmarkLookupError &&
             comparedCandidateCount === totalCandidateCount &&
             (totalCandidateCount === 0 || boundBenchmarkChanges.length > 0) &&
             disaComparisonComplete;
-        if (totalCandidateCount > 0 && boundBenchmarkChanges.length === 0) {
+        if (benchmarkLookupError) {
+            comparisonMode = "failed";
+            comparisonReason = `Required CIS WorkBench source unavailable: ${benchmarkLookupError}`;
+            comparisonComplete = false;
+        } else if (totalCandidateCount > 0 && boundBenchmarkChanges.length === 0) {
             comparisonMode = "failed";
             comparisonReason = "No licensed-source candidate produced a source-bound reviewer proposal.";
             comparisonComplete = false;
@@ -2429,6 +2483,29 @@ Rules:
                     ? ` Compared ${resolvedDisaStigSources.length} of ${expectedDirectDisaSourceCount} pinned public DISA STIG source(s).`
                     : "");
         }
+        const compliancePayload = await compliancePayloadPromise;
+        const combinedChanges = dedupeProposedChanges(addUnambiguousTargetSheets([
+            ...(compliancePayload.changes || []),
+            ...boundBenchmarkChanges,
+            ...disaStigChanges,
+        ], controls));
+        const uncappedDirectProposalCount = combinedChanges.filter(
+            (change) => change.sourceEvidence?.evidenceTier === "direct"
+        ).length;
+        const fairlyLimitedChanges = fairlyLimitSCSEMProposals(combinedChanges, MAX_UPDATER_CHANGES);
+        const retainedDirectProposalCount = fairlyLimitedChanges.filter(
+            (change) => change.sourceEvidence?.evidenceTier === "direct"
+        ).length;
+        const capOmittedDirectProposalCount = Math.max(
+            0,
+            uncappedDirectProposalCount - retainedDirectProposalCount
+        );
+        if (capOmittedDirectProposalCount > 0) {
+            comparisonComplete = false;
+            comparisonReason +=
+                ` The ${MAX_UPDATER_CHANGES}-proposal safety cap omitted ${capOmittedDirectProposalCount} complete direct-source proposal(s) or strictness-group member(s); this run cannot be release-ready.`;
+        }
+
         const supplementalComparison: SCSEMSupplementalComparison = {
             mode: comparisonMode,
             complete: comparisonComplete,
@@ -2438,12 +2515,11 @@ Rules:
             comparedDirectSourceCount: comparedDirectSourceCount + resolvedDisaStigSources.length,
             candidateCount: totalCandidateCount + disaStigChanges.length,
             comparedCandidateCount: comparedCandidateCount + disaStigChanges.length,
-            rawProposalCount: boundBenchmarkChanges.length + disaStigChanges.length,
-            evidenceBoundProposalCount: boundBenchmarkChanges.length + disaStigChanges.length,
+            rawProposalCount: uncappedDirectProposalCount,
+            evidenceBoundProposalCount: retainedDirectProposalCount,
             reason: comparisonReason,
         };
         updaterSession.audit.supplementalComparison = supplementalComparison;
-        const compliancePayload = await compliancePayloadPromise;
         const analysisCoverage = buildSCSEMAnalysisCoverage({
             totalRows: controls.length,
             compliance: compliancePayload,
@@ -2453,14 +2529,6 @@ Rules:
             additionalBlockers: sourceCoverageBlockers,
         });
         updaterSession.audit.analysisCoverage = analysisCoverage;
-        const combinedChanges = dedupeProposedChanges(addUnambiguousTargetSheets([
-            ...(compliancePayload.changes || []),
-            ...boundBenchmarkChanges,
-            ...disaStigChanges,
-        ],
-            controls
-        ));
-        const fairlyLimitedChanges = fairlyLimitSCSEMProposals(combinedChanges, MAX_UPDATER_CHANGES);
         const validChanges = addIdsToChanges(
             validateChanges(fairlyLimitedChanges, controls, MAX_UPDATER_CHANGES)
         );
@@ -2485,7 +2553,7 @@ Rules:
             description:
                 `All-source analysis ran ${compliancePayload.batchCount} bounded Publication 1075/NIST-mapping batch(es). ` +
                 `CIS Benchmark/CIS-STIG mode ${comparisonMode} compared ${comparedCandidateCount}/${totalCandidateCount} ` +
-                `candidate(s), rebound ${boundBenchmarkChanges.length}/${rawProposalCount} proposal(s), and generated ` +
+                `candidate(s), retained ${boundBenchmarkChanges.length} source-bound proposal(s) from ${rawEmissionCount} AI/fallback emission(s), and generated ` +
                 `${validChanges.length} total reviewer-gated change(s).`,
         });
         await writeSCSEMUpdaterSession(updaterSession, updaterSession.revision, {
