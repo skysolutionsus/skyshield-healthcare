@@ -840,16 +840,16 @@ export function SCSEMUpdater() {
                                     disabled={analysisBusy || activeAnalysisProtected || session.workspaceMode === "cis_bootstrap"}
                                     className="w-full rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 disabled:opacity-50"
                                 >
-                                    <option value="full">Pub 1075 + NIST + CIS WorkBench</option>
-                                    <option value="compliance_only">Pub 1075 + NIST only</option>
+                                    <option value="full">All sources: CIS + STIG + Pub 1075 (strictest)</option>
+                                    <option value="compliance_only">Pub 1075 + NIST mapping only</option>
                                 </select>
                             </label>
                             <p className="text-xs leading-5 text-[var(--sky-text-muted)]">
                                 {session.workspaceMode === "cis_bootstrap"
                                     ? "This blank CIS bootstrap draft is already populated with source-bound candidates. Complete mappings and review them below instead of rerunning existing-SCSEM analysis."
                                     : requestedAnalysisScope === "full"
-                                    ? "Runs the governing compliance review, then retrieves licensed CIS Benchmark/CIS-STIG evidence from CIS WorkBench."
-                                    : "Does not authenticate to CIS WorkBench or require CIS SecureSuite credentials for this run."}
+                                    ? "Runs independent CIS WorkBench, CIS-STIG, public DISA STIG, and Publication 1075 lanes, then retains the strictest applicable control. This mode fails closed if licensed CIS access is unavailable."
+                                    : "Uses Publication 1075 to review existing mapped rows. NIST is mapping/assessment evidence only; document sections do not automatically become new technology test cases."}
                             </p>
                             <button
                                 onClick={runAnalysis}
@@ -1050,7 +1050,7 @@ export function SCSEMUpdater() {
                             <p className="text-xs font-semibold uppercase text-[var(--sky-text-muted)]">Pinned Publication 1075</p>
                             <p className="mt-2 text-sm font-medium text-white">{session.audit.pub1075Version || "Unknown"}</p>
                             <p className="mt-1 text-xs text-[var(--sky-text-secondary)]">
-                                Governing policy evidence for candidate drafting · {session.audit.complianceCoverage?.pub1075 ?? 0} mapped control ID(s)
+                                Binding policy evidence considered alongside directly applicable CIS and STIG controls; the strictest applicable requirement is retained · {session.audit.complianceCoverage?.pub1075 ?? 0} mapped control ID(s)
                             </p>
                         </article>
                         <article className="rounded-lg border border-[var(--sky-border)] bg-[var(--sky-surface-overlay)] p-4">
@@ -1377,6 +1377,8 @@ function SourceEvidencePanel({ change }: { change: UpdaterChange }) {
         ["CIS-STIG Profile", sourceEvidenceText(evidence, "stigProfile")],
         ["Adjacent Category", sourceEvidenceText(evidence, "adjacentSourceCategory")],
         ["Applicability", sourceEvidenceText(evidence, "applicabilityRationale")],
+        ["Strictness review", sourceEvidenceText(evidence, "strictnessSelectionRequired") === "true" ? "Required — choose the strictest applicable authority" : null],
+        ["Competing authorities", Array.isArray(evidence.competingAuthorities) ? evidence.competingAuthorities.join(", ") : sourceEvidenceText(evidence, "competingAuthorities")],
         ["Target sheet", change.targetSheet || sourceEvidenceText(evidence, "sourceSheet")],
         ["Pub 1075", sourceEvidenceText(evidence, "pub1075Version")],
         ["NIST fallback", sourceEvidenceText(evidence, "nistVersion")],

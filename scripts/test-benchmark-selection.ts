@@ -14,7 +14,7 @@ import {
   rankCISBenchmarkCandidatesForTechnology,
   saveCISBenchmarkSnapshot,
 } from "../src/lib/cis-benchmark-xlsx";
-import { scsemBenchmarkQueriesForSheet } from "../src/lib/scsem-benchmark-resolver";
+import { isCISBenchmarkSelectionAccepted, scsemBenchmarkQueriesForSheet } from "../src/lib/scsem-benchmark-resolver";
 import { parseSCSEMFile } from "../src/lib/xlsx-parser";
 import {
   buildComparisonCandidates,
@@ -226,7 +226,37 @@ function assertMergedSourcesRemainSheetScoped() {
   );
 }
 
+function assertExactCurrentBenchmarkSurvivesRenumbering() {
+  const renumberedProfile = {
+    profile: "Level 1 - Member Server",
+    recommendations: [{ recommendation: "9.9.1" }] as CISBenchmarkRecommendation[],
+    sharedRecommendationCount: 0,
+    totalRecommendationCount: 1,
+  };
+  assert.equal(
+    isCISBenchmarkSelectionAccepted(renumberedProfile, 120, 1000),
+    true,
+    "an exact accepted product/generation benchmark must remain eligible when a new revision renumbers every recommendation"
+  );
+  assert.equal(
+    isCISBenchmarkSelectionAccepted(renumberedProfile, 0, 1000),
+    true,
+    "an exact accepted product/generation benchmark must be eligible to propose the first CIS controls when the SCSEM has no recommendation IDs"
+  );
+  assert.equal(
+    isCISBenchmarkSelectionAccepted(renumberedProfile, 0, 84),
+    false,
+    "a sheet with no recommendation IDs must not use a merely similar benchmark title"
+  );
+  assert.equal(
+    isCISBenchmarkSelectionAccepted(renumberedProfile, 120, 84),
+    false,
+    "a merely similar title still requires material recommendation overlap"
+  );
+}
+
 async function main() {
+  assertExactCurrentBenchmarkSurvivesRenumbering();
   assertDb2VersionTabsStayIndependent();
   assertMergedSourcesRemainSheetScoped();
   const accepted = benchmark(

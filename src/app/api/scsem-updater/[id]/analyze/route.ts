@@ -61,7 +61,10 @@ import {
     normalizeNistControlId,
     type ComplianceEvidence,
 } from "@/lib/compliance-evidence";
-import { buildMissingPub1075ControlCandidates } from "@/lib/scsem-compliance-gap-candidates";
+import {
+    annotateSCSEMStrictnessConflicts,
+    dedupeSCSEMProposalsPreservingAuthorities,
+} from "@/lib/scsem-source-precedence";
 import {
     buildDisaStigChanges,
     downloadAndParseDisaStigSource,
@@ -235,6 +238,7 @@ function sourceEvidence(
     return {
         evidenceTier: candidate.sourceRelationship === "adjacent" ? "adjacent" : "direct",
         sourceRelationship: candidate.sourceRelationship || "direct",
+        sourceKind: candidate.sourceKind,
         cisRecommendation: candidate.sourceKind === "CIS" ? candidate.recommendation.recommendation : null,
         cisProfile: candidate.sourceKind === "CIS" ? candidate.sourceProfile : null,
         stigRecommendation: candidate.sourceKind === "CIS_STIG" ? candidate.recommendation.recommendation : null,
@@ -696,7 +700,7 @@ function buildFallbackPayload({
             field: selectedField.field,
             currentValue: selectedField.currentValue.slice(0, 1200),
             proposedValue: selectedField.proposedValue,
-            reason: `${benchmarkKindLabel(candidate.sourceKind)} ${candidate.recommendation.recommendation} (${candidate.sourceProfile}, WB ${candidate.sourceWorkbenchId}) materially differs from the uploaded SCSEM row. The updater selected ${selectedField.field} because the benchmark provides supplemental hardening evidence after applying ${pub1075.version} first and NIST ${pub1075.nist?.version || "SP 800-53"} only where Pub 1075 has no control section.`,
+            reason: `${benchmarkKindLabel(candidate.sourceKind)} ${candidate.recommendation.recommendation} (${candidate.sourceProfile}, WB ${candidate.sourceWorkbenchId}) materially differs from the uploaded SCSEM row. The updater retained this direct benchmark delta for strictest-control comparison with applicable Publication 1075 and STIG evidence; NIST ${pub1075.nist?.version || "SP 800-53"} is mapping and assessment evidence only.`,
             confidence: "needs_review",
             sourceEvidence: sourceEvidence(candidate, pub1075.version, pub1075.nist?.version),
         });
@@ -713,7 +717,7 @@ function buildFallbackPayload({
             field: "newControl",
             currentValue: "Not present in current SCSEM",
             proposedValue: `${benchmarkKindLabel(candidate.sourceKind)} ${recommendation.recommendation}: ${recommendation.title}`,
-            reason: `${benchmarkKindLabel(candidate.sourceKind)} ${recommendation.recommendation} appears in ${candidate.sourceBenchmarkTitle} (${candidate.sourceProfile}, WB ${candidate.sourceWorkbenchId}) but was not mapped in the uploaded SCSEM. It is a reviewer-gated supplemental hardening candidate after applying ${pub1075.version} first and NIST ${pub1075.nist?.version || "SP 800-53"} only as fallback.`,
+            reason: `${benchmarkKindLabel(candidate.sourceKind)} ${recommendation.recommendation} appears in ${candidate.sourceBenchmarkTitle} (${candidate.sourceProfile}, WB ${candidate.sourceWorkbenchId}) but was not mapped in the uploaded SCSEM. It is a reviewer-gated directly applicable benchmark candidate that must be compared with Publication 1075 and STIG evidence so the strictest applicable control is retained.`,
             confidence: "needs_review",
             newControl: {
                 nistId: null,
@@ -738,7 +742,7 @@ function buildFallbackPayload({
     }
 
     return {
-        summary: `Generated deterministic supplemental hardening items for ${technology}${fallbackReason ? ` because ${fallbackReason}` : ""}. Each item is marked needs_review and follows the ${pub1075.version}-first, NIST-fallback source hierarchy.`,
+        summary: `Generated deterministic CIS/CIS-STIG benchmark proposals for ${technology}${fallbackReason ? ` because ${fallbackReason}` : ""}. Each item is marked needs_review and preserved for strictest-control comparison with applicable public STIG and Publication 1075 evidence.`,
         changes,
         examinedCandidateCount,
     };
@@ -954,24 +958,9 @@ function deterministicComplianceGapChanges(
 }
 
 function dedupeProposedChanges(changes: any[]): any[] {
-    const seen = new Set<string>();
-    return changes.filter((change) => {
-        const sourceIdentity = change.sourceEvidence?.sourceKind === "STIG"
-            ? `${change.sourceEvidence.stigBenchmarkId || ""}|${change.sourceEvidence.stigRuleId || ""}`
-            : change.sourceEvidence?.gapType === "missing_control_id"
-                ? String(change.sourceEvidence.pub1075ControlId || "")
-                : "";
-        const key = [
-            change.action || "updateField",
-            change.targetSheet || "",
-            change.testId || "",
-            change.field || "",
-            sourceIdentity,
-        ].join("|");
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-    });
+    return annotateSCSEMStrictnessConflicts(
+        dedupeSCSEMProposalsPreservingAuthorities(changes)
+    );
 }
 
 function addUnambiguousTargetSheets(
@@ -1020,17 +1009,11 @@ async function buildCompliancePayload({
         Boolean(normalizeNistControlId(control.nistId))
     ).length;
     if (batches.length === 0) {
-        const missingControlCandidates = buildMissingPub1075ControlCandidates({
-            parsed,
-            controls,
-            pub1075Version: complianceOverview.pub1075.version,
-            nistVersion: complianceOverview.nist.version,
-        });
         return {
             summary:
                 `Compliance review found no normalized NIST control identifiers in the ${technology} SCSEM rows. ` +
-                `Generated ${missingControlCandidates.length} deterministic Publication 1075 applicability candidate(s); existing rows remain unmapped and require reviewer correction.`,
-            changes: missingControlCandidates,
+                "SkyShield did not invent document-section test cases; the unmapped rows require reviewer mapping before Publication 1075 or NIST can support a row-level update.",
+            changes: [],
             batchCount: 0,
             completedBatchCount: 0,
             reviewedRowCount: 0,
@@ -1075,13 +1058,14 @@ async function buildCompliancePayload({
             const prompt = `You are an IRS Safeguards SCSEM update analyst. Perform the primary compliance review using only the uploaded SCSEM rows and the authoritative evidence below.
 
 Decision policy:
-- IRS Publication 1075 is the first and governing source. When a Pub 1075 excerpt exists for a control, use it and do not let NIST or a benchmark weaken, replace, or override it.
-- NIST SP 800-53 is fallback evidence only for controls where this evidence package explicitly says no Pub 1075 section was found.
+- This bounded step reviews the Publication 1075/NIST mapping lane only; final all-source strictness resolution occurs after direct CIS and STIG lanes complete.
+- Use Publication 1075 for an existing row when an exact mapped excerpt is supplied.
+- NIST SP 800-53/800-53A is mapping and assessment evidence only where this package explicitly says no Publication 1075 section was found.
 - Existing IRS SCSEM rows remain the base source of truth.
-- Propose an update only when the current row is materially incomplete, materially weaker, or materially inconsistent with the applicable compliance excerpt for the same control.
+- Propose an update only when the current row is materially incomplete, materially weaker, or materially inconsistent with the applicable mapped excerpt for the same control.
 - Do not propose formatting-only, grammar-only, casing-only, numbering-only, or equivalent-wording changes.
 - Do not rewrite a row merely because the authority uses different phrasing.
-- Do not invent product-specific benchmark requirements. CIS Benchmark and CIS-STIG workbooks from CIS WorkBench are assessed separately as supplemental hardening evidence.
+- No CIS or STIG evidence appears in this bounded prompt. Do not infer benchmark requirements here; later lanes may supersede this proposal with a stricter directly applicable benchmark control.
 - Propose updateField changes only. Missing-control analysis requires workbook-wide applicability evidence and is outside this bounded row batch.
 - Mark confidence "needs_review" unless the gap is direct and unambiguous.
 
@@ -1194,33 +1178,24 @@ Rules:
 
     const completedBatchCount = batchResults.filter((result) => result.analyzed).length;
     const reviewedRowCount = batches.reduce((total, batch) => total + batch.length, 0);
-    // Missing-control coverage cannot depend on model inference. Compare the
-    // exact normalized control IDs in the workbook with every substantive
-    // control section in the pinned Publication 1075 source. These candidates
-    // require an applicability decision and an exact workbook issue code
-    // before approval; they are not assertions that every control belongs in
-    // every technology template.
-    const missingControlCandidates = buildMissingPub1075ControlCandidates({
-        parsed,
-        controls,
-        pub1075Version: complianceOverview.pub1075.version,
-        nistVersion: complianceOverview.nist.version,
-    });
-    const changes = dedupeProposedChanges([
-        ...batchResults.flatMap((result) => result.changes),
-        ...missingControlCandidates,
-    ]);
+    // Publication 1075 and NIST are used to strengthen existing mapped rows.
+    // Do not turn every document section that lacks an exact workbook mapping
+    // into a new technology test case; direct CIS/STIG evidence or an explicit
+    // reviewer applicability decision is required before proposing a new row.
+    const changes = dedupeProposedChanges(
+        batchResults.flatMap((result) => result.changes)
+    );
     const coverage = [
         `${batches.length} bounded batch(es)`,
         `${reviewedRowCount} NIST-mapped row(s) distributed across version/provider tabs`,
         `${completedBatchCount} completed with AI reasoning`,
         `${complianceOverview.pub1075.controlIds.length} control ID(s) mapped to Pub 1075`,
-        `${complianceOverview.nist.controlIds.length} control ID(s) mapped to NIST fallback`,
-        `${missingControlCandidates.length} missing Publication 1075 control ID candidate(s) requiring applicability review`,
+        `${complianceOverview.nist.controlIds.length} control ID(s) mapped to NIST evidence`,
+        "0 document-section-only new-control candidates",
     ].join(", ");
 
     return {
-        summary: `Primary compliance review for ${technology}: ${coverage}. Generated ${changes.length} reviewer-gated proposal(s) before supplemental CIS Benchmark/CIS-STIG hardening review.`,
+        summary: `Publication 1075/NIST-mapping review for ${technology}: ${coverage}. Generated ${changes.length} reviewer-gated existing-row proposal(s) for later strictest-control comparison with directly applicable CIS and STIG evidence.`,
         changes,
         batchCount: batches.length,
         completedBatchCount,
@@ -1433,6 +1408,19 @@ export async function POST(
             // Backwards compatibility for existing clients that send an empty POST.
         }
 
+        // A "full" run means all required authorities were actually available.
+        // Do not silently downgrade to Pub 1075/NIST and present that result as
+        // the user's requested CIS/STIG/Publication comparison.
+        if (requestedScope === "full" && !hasConfiguredCISLicense()) {
+            return NextResponse.json({
+                error:
+                    "Full-source analysis requires an active CIS SecureSuite license. " +
+                    "CIS WorkBench was not searched, so SkyShield did not start a partial analysis under the full-source label.",
+                code: "CIS_LICENSE_NOT_CONFIGURED",
+                requiredConfiguration: "CIS_LICENSE_XML_BASE64 or CIS_LICENSE_XML_PATH",
+            }, { status: 424 });
+        }
+
         const expectedRevision = requireSCSEMUpdaterExpectedRevision(request);
         const updaterSession = readSCSEMUpdaterSessionForUser(id, user);
         assertSCSEMUpdaterRevision(updaterSession, expectedRevision);
@@ -1546,9 +1534,9 @@ export async function POST(
                 })
         );
 
-        // Start the governing compliance review before attempting any benchmark lookup.
-        // This promise resolves independently, so CIS credentials, catalog availability,
-        // or title/profile matching can never suppress Pub 1075/NIST analysis.
+        // Start the independent Publication 1075/NIST-mapping lane before benchmark lookup.
+        // It resolves independently so source failures remain visible, but its
+        // proposals do not erase stricter directly applicable CIS or STIG evidence.
         const compliance = extractComplianceEvidence(
             controls.map((control) => control.nistId),
             {
@@ -1971,7 +1959,7 @@ export async function POST(
             updaterSession.history.push({
                 at: new Date().toISOString(),
                 action: "analyze",
-                description: `Pub 1075-first/NIST-fallback compliance analysis completed without a direct CIS Benchmark or CIS-STIG source and generated ${validChanges.length} proposed change(s) across ${compliancePayload.batchCount} bounded batch(es).`,
+                description: `Publication 1075/NIST-mapping analysis completed without a direct CIS Benchmark or CIS-STIG source and generated ${validChanges.length} proposed change(s) across ${compliancePayload.batchCount} bounded batch(es).`,
             });
             await writeSCSEMUpdaterSession(updaterSession, updaterSession.revision, {
                 action: "SCSEM_UPDATER_ANALYZE_FINALIZE",
@@ -2070,12 +2058,12 @@ export async function POST(
                 analysisOperationId
             );
             updaterSession.status = analysisCoverage.complete ? "review_ready" : "analysis_incomplete";
-            updaterSession.summary = `${compliancePayload.summary} No supplemental CIS Benchmark or CIS-STIG deltas were detected.${analysisCoverage.complete ? "" : " Analysis remains incomplete; see coverage blockers."}`;
+            updaterSession.summary = `${compliancePayload.summary} No directly applicable CIS Benchmark or CIS-STIG deltas were detected.${analysisCoverage.complete ? "" : " Analysis remains incomplete; see coverage blockers."}`;
             updaterSession.changes = validChanges;
             updaterSession.history.push({
                 at: new Date().toISOString(),
                 action: "analyze",
-                description: `Compliance analysis completed across ${compliancePayload.batchCount} bounded batch(es); no supplemental CIS Benchmark/CIS-STIG deltas were detected. Generated ${validChanges.length} proposed change(s).`,
+                description: `Compliance and benchmark analysis completed across ${compliancePayload.batchCount} bounded batch(es); no directly applicable CIS Benchmark/CIS-STIG deltas were detected. Generated ${validChanges.length} proposed change(s).`,
             });
             await writeSCSEMUpdaterSession(updaterSession, updaterSession.revision, {
                 action: "SCSEM_UPDATER_ANALYZE_FINALIZE",
@@ -2144,16 +2132,13 @@ export async function POST(
         const prompt = `You are an IRS Safeguards SCSEM update analyst. Propose human-reviewable SCSEM workbook changes using only the evidence below.
 
 Decision policy:
-- IRS Publication 1075 is the first and governing compliance source.
-- NIST SP 800-53 is fallback compliance evidence only for controls where no Pub 1075 section was found.
-- CIS Benchmark and CIS-STIG rows retrieved from CIS WorkBench are supplemental security-hardening evidence.
-- Pub 1075 always wins over NIST, CIS Benchmark, or CIS-STIG evidence for a covered control.
-- If a NIST fallback requirement is stricter than CIS Benchmark or CIS-STIG evidence and Pub 1075 has no section for that control, propose NIST-aligned text.
-- If CIS Benchmark or CIS-STIG evidence is stricter and does not conflict with the applicable Pub 1075 requirement or NIST fallback, propose the stricter aligned text.
-- If CIS Benchmark and CIS-STIG evidence differ, propose the stricter secure setting when clear; otherwise mark confidence "needs_review".
-- If strictness is ambiguous, include the item only when it is clearly useful for human review and mark confidence "needs_review".
+- Evaluate every directly applicable source independently: current CIS Benchmark, CIS-STIG benchmark, public DISA STIG, and IRS Publication 1075.
+- No authority wins merely because it is listed first. For the same control, propose the strictest applicable requirement that does not weaken another binding requirement.
+- NIST SP 800-53 and 800-53A are control-mapping and assessment evidence. They may clarify a mapped control but must not create a technology-specific test case by themselves.
+- If CIS Benchmark, CIS-STIG, DISA STIG, and Publication 1075 differ, select the stricter secure setting when the supplied evidence makes that comparison clear.
+- If strictness or applicability is ambiguous, preserve the competing source proposal for explicit human review and mark confidence "needs_review"; never silently discard CIS or STIG evidence because a Pub 1075 proposal was generated first.
 - Existing IRS SCSEM rows remain the base source of truth.
-- You may propose new SCSEM controls when a relevant CIS Benchmark or CIS-STIG row is missing from the uploaded SCSEM and appears security-relevant.
+- You may propose a new SCSEM control only when a directly applicable CIS or STIG recommendation is absent from the uploaded SCSEM. Do not manufacture new controls merely from Publication 1075 or NIST section headings.
 - Explain each proposed update with enough detail for a human reviewer to decide quickly.
 
 Uploaded SCSEM:
@@ -2200,7 +2185,7 @@ Return ONLY valid JSON:
       "field": "testProcedures|expectedResults|remediationProcedure|description|rationale|impact|sectionTitle|findingStatement",
       "currentValue": "brief current value summary",
       "proposedValue": "complete replacement text for that field",
-      "reason": "specific reason citing Pub 1075 first, NIST only when it is the supplied fallback, and any supplemental CIS Benchmark/CIS-STIG evidence used",
+      "reason": "specific reason citing the directly applicable CIS Benchmark or CIS-STIG evidence and any Publication 1075 mapping used to select the strictest applicable requirement",
       "confidence": "high|medium|needs_review",
       "sourceEvidence": {
         "cisRecommendation": "CIS recommendation number if CIS evidence applies, otherwise null",
@@ -2298,7 +2283,7 @@ Rules:
                     model: getConfiguredBifrostModel("BIFROST_SCSEM_MODEL"),
                     maxTokens: 9000,
                     temperature: 0.15,
-                    system: "You generate precise JSON SCSEM recommendations using IRS Pub 1075 first, NIST SP 800-53 only as fallback, and CIS Benchmark/CIS-STIG workbooks from CIS WorkBench as supplemental hardening evidence.",
+                    system: "You generate precise JSON SCSEM recommendations by comparing directly applicable CIS Benchmark/CIS-STIG evidence with Publication 1075 and selecting the strictest applicable control. NIST is mapping and assessment evidence only.",
                     prompt,
                     signal: abortController.signal,
                 });
@@ -2427,8 +2412,8 @@ Rules:
             at: new Date().toISOString(),
             action: "analyze",
             description:
-                `Pub 1075-first/NIST-fallback analysis ran across ${compliancePayload.batchCount} bounded compliance batch(es). ` +
-                `Supplemental CIS Benchmark/CIS-STIG mode ${comparisonMode} compared ${comparedCandidateCount}/${totalCandidateCount} ` +
+                `All-source analysis ran ${compliancePayload.batchCount} bounded Publication 1075/NIST-mapping batch(es). ` +
+                `CIS Benchmark/CIS-STIG mode ${comparisonMode} compared ${comparedCandidateCount}/${totalCandidateCount} ` +
                 `candidate(s), rebound ${boundBenchmarkChanges.length}/${rawProposalCount} proposal(s), and generated ` +
                 `${validChanges.length} total reviewer-gated change(s).`,
         });

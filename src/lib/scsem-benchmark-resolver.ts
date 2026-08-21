@@ -435,16 +435,28 @@ function selectionScore(selection: SelectedCISProfile, sheetRefCount: number): n
     return selection.sharedRecommendationCount * 2 + sharedRatio * 100 + profileRatio * 35;
 }
 
-function acceptsSelection(
+export function isCISBenchmarkSelectionAccepted(
     selection: SelectedCISProfile,
-    sheetRefCount: number
+    sheetRefCount: number,
+    titleScore: number
 ): boolean {
-    if (sheetRefCount <= 0) return false;
+    if (selection.totalRecommendationCount <= 0) return false;
+    if (sheetRefCount <= 0) return titleScore >= 1000;
     const shared = selection.sharedRecommendationCount;
     const sharedRatio = shared / sheetRefCount;
 
-    if (sheetRefCount <= 5) return shared === sheetRefCount;
-    return shared >= 5 && sharedRatio >= 0.45;
+    if (sheetRefCount <= 5 && shared === sheetRefCount) return true;
+    if (shared >= 5 && sharedRatio >= 0.45) return true;
+
+    // A newly accepted benchmark can renumber, split, or add recommendations,
+    // which is exactly when the updater must surface new CIS controls. Requiring
+    // 45% overlap made an exact product/generation match disappear whenever the
+    // new benchmark changed enough to need review. Catalog ranking has already
+    // rejected wrong families, generations, unpublished workbooks, and STIG
+    // variants before this point. An exact title match can therefore proceed as
+    // a reviewer-gated direct source even with low or zero recommendation-ID
+    // overlap; the subsequent comparison and evidence binding remain mandatory.
+    return titleScore >= 1000;
 }
 
 async function evaluateQuery({
@@ -525,7 +537,7 @@ async function evaluateQuery({
             continue;
         }
 
-        if (!acceptsSelection(selectedProfile, sheetRecommendationCount)) {
+        if (!isCISBenchmarkSelectionAccepted(selectedProfile, sheetRecommendationCount, candidate.titleScore)) {
             candidateAttempts.push({
                 ...attemptBase,
                 outcome: "insufficient_control_overlap",
@@ -693,7 +705,7 @@ export async function resolveSCSEMBenchmarkSourcesDetailed({
 
     for (const sheet of parsed.sheets.filter((candidate) => candidate.sheetType === "test_cases")) {
         const sheetRecommendationCount = recommendationCount(sheet.controls);
-        if (sheet.controls.length === 0 || sheetRecommendationCount === 0) continue;
+        if (sheet.controls.length === 0) continue;
 
         const queries = sheetQueries(sheet.sheetName, technology, parsed);
         if (queries.length === 0) continue;

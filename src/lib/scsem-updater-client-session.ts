@@ -215,6 +215,10 @@ const SOURCE_EVIDENCE_KEYS = [
     "nistControlIds",
     "gapType",
     "applicabilityReviewRequired",
+    "strictnessGroupId",
+    "strictnessSelectionRequired",
+    "competingAuthorityCount",
+    "competingAuthorities",
 ] as const;
 
 function clientSourceEvidence(

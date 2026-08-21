@@ -22,6 +22,7 @@ import {
 import { assertSCSEMUpdaterSourceIntegrity } from "@/lib/scsem-source-integrity";
 import { scsemUpdaterAuditChange } from "@/lib/scsem-change-audit";
 import { clientSafeSCSEMUpdaterSession } from "@/lib/scsem-updater-client-session";
+import { strictnessApprovalErrors } from "@/lib/scsem-source-precedence";
 import {
     readSCSEMNewControlTargetSchemas,
     type SCSEMNewControlTargetSchema,
@@ -128,7 +129,7 @@ export async function PATCH(
                 code: "SCSEM_SESSION_NOT_REVIEWABLE",
             }, { status: 409 });
         }
-        const ids = new Set(changeIds.map(String));
+        const ids = new Set<string>(changeIds.map(String));
         let issueCodeCatalog: Map<string, SCSEMIssueCodeEntry> | null = null;
         let targetSchemas = new Map<string, SCSEMNewControlTargetSchema>();
         const approvingNewControl = nextStatus === "APPROVED" && updaterSession.changes.some(
@@ -172,6 +173,11 @@ export async function PATCH(
             let updated = { ...edited, status: resolvedStatus };
             if (resolvedStatus === "APPROVED") {
                 const errors = approvedProposalValidationErrors(updated);
+                errors.push(...strictnessApprovalErrors({
+                    candidate: updated,
+                    allChanges: updaterSession.changes,
+                    approvingIds: ids,
+                }));
                 if (
                     updaterSession.workspaceMode === "cis_bootstrap" &&
                     updated.action === "addControl" &&

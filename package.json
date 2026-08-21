@@ -27,6 +27,7 @@
     "test:scsem-compliance-gaps": "node --expose-gc --import tsx scripts/test-scsem-compliance-gaps.ts",
     "test:disa-stig": "node --import tsx scripts/test-disa-stig.ts",
     "test:scsem-semantic-proposals": "node --expose-gc --import tsx scripts/test-scsem-semantic-proposals.ts",
+    "test:scsem-source-precedence": "node --import tsx scripts/test-scsem-source-precedence.ts",
     "verify:disa-stig-live-sources": "node --import tsx scripts/verify-disa-stig-live-sources.ts",
     "test:scsem-source-integrity": "npx tsx scripts/test-scsem-source-integrity.ts",
     "test:runtime-hardening": "npx tsx scripts/test-runtime-hardening.ts",
@@ -45,7 +46,7 @@
     "test:native-excel-corpus": "node --import tsx scripts/test-native-excel-corpus.ts",
     "test:native-excel-corpus:self": "node --import tsx scripts/test-native-excel-corpus.ts --self-test",
     "test:scsem-updater": "npx tsx scripts/test-scsem-updater.ts",
-    "test": "npm run test:compliance-evidence && npm run test:benchmark-selection && npm run test:scsem-cis-bootstrap && npm run test:scsem-structural-admission && npm run test:scsem-manifest && npm run test:scsem-column-schema && npm run test:scsem-analysis-coverage && npm run test:scsem-compliance-gaps && npm run test:disa-stig && npm run test:scsem-semantic-proposals && npm run test:scsem-source-integrity && npm run test:runtime-hardening && npm run test:legacy-scsem-retirement && npm run test:user-management-security && npm run test:credential-lifecycle && npm run test:mfa-evidence-db && npm run test:bifrost-model-switch && npm run test:mobile-responsive-layout && npm run test:scsem-updater-lifecycle && npm run test:scsem-formula-translation && npm run test:scsem-issue-codes && npm run test:scsem-updater && npm run test:scsem-corpus-export && npm run test:scsem-corpus-add-control",
+    "test": "npm run test:compliance-evidence && npm run test:benchmark-selection && npm run test:scsem-cis-bootstrap && npm run test:scsem-structural-admission && npm run test:scsem-manifest && npm run test:scsem-column-schema && npm run test:scsem-analysis-coverage && npm run test:scsem-compliance-gaps && npm run test:disa-stig && npm run test:scsem-semantic-proposals && npm run test:scsem-source-precedence && npm run test:scsem-source-integrity && npm run test:runtime-hardening && npm run test:legacy-scsem-retirement && npm run test:user-management-security && npm run test:credential-lifecycle && npm run test:mfa-evidence-db && npm run test:bifrost-model-switch && npm run test:mobile-responsive-layout && npm run test:scsem-updater-lifecycle && npm run test:scsem-formula-translation && npm run test:scsem-issue-codes && npm run test:scsem-updater && npm run test:scsem-corpus-export && npm run test:scsem-corpus-add-control",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate"
   },
