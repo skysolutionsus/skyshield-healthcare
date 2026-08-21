@@ -1,5 +1,6 @@
 import type { CISBenchmark, CISExcelFile } from "@/lib/cis-api";
 import {
+    isExactCISProductIdentity,
     normalizeRecommendation,
     rankCISBenchmarkCandidatesForTechnology,
     selectApplicableSTIGProfiles,
@@ -196,10 +197,28 @@ function aliasesForText(value: string): string[] {
     else if (normalized.includes("tomcat")) aliases.push("Apache Tomcat");
 
     if (normalized.includes("nginx")) aliases.push("NGINX");
-    if (normalized.includes("mysql")) aliases.push("MySQL");
-    if (normalized.includes("mongodb")) aliases.push("MongoDB");
-    if (normalized.includes("microsoft sql server") || /\bsql server\b/.test(normalized)) aliases.push("Microsoft SQL Server");
-    if (normalized.includes("oracle database") || normalized === "oracle") aliases.push("Oracle Database");
+    if (normalized.includes("mysql")) {
+        const version = matchedVersion(normalized, [/\bmysql\s*(\d+(?:\.\d+)?)\b/]);
+        aliases.push(version ? `MySQL ${version}` : "MySQL");
+    }
+    if (normalized.includes("mongodb")) {
+        const version = matchedVersion(normalized, [/\bmongodb\s*(\d+(?:\.\d+)?)\b/]);
+        aliases.push(version ? `MongoDB ${version}` : "MongoDB");
+    }
+    if (normalized.includes("postgresql")) {
+        const version = matchedVersion(normalized, [/\bpostgresql\s*(\d+(?:\.\d+)?)\b/]);
+        aliases.push(version ? `PostgreSQL ${version}` : "PostgreSQL");
+    }
+    if (normalized.includes("microsoft sql server") || /\bsql server\b/.test(normalized)) {
+        const version = matchedVersion(normalized, [/\bsql server\s*(\d{4})\b/]);
+        aliases.push(version ? `Microsoft SQL Server ${version}` : "Microsoft SQL Server");
+    }
+    if (normalized.includes("oracle database") || normalized === "oracle" || (/\boracle\b/.test(normalized) && normalized.includes("rdbms"))) {
+        const databaseVersion = matchedVersion(normalized, [/\boracle database\s*(\d{1,2}(?:c|ai)?)/]);
+        const rdbmsVersion = matchedVersion(normalized, [/\boracle\s*(\d{1,2})\s+rdbms\b/]);
+        const version = databaseVersion || (rdbmsVersion ? `${rdbmsVersion}c` : null);
+        aliases.push(version ? `Oracle Database ${version}` : "Oracle Database");
+    }
     if (normalized.includes("teradata")) aliases.push("Teradata");
 
     if (normalized.includes("red hat enterprise linux") || /\brhel\s*\d*\b/.test(normalized)) {
@@ -438,10 +457,10 @@ function selectionScore(selection: SelectedCISProfile, sheetRefCount: number): n
 export function isCISBenchmarkSelectionAccepted(
     selection: SelectedCISProfile,
     sheetRefCount: number,
-    titleScore: number
+    exactProductIdentity: boolean
 ): boolean {
     if (selection.totalRecommendationCount <= 0) return false;
-    if (sheetRefCount <= 0) return titleScore >= 1000;
+    if (sheetRefCount <= 0) return exactProductIdentity;
     const shared = selection.sharedRecommendationCount;
     const sharedRatio = shared / sheetRefCount;
 
@@ -453,10 +472,10 @@ export function isCISBenchmarkSelectionAccepted(
     // 45% overlap made an exact product/generation match disappear whenever the
     // new benchmark changed enough to need review. Catalog ranking has already
     // rejected wrong families, generations, unpublished workbooks, and STIG
-    // variants before this point. An exact title match can therefore proceed as
-    // a reviewer-gated direct source even with low or zero recommendation-ID
-    // overlap; the subsequent comparison and evidence binding remain mandatory.
-    return titleScore >= 1000;
+    // variants before this point. Only an exact recognized product/generation
+    // identity can proceed with low or zero recommendation-ID overlap;
+    // substring title similarity alone is never sufficient.
+    return exactProductIdentity;
 }
 
 async function evaluateQuery({
@@ -537,7 +556,13 @@ async function evaluateQuery({
             continue;
         }
 
-        if (!isCISBenchmarkSelectionAccepted(selectedProfile, sheetRecommendationCount, candidate.titleScore)) {
+        const candidateTitleText = [
+            candidate.benchmark.benchmarkTitle,
+            candidate.excel.excelTitle,
+            candidate.excel.excelFileName,
+        ].filter(Boolean).join(" ");
+        const exactProductIdentity = isExactCISProductIdentity(query, candidateTitleText);
+        if (!isCISBenchmarkSelectionAccepted(selectedProfile, sheetRecommendationCount, exactProductIdentity)) {
             candidateAttempts.push({
                 ...attemptBase,
                 outcome: "insufficient_control_overlap",
@@ -704,7 +729,6 @@ export async function resolveSCSEMBenchmarkSourcesDetailed({
     const diagnostics: BenchmarkQueryResolutionDiagnostic[] = [];
 
     for (const sheet of parsed.sheets.filter((candidate) => candidate.sheetType === "test_cases")) {
-        const sheetRecommendationCount = recommendationCount(sheet.controls);
         if (sheet.controls.length === 0) continue;
 
         const queries = sheetQueries(sheet.sheetName, technology, parsed);

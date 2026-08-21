@@ -1312,8 +1312,10 @@ export function createSCSEMUpdaterDurabilityTestHarness(sink: SCSEMUpdaterDurabi
 
 export function addIdsToChanges(changes: any[]): SCSEMUpdaterChange[] {
     return changes.map((change) => ({
-        id: change.id || randomUUID(),
-        status: change.status || "PENDING",
+        // IDs are server-owned. Never preserve model- or client-supplied IDs;
+        // uniqueness is part of strictness-conflict approval safety.
+        id: randomUUID(),
+        status: "PENDING",
         action: change.action === "addControl" ? "addControl" : "updateField",
         testId: String(change.testId || ""),
         field: String(change.field || (change.action === "addControl" ? "newControl" : "")),

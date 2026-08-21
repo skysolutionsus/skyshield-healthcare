@@ -64,6 +64,7 @@ import {
 import {
     annotateSCSEMStrictnessConflicts,
     dedupeSCSEMProposalsPreservingAuthorities,
+    fairlyLimitSCSEMProposals,
 } from "@/lib/scsem-source-precedence";
 import {
     buildDisaStigChanges,
@@ -668,6 +669,28 @@ function chooseFallbackField(
         isMaterialTextDelta(choice.currentValue, choice.proposedValue)) || null;
 }
 
+function interleaveBenchmarkAuthorities<T extends { sourceKind: ResolvedBenchmarkKind }>(candidates: T[]): T[] {
+    const buckets = new Map<ResolvedBenchmarkKind, T[]>([
+        ["CIS", candidates.filter((candidate) => candidate.sourceKind === "CIS")],
+        ["CIS_STIG", candidates.filter((candidate) => candidate.sourceKind === "CIS_STIG")],
+    ]);
+    const indexes = new Map<ResolvedBenchmarkKind, number>([["CIS", 0], ["CIS_STIG", 0]]);
+    const output: T[] = [];
+    while (output.length < candidates.length) {
+        let added = false;
+        for (const kind of ["CIS", "CIS_STIG"] as const) {
+            const index = indexes.get(kind) || 0;
+            const candidate = buckets.get(kind)?.[index];
+            if (!candidate) continue;
+            output.push(candidate);
+            indexes.set(kind, index + 1);
+            added = true;
+        }
+        if (!added) break;
+    }
+    return output;
+}
+
 function buildFallbackPayload({
     technology,
     pub1075,
@@ -681,14 +704,19 @@ function buildFallbackPayload({
     updateCandidates: AnalysisUpdateCandidate[];
     newControlCandidates: AnalysisNewCandidate[];
 }) {
-    const fallbackUpdates = [...updateCandidates].sort((a, b) => b.score - a.score);
-    const fallbackNewControls = [...newControlCandidates];
+    const fallbackUpdates = interleaveBenchmarkAuthorities(
+        [...updateCandidates].sort((a, b) => b.score - a.score)
+    );
+    const fallbackNewControls = interleaveBenchmarkAuthorities([...newControlCandidates]);
 
     const changes: any[] = [];
     let examinedCandidateCount = 0;
+    const maxUpdateChanges = fallbackNewControls.length > 0
+        ? Math.max(1, Math.floor(MAX_UPDATER_CHANGES * 0.7))
+        : MAX_UPDATER_CHANGES;
 
     for (const candidate of fallbackUpdates) {
-        if (changes.length >= MAX_UPDATER_CHANGES) break;
+        if (changes.length >= maxUpdateChanges) break;
         examinedCandidateCount++;
         const selectedField = chooseFallbackField(candidate.control, candidate.recommendation);
         if (!selectedField) continue;
@@ -957,6 +985,26 @@ function deterministicComplianceGapChanges(
     return changes;
 }
 
+function buildPublicDisaProposalEvidence(changes: any[], maxChars = 18000): string {
+    const blocks: string[] = [];
+    let used = 0;
+    for (const change of changes) {
+        const evidence = change.sourceEvidence || {};
+        const block = [
+            `Target: ${change.targetSheet || evidence.sourceSheet || "unknown"}!${change.testId || "new control"} (${change.field || "newControl"})`,
+            `DISA benchmark: ${evidence.stigBenchmarkId || evidence.sourceTitle || "unknown"}`,
+            `DISA rule: ${evidence.stigVersion || evidence.stigRuleId || "unknown"}`,
+            `NIST mappings: ${Array.isArray(evidence.nistControlIds) ? evidence.nistControlIds.join(", ") : evidence.nistControlIds || "none"}`,
+            `Proposed requirement: ${change.proposedValue || change.newControl?.expectedResults || change.newControl?.description || ""}`,
+            change.newControl?.testProcedures ? `Test procedure: ${change.newControl.testProcedures}` : null,
+        ].filter(Boolean).join("\n");
+        if (used + block.length > maxChars) break;
+        blocks.push(block);
+        used += block.length + 8;
+    }
+    return blocks.join("\n\n---\n\n");
+}
+
 function dedupeProposedChanges(changes: any[]): any[] {
     return annotateSCSEMStrictnessConflicts(
         dedupeSCSEMProposalsPreservingAuthorities(changes)
@@ -1101,7 +1149,7 @@ Return ONLY valid JSON:
       "field": "testProcedures|expectedResults|remediationProcedure|description|rationale|impact|sectionTitle|findingStatement",
       "currentValue": "brief current value summary",
       "proposedValue": "complete replacement text for that field",
-      "reason": "specific reason citing the Pub 1075 requirement, or the NIST fallback control only when no Pub 1075 section was supplied",
+      "reason": "specific reason citing the Publication 1075 requirement, or the NIST mapping/assessment evidence only when no Publication 1075 section was supplied",
       "confidence": "high|medium|needs_review",
       "sourceEvidence": {
         "cisRecommendation": null,
@@ -1123,7 +1171,7 @@ Rules:
 - Use only Test IDs listed in SCSEM ROWS FOR COMPLIANCE REVIEW.
 - Do not include changes that only restate the same control in different words.
 - Do not claim Pub 1075 or NIST says something unless that exact source excerpt is present above.
-- Never use NIST fallback evidence for an ID listed under Pub 1075-covered IDs.
+- Never use NIST mapping/assessment evidence as an independent authority for an ID with a supplied Publication 1075 excerpt.
 - Do not include markdown fences.`;
 
             if (prompt.length > AI_PROMPT_CHAR_LIMIT) {
@@ -1149,7 +1197,7 @@ Rules:
                     model: getConfiguredBifrostModel("BIFROST_SCSEM_MODEL"),
                     maxTokens: 4500,
                     temperature: 0.1,
-                    system: "You generate precise JSON SCSEM recommendations using IRS Pub 1075 first and NIST SP 800-53 only as fallback evidence.",
+                    system: "You generate precise JSON SCSEM recommendations for existing mapped rows using Publication 1075 requirements and NIST SP 800-53/800-53A mapping and assessment evidence. NIST does not independently create technology controls; final strictness is resolved with direct CIS and STIG lanes.",
                     prompt,
                     signal: abortController.signal,
                 });
@@ -1260,8 +1308,8 @@ ${controlEvidence || "No SCSEM row text was available."}
 ADJACENT BENCHMARK EVIDENCE:
 ${adjacentEvidence || "No adjacent benchmark recommendations were selected."}
 
-COMPLIANCE EVIDENCE — PUB 1075 FIRST, NIST FALLBACK ONLY:
-${pub1075.excerpts || "No Pub 1075 or NIST fallback excerpts were found for the referenced controls."}
+COMPLIANCE EVIDENCE — PUBLICATION 1075 WITH NIST MAPPING/ASSESSMENT SUPPORT:
+${pub1075.excerpts || "No Publication 1075 or NIST mapping/assessment excerpts were found for the referenced controls."}
 
 Return ONLY valid JSON:
 {
@@ -1408,22 +1456,47 @@ export async function POST(
             // Backwards compatibility for existing clients that send an empty POST.
         }
 
-        // A "full" run means all required authorities were actually available.
-        // Do not silently downgrade to Pub 1075/NIST and present that result as
-        // the user's requested CIS/STIG/Publication comparison.
-        if (requestedScope === "full" && !hasConfiguredCISLicense()) {
-            return NextResponse.json({
-                error:
-                    "Full-source analysis requires an active CIS SecureSuite license. " +
-                    "CIS WorkBench was not searched, so SkyShield did not start a partial analysis under the full-source label.",
-                code: "CIS_LICENSE_NOT_CONFIGURED",
-                requiredConfiguration: "CIS_LICENSE_XML_BASE64 or CIS_LICENSE_XML_PATH",
-            }, { status: 424 });
-        }
-
         const expectedRevision = requireSCSEMUpdaterExpectedRevision(request);
         const updaterSession = readSCSEMUpdaterSessionForUser(id, user);
         assertSCSEMUpdaterRevision(updaterSession, expectedRevision);
+
+        let cisPreflight: {
+            token: string;
+            benchmarks: Awaited<ReturnType<typeof fetchAllBenchmarks>>;
+            excelFiles: Awaited<ReturnType<typeof fetchAllBenchmarkExcelFiles>>;
+        } | null = null;
+        if (requestedScope === "full") {
+            if (!hasConfiguredCISLicense()) {
+                return NextResponse.json({
+                    error:
+                        "Full-source analysis requires an active CIS SecureSuite license. " +
+                        "CIS WorkBench was not searched, so SkyShield did not start a partial analysis under the full-source label.",
+                    code: "CIS_LICENSE_NOT_CONFIGURED",
+                    requiredConfiguration: "CIS_LICENSE_XML_BASE64 or CIS_LICENSE_XML_PATH",
+                }, { status: 424 });
+            }
+            try {
+                const token = await getCISToken();
+                const [benchmarks, excelFiles] = await Promise.all([
+                    fetchAllBenchmarks(token),
+                    fetchAllBenchmarkExcelFiles(token),
+                ]);
+                if (benchmarks.length === 0 || excelFiles.length === 0) {
+                    throw new Error("The CIS WorkBench catalog contained no usable benchmark workbooks.");
+                }
+                cisPreflight = { token, benchmarks, excelFiles };
+            } catch (error: unknown) {
+                const failure = scsemBenchmarkLookupFailureDetails(error, "direct");
+                console.warn("SCSEM updater full-source preflight failed.", error);
+                return NextResponse.json({
+                    error:
+                        "Full-source analysis requires currently usable CIS WorkBench access. " +
+                        "License authentication or catalog validation failed, so no partial analysis was started.",
+                    code: failure.code,
+                }, { status: 424 });
+            }
+        }
+
         updaterSession.analysisScope = requestedScope;
         const sourceCoverageBlockers = updaterSession.audit.structuralAdmission
             ? [updaterSession.audit.structuralAdmission.blocker]
@@ -1556,44 +1629,26 @@ export async function POST(
             pub1075: compliance,
         });
 
-        let cisToken = "";
+        const cisToken = cisPreflight?.token || "";
         let benchmarkLookupError: string | undefined;
         let benchmarkLookupErrorCode: string | undefined;
-        let allBenchmarks: Awaited<ReturnType<typeof fetchAllBenchmarks>> = [];
-        let allExcelFiles: Awaited<ReturnType<typeof fetchAllBenchmarkExcelFiles>> = [];
+        const allBenchmarks = cisPreflight?.benchmarks || [];
+        const allExcelFiles = cisPreflight?.excelFiles || [];
         const downloadedBenchmarks = new Map<number, DownloadedBenchmark>();
         let resolvedSources: ResolvedBenchmarkSource[] = [];
         let benchmarkResolutionDiagnostics: BenchmarkQueryResolutionDiagnostic[] = [];
-        const cisLicenseConfigured = requestedScope === "full" && hasConfiguredCISLicense();
 
-        if (cisLicenseConfigured) {
-            try {
-                cisToken = await getCISToken();
-                [allBenchmarks, allExcelFiles] = await Promise.all([
-                    fetchAllBenchmarks(cisToken),
-                    fetchAllBenchmarkExcelFiles(cisToken),
-                ]);
-                const benchmarkResolution = await resolveSCSEMBenchmarkSourcesDetailed({
-                    token: cisToken,
-                    technology: updaterSession.inferredTechnology,
-                    parsed,
-                    benchmarks: allBenchmarks,
-                    excelFiles: allExcelFiles,
-                    downloadedBenchmarks,
-                });
-                resolvedSources = benchmarkResolution.sources;
-                benchmarkResolutionDiagnostics = benchmarkResolution.diagnostics;
-            } catch (error: unknown) {
-                const failure = scsemBenchmarkLookupFailureDetails(error, "direct");
-                benchmarkLookupError = failure.message;
-                benchmarkLookupErrorCode = failure.code;
-                console.warn(
-                    "SCSEM updater benchmark lookup failed; continuing with compliance-first analysis.",
-                    error
-                );
-            }
-        } else if (requestedScope === "full") {
-            benchmarkLookupErrorCode = "CIS_LICENSE_NOT_CONFIGURED";
+        if (requestedScope === "full" && cisPreflight) {
+            const benchmarkResolution = await resolveSCSEMBenchmarkSourcesDetailed({
+                token: cisToken,
+                technology: updaterSession.inferredTechnology,
+                parsed,
+                benchmarks: allBenchmarks,
+                excelFiles: allExcelFiles,
+                downloadedBenchmarks,
+            });
+            resolvedSources = benchmarkResolution.sources;
+            benchmarkResolutionDiagnostics = benchmarkResolution.diagnostics;
         }
 
         const updateCandidates: AnalysisUpdateCandidate[] = [];
@@ -1933,7 +1988,11 @@ export async function POST(
                 ...boundAdjacentChanges,
             ], controls));
             const validChanges = addIdsToChanges(
-                validateChanges(rawChanges, controls, MAX_UPDATER_CHANGES)
+                validateChanges(
+                    fairlyLimitSCSEMProposals(rawChanges, MAX_UPDATER_CHANGES),
+                    controls,
+                    MAX_UPDATER_CHANGES
+                )
             );
 
             const completedAnalysisLease = clearSCSEMAnalysisLease(
@@ -1951,9 +2010,7 @@ export async function POST(
                         : "No direct current public DISA STIG source matched this technology.",
                 benchmarkLookupError
                     ? `Configured CIS Benchmark lookup was unavailable (${benchmarkLookupError}); see coverage blockers before release.`
-                    : cisLicenseConfigured
-                        ? "No direct licensed CIS workbook/profile matched; the public DISA and compliance comparisons remain independently auditable."
-                        : "No CIS SecureSuite license is configured, so licensed CIS content was not accessed. Publication 1075, NIST fallback, and current public DISA STIG sources were still evaluated.",
+                    : "No direct licensed CIS workbook/profile matched; public DISA STIG and Publication 1075 comparisons remain independently auditable.",
             ].filter(Boolean).join(" ");
             updaterSession.changes = validChanges;
             updaterSession.history.push({
@@ -2045,11 +2102,12 @@ export async function POST(
                 additionalBlockers: sourceCoverageBlockers,
             });
             updaterSession.audit.analysisCoverage = analysisCoverage;
+            const noLicensedDeltaChanges = dedupeProposedChanges(addUnambiguousTargetSheets([
+                ...(compliancePayload.changes || []),
+                ...disaStigChanges,
+            ], controls));
             const validChanges = addIdsToChanges(validateChanges(
-                dedupeProposedChanges(addUnambiguousTargetSheets([
-                    ...(compliancePayload.changes || []),
-                    ...disaStigChanges,
-                ], controls)),
+                fairlyLimitSCSEMProposals(noLicensedDeltaChanges, MAX_UPDATER_CHANGES),
                 controls,
                 MAX_UPDATER_CHANGES
             ));
@@ -2115,6 +2173,7 @@ export async function POST(
         const stigNewControlEvidence = stigNewControlCandidates
             .map((candidate) => `Target sheet: ${candidate.targetSheet || "unknown"}\n${buildNewControlEvidence(candidate.recommendation, candidate.sourceLabel)}`)
             .join("\n\n---\n\n");
+        const publicDisaEvidence = buildPublicDisaProposalEvidence(disaStigChanges);
         const benchmarkSourceSummary = (sources: ResolvedBenchmarkSource[], kind: ResolvedBenchmarkKind) => sources.length > 0
             ? sources.map((source) => [
                 `- Title: ${source.downloaded.snapshot.benchmarkTitle}`,
@@ -2135,8 +2194,9 @@ Decision policy:
 - Evaluate every directly applicable source independently: current CIS Benchmark, CIS-STIG benchmark, public DISA STIG, and IRS Publication 1075.
 - No authority wins merely because it is listed first. For the same control, propose the strictest applicable requirement that does not weaken another binding requirement.
 - NIST SP 800-53 and 800-53A are control-mapping and assessment evidence. They may clarify a mapped control but must not create a technology-specific test case by themselves.
-- If CIS Benchmark, CIS-STIG, DISA STIG, and Publication 1075 differ, select the stricter secure setting when the supplied evidence makes that comparison clear.
-- If strictness or applicability is ambiguous, preserve the competing source proposal for explicit human review and mark confidence "needs_review"; never silently discard CIS or STIG evidence because a Pub 1075 proposal was generated first.
+- If CIS Benchmark, CIS-STIG, public DISA STIG, and Publication 1075 differ, select the stricter secure setting when the supplied evidence makes that comparison clear.
+- Public DISA STIG proposals are preserved independently and source-bound by the server. Do not emit a weaker CIS/CIS-STIG value for the same control; if strictness is ambiguous, leave the benchmark proposal reviewer-gated.
+- If strictness or applicability is ambiguous, preserve the competing source proposal for explicit human review and mark confidence "needs_review"; never silently discard CIS or STIG evidence because a Publication 1075 proposal was generated first.
 - Existing IRS SCSEM rows remain the base source of truth.
 - You may propose a new SCSEM control only when a directly applicable CIS or STIG recommendation is absent from the uploaded SCSEM. Do not manufacture new controls merely from Publication 1075 or NIST section headings.
 - Explain each proposed update with enough detail for a human reviewer to decide quickly.
@@ -2171,8 +2231,11 @@ ${stigUpdateEvidence || "None"}
 POTENTIAL NEW CIS-STIG ROWS NOT PRESENT IN THE SCSEM:
 ${stigNewControlEvidence || "None"}
 
-COMPLIANCE EVIDENCE — PUB 1075 FIRST, NIST FALLBACK ONLY:
-${pub1075.excerpts || "No Pub 1075 or NIST fallback excerpts were found for the candidate controls."}
+PUBLIC DISA STIG PROPOSALS — PRESERVED INDEPENDENTLY:
+${publicDisaEvidence || "No directly applicable public DISA STIG proposal was generated."}
+
+COMPLIANCE EVIDENCE — PUBLICATION 1075 WITH NIST MAPPING/ASSESSMENT SUPPORT:
+${pub1075.excerpts || "No Publication 1075 or NIST mapping/assessment excerpts were found for the candidate controls."}
 
 Return ONLY valid JSON:
 {
@@ -2243,7 +2306,7 @@ Rules:
 - For updateField, only use Test IDs from CURRENT SCSEM ROWS MATCHED TO CIS CANDIDATES or CURRENT SCSEM ROWS MATCHED TO CIS-STIG CANDIDATES.
 - For addControl, only use recommendation numbers from POTENTIAL NEW CIS ROWS or POTENTIAL NEW CIS-STIG ROWS.
 - Do not claim Pub 1075 or NIST says something unless the corresponding excerpt is present above.
-- Never use NIST fallback evidence for a control covered by a supplied Pub 1075 excerpt.
+- Never treat NIST mapping/assessment evidence as an independent authority when a supplied Publication 1075 excerpt covers the control.
 - Treat newControl.findingStatement as canonical template text describing the failed control condition, never as an observed agency response.
 - Leave newControl.issueCode null. A reviewer must select an exact code from the uploaded workbook's IRS Issue Code Table before approval; never invent or infer a code outside that table.
 - Do not include markdown fences.`;
@@ -2263,6 +2326,16 @@ Rules:
             updateCandidates,
             newControlCandidates,
         });
+        const preservationPayload = deterministicFallback(
+            "every discovered licensed-source candidate must remain represented even if AI emits no proposal"
+        );
+        const preservedBoundBenchmarkChanges = bindBenchmarkChangesToResolvedEvidence(
+            preservationPayload.changes,
+            controls,
+            [...updateCandidates, ...newControlCandidates],
+            pub1075.pub1075.version,
+            pub1075.nist.version
+        );
 
         if (!aiWithinInteractiveLimits) {
             comparisonMode = "deterministic_fallback";
@@ -2272,7 +2345,7 @@ Rules:
         } else if (!aiConfigured) {
             comparisonMode = "deterministic_fallback";
             comparisonReason =
-                "the supplemental AI provider was not configured, so the complete bounded candidate set was compared deterministically";
+                "the bounded comparison AI provider was not configured, so the complete candidate set was compared deterministically";
             payload = deterministicFallback(comparisonReason);
         } else {
             const abortController = new AbortController();
@@ -2283,7 +2356,7 @@ Rules:
                     model: getConfiguredBifrostModel("BIFROST_SCSEM_MODEL"),
                     maxTokens: 9000,
                     temperature: 0.15,
-                    system: "You generate precise JSON SCSEM recommendations by comparing directly applicable CIS Benchmark/CIS-STIG evidence with Publication 1075 and selecting the strictest applicable control. NIST is mapping and assessment evidence only.",
+                    system: "You generate precise JSON SCSEM recommendations by comparing directly applicable CIS Benchmark, CIS-STIG, public DISA STIG, and Publication 1075 evidence and selecting the strictest applicable control. NIST is mapping and assessment evidence only. Public DISA proposals remain independently source-bound and must not be weakened.",
                     prompt,
                     signal: abortController.signal,
                 });
@@ -2298,8 +2371,8 @@ Rules:
                 console.warn("SCSEM updater AI analysis failed; using deterministic fallback changes.", error);
                 comparisonMode = "deterministic_fallback";
                 comparisonReason = error instanceof Error && error.name === "AbortError"
-                    ? "the supplemental AI comparison exceeded the interactive timeout"
-                    : "the supplemental AI response could not be validated safely";
+                    ? "the all-source AI comparison exceeded the interactive timeout"
+                    : "the all-source AI response could not be validated safely";
                 payload = deterministicFallback(comparisonReason);
             } finally {
                 clearTimeout(timeout);
@@ -2326,8 +2399,12 @@ Rules:
                 pub1075.nist.version
             );
         }
+        boundBenchmarkChanges = dedupeProposedChanges([
+            ...boundBenchmarkChanges,
+            ...preservedBoundBenchmarkChanges,
+        ]);
 
-        const rawProposalCount = payload.changes.length;
+        const rawProposalCount = payload.changes.length + preservationPayload.changes.length;
         const comparedCandidateCount = comparisonMode === "ai"
             ? availableCandidateCount
             : Number(payload.examinedCandidateCount || 0);
@@ -2337,24 +2414,17 @@ Rules:
         const disaComparisonComplete = expectedDirectDisaSourceCount === resolvedDisaStigSources.length;
         let comparisonComplete =
             comparedCandidateCount === totalCandidateCount &&
-            boundBenchmarkChanges.length === rawProposalCount &&
+            (totalCandidateCount === 0 || boundBenchmarkChanges.length > 0) &&
             disaComparisonComplete;
-        if (
-            comparisonMode === "deterministic_fallback" &&
-            totalCandidateCount > 0 &&
-            rawProposalCount === 0
-        ) {
+        if (totalCandidateCount > 0 && boundBenchmarkChanges.length === 0) {
             comparisonMode = "failed";
-            comparisonReason = "The deterministic comparison produced no bindable result for a non-empty candidate set.";
-            comparisonComplete = false;
-        } else if (rawProposalCount > 0 && boundBenchmarkChanges.length === 0) {
-            comparisonMode = "failed";
-            comparisonReason = "No supplemental proposal could be rebound to exact source evidence.";
+            comparisonReason = "No licensed-source candidate produced a source-bound reviewer proposal.";
             comparisonComplete = false;
         } else if (!comparisonComplete) {
             comparisonReason +=
-                ` Compared ${comparedCandidateCount} of ${totalCandidateCount} discovered licensed-source candidate(s) and bound ` +
-                `${boundBenchmarkChanges.length} of ${rawProposalCount} emitted licensed-source proposal(s).` +
+                ` Compared ${comparedCandidateCount} of ${totalCandidateCount} discovered licensed-source candidate(s), ` +
+                `received ${payload.changes.length} AI/fallback emission(s), preserved ${preservationPayload.changes.length} deterministic emission(s), and retained ` +
+                `${boundBenchmarkChanges.length} source-bound proposal(s).` +
                 (!disaComparisonComplete
                     ? ` Compared ${resolvedDisaStigSources.length} of ${expectedDirectDisaSourceCount} pinned public DISA STIG source(s).`
                     : "");
@@ -2368,7 +2438,7 @@ Rules:
             comparedDirectSourceCount: comparedDirectSourceCount + resolvedDisaStigSources.length,
             candidateCount: totalCandidateCount + disaStigChanges.length,
             comparedCandidateCount: comparedCandidateCount + disaStigChanges.length,
-            rawProposalCount: rawProposalCount + disaStigChanges.length,
+            rawProposalCount: boundBenchmarkChanges.length + disaStigChanges.length,
             evidenceBoundProposalCount: boundBenchmarkChanges.length + disaStigChanges.length,
             reason: comparisonReason,
         };
@@ -2390,8 +2460,9 @@ Rules:
         ],
             controls
         ));
+        const fairlyLimitedChanges = fairlyLimitSCSEMProposals(combinedChanges, MAX_UPDATER_CHANGES);
         const validChanges = addIdsToChanges(
-            validateChanges(combinedChanges, controls, MAX_UPDATER_CHANGES)
+            validateChanges(fairlyLimitedChanges, controls, MAX_UPDATER_CHANGES)
         );
 
         const completedAnalysisLease = clearSCSEMAnalysisLease(
@@ -2401,7 +2472,7 @@ Rules:
         updaterSession.status = analysisCoverage.complete ? "review_ready" : "analysis_incomplete";
         updaterSession.summary = [
             compliancePayload.summary,
-            payload.summary || `Supplemental CIS Benchmark/CIS-STIG review generated for ${updaterSession.inferredTechnology}.`,
+            payload.summary || `CIS Benchmark/CIS-STIG strictness review generated for ${updaterSession.inferredTechnology}.`,
             resolvedDisaStigSources.length > 0
                 ? `Compared ${resolvedDisaStigSources.length} exact public DISA STIG source(s) and generated ${disaStigChanges.length} source-bound proposal(s).`
                 : null,

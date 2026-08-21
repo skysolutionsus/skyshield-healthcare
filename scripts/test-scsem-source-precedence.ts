@@ -4,8 +4,10 @@ import * as path from "node:path";
 import {
     annotateSCSEMStrictnessConflicts,
     dedupeSCSEMProposalsPreservingAuthorities,
+    fairlyLimitSCSEMProposals,
     strictnessApprovalErrors,
 } from "../src/lib/scsem-source-precedence";
+import { addIdsToChanges } from "../src/lib/scsem-updater-store";
 
 function proposal(
     id: string,
@@ -100,6 +102,48 @@ function main(): void {
         "one explicitly selected strictness proposal can be approved"
     );
 
+    const addCis = {
+        ...cis,
+        id: "same-id",
+        action: "addControl" as const,
+        testId: "NEW-CIS-5.4.1",
+        field: "newControl",
+        proposedValue: "Require strong password length",
+        newControl: { sectionTitle: "Password length requirement", nistId: "IA-5" },
+    };
+    const addStig = {
+        ...stig,
+        id: "same-id",
+        action: "addControl" as const,
+        testId: "NEW-STIG-SV-123",
+        field: "newControl",
+        proposedValue: "Require stronger password length",
+        newControl: { sectionTitle: "Password length requirement", nistId: "IA-5" },
+    };
+    const annotatedAdds = annotateSCSEMStrictnessConflicts([addCis, addStig]);
+    assert.equal(annotatedAdds[0].sourceEvidence?.strictnessSelectionRequired, true);
+    assert.equal(
+        strictnessApprovalErrors({
+            candidate: annotatedAdds[0],
+            allChanges: annotatedAdds,
+            approvingIds: new Set(["same-id"]),
+        }).length,
+        1,
+        "duplicate client/model IDs must not bypass new-control strictness exclusion"
+    );
+
+    const serverOwned = addIdsToChanges([
+        { ...addCis, status: "APPROVED" },
+        { ...addStig, status: "APPROVED" },
+    ]);
+    assert.notEqual(serverOwned[0].id, serverOwned[1].id);
+    assert.ok(serverOwned.every((change) => change.status === "PENDING"));
+
+    const manyCis = Array.from({ length: 5000 }, (_, index) => ({ ...cis, id: `cis-${index}` }));
+    const fair = fairlyLimitSCSEMProposals([...manyCis, stig], 5000);
+    assert.equal(fair.length, 5000);
+    assert.ok(fair.some((change) => change.id === "stig"), "hard caps must not starve STIG behind CIS proposals");
+
     const routeSource = fs.readFileSync(
         path.join(process.cwd(), "src/app/api/scsem-updater/[id]/analyze/route.ts"),
         "utf8"
@@ -111,6 +155,12 @@ function main(): void {
     );
     assert.match(routeSource, /CIS_LICENSE_NOT_CONFIGURED/);
     assert.match(routeSource, /did not start a partial analysis under the full-source label/);
+    assert.match(routeSource, /License authentication or catalog validation failed, so no partial analysis was started/);
+    assert.ok(
+        routeSource.indexOf("readSCSEMUpdaterSessionForUser(id, user)") < routeSource.indexOf("const token = await getCISToken()") &&
+        routeSource.indexOf("const token = await getCISToken()") < routeSource.indexOf("claimSCSEMAnalysisLease("),
+        "session authorization and live CIS authentication/catalog validation must complete before an analysis lease is claimed"
+    );
 
     console.log("SCSEM source precedence, strictness conflict, CIS fail-closed, and no-redundant-section tests passed.");
 }

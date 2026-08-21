@@ -276,6 +276,43 @@ export function identifyCISProduct(value: string): CISProductIdentity {
         return { family: "aws", productGeneration: null };
     }
 
+    if (/\boracle database\b|\boracle db\b/.test(text)) {
+        return {
+            family: "oracle-database",
+            productGeneration: firstMatch(text, [
+                /\boracle (?:database|db)\s*(\d{1,2}(?:c|ai)?)/,
+            ]),
+        };
+    }
+
+    if (/\bmicrosoft sql server\b|\bsql server\b/.test(text)) {
+        return {
+            family: "microsoft-sql-server",
+            productGeneration: firstMatch(text, [/\bsql server\s*(\d{4})\b/]),
+        };
+    }
+
+    if (/\bmysql\b/.test(text)) {
+        return {
+            family: "mysql",
+            productGeneration: firstMatch(text, [/\bmysql(?:\s+community\s+edition)?\s*(\d+(?:\.\d+)?)\b/]),
+        };
+    }
+
+    if (/\bmongodb\b/.test(text)) {
+        return {
+            family: "mongodb",
+            productGeneration: firstMatch(text, [/\bmongodb\s*(\d+(?:\.\d+)?)\b/]),
+        };
+    }
+
+    if (/\bpostgresql\b/.test(text)) {
+        return {
+            family: "postgresql",
+            productGeneration: firstMatch(text, [/\bpostgresql\s*(\d+(?:\.\d+)?)\b/]),
+        };
+    }
+
     if (/\boracle linux\b/.test(text)) {
         return {
             family: "oracle-linux",
@@ -365,6 +402,21 @@ function matchingScore(technology: string, titleText: string): number {
     if (/\blinux\b/.test(normalizedTechnology) !== /\blinux\b/.test(normalizedTitle)) score -= 20;
 
     return score;
+}
+
+export function isExactCISProductIdentity(query: string, titleText: string): boolean {
+    const queryProduct = identifyCISProduct(query);
+    const candidateProduct = identifyCISProduct(titleText);
+    if (!queryProduct.family || !candidateProduct.family) return false;
+    if (queryProduct.family !== candidateProduct.family) return false;
+    if (queryProduct.productGeneration || candidateProduct.productGeneration) {
+        return Boolean(
+            queryProduct.productGeneration &&
+            candidateProduct.productGeneration &&
+            sameProductGeneration(queryProduct.productGeneration, candidateProduct.productGeneration)
+        );
+    }
+    return matchingScore(query, titleText) === 1000;
 }
 
 function parseVersion(value: string | null | undefined): number[] {

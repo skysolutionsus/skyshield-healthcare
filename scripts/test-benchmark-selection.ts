@@ -11,6 +11,7 @@ import {
 } from "../src/lib/cis-api";
 import {
   identifyCISProduct,
+  isExactCISProductIdentity,
   rankCISBenchmarkCandidatesForTechnology,
   saveCISBenchmarkSnapshot,
 } from "../src/lib/cis-benchmark-xlsx";
@@ -226,6 +227,21 @@ function assertMergedSourcesRemainSheetScoped() {
   );
 }
 
+function assertVersionedDatabaseQueriesStayExact() {
+  const oraclePath = path.join(process.cwd(), "data/scsems/current/safeguards-scsem-oracle.xlsx");
+  const parsed = parseSCSEMFile(oraclePath);
+  const oracle19Queries = scsemBenchmarkQueriesForSheet(
+    "Oracle 19 RDBMS Test Cases",
+    parsed.metadata.subject || "Oracle",
+    parsed
+  );
+  assert.deepEqual(oracle19Queries, ["Oracle Database 19c"]);
+  assert.equal(
+    isExactCISProductIdentity("Oracle Database 19c", "CIS Oracle Database 12c Benchmark v4.0.0"),
+    false
+  );
+}
+
 function assertExactCurrentBenchmarkSurvivesRenumbering() {
   const renumberedProfile = {
     profile: "Level 1 - Member Server",
@@ -234,28 +250,44 @@ function assertExactCurrentBenchmarkSurvivesRenumbering() {
     totalRecommendationCount: 1,
   };
   assert.equal(
-    isCISBenchmarkSelectionAccepted(renumberedProfile, 120, 1000),
+    isExactCISProductIdentity(
+      "Oracle Database 12c",
+      "CIS Oracle Database 12c Benchmark v4.0.0"
+    ),
+    true
+  );
+  assert.equal(
+    isExactCISProductIdentity(
+      "Oracle Database 12c",
+      "CIS Oracle Database 19c Benchmark v2.0.0"
+    ),
+    false,
+    "substring title similarity must not admit Oracle 19c for an Oracle 12c sheet"
+  );
+  assert.equal(
+    isCISBenchmarkSelectionAccepted(renumberedProfile, 120, true),
     true,
     "an exact accepted product/generation benchmark must remain eligible when a new revision renumbers every recommendation"
   );
   assert.equal(
-    isCISBenchmarkSelectionAccepted(renumberedProfile, 0, 1000),
+    isCISBenchmarkSelectionAccepted(renumberedProfile, 0, true),
     true,
     "an exact accepted product/generation benchmark must be eligible to propose the first CIS controls when the SCSEM has no recommendation IDs"
   );
   assert.equal(
-    isCISBenchmarkSelectionAccepted(renumberedProfile, 0, 84),
+    isCISBenchmarkSelectionAccepted(renumberedProfile, 0, false),
     false,
-    "a sheet with no recommendation IDs must not use a merely similar benchmark title"
+    "a sheet with no recommendation IDs must not use a non-exact benchmark identity"
   );
   assert.equal(
-    isCISBenchmarkSelectionAccepted(renumberedProfile, 120, 84),
+    isCISBenchmarkSelectionAccepted(renumberedProfile, 120, false),
     false,
-    "a merely similar title still requires material recommendation overlap"
+    "a non-exact product identity still requires material recommendation overlap"
   );
 }
 
 async function main() {
+  assertVersionedDatabaseQueriesStayExact();
   assertExactCurrentBenchmarkSurvivesRenumbering();
   assertDb2VersionTabsStayIndependent();
   assertMergedSourcesRemainSheetScoped();

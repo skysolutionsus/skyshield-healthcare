@@ -8,13 +8,25 @@ function text(value: unknown): string {
     return typeof value === "string" ? value.trim() : value === null || value === undefined ? "" : String(value);
 }
 
+function semanticNewControlIdentity(change: SCSEMProposalLike): string {
+    const newControl = change.newControl || {};
+    const nistId = text(newControl.nistId).toUpperCase().replace(/\s+/g, "");
+    const title = text(newControl.sectionTitle || change.proposedValue)
+        .toLowerCase()
+        .replace(/\b(?:cis|disa|stig|benchmark|recommendation|review|applicable|ensure|that|the|a|an)\b/g, " ")
+        .replace(/[^a-z0-9]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    return `nist:${nistId || "none"}|title:${title}`;
+}
+
 function proposalTargetKey(change: SCSEMProposalLike): string {
-    return [
-        change.action || "updateField",
-        change.targetSheet || text(change.sourceEvidence?.sourceSheet),
-        change.testId || "",
-        change.field || "",
-    ].join("|");
+    const action = change.action || "updateField";
+    const targetSheet = change.targetSheet || text(change.sourceEvidence?.sourceSheet);
+    if (action === "addControl") {
+        return [action, targetSheet, semanticNewControlIdentity(change), "newControl"].join("|");
+    }
+    return [action, targetSheet, change.testId || "", change.field || ""].join("|");
 }
 
 export function scsemProposalSourceLabel(change: SCSEMProposalLike): string {
@@ -79,7 +91,6 @@ export function dedupeSCSEMProposalsPreservingAuthorities<T extends SCSEMProposa
 export function annotateSCSEMStrictnessConflicts<T extends SCSEMProposalLike>(changes: T[]): T[] {
     const groups = new Map<string, T[]>();
     for (const change of changes) {
-        if (change.action === "addControl") continue;
         const key = proposalTargetKey(change);
         groups.set(key, [...(groups.get(key) || []), change]);
     }
@@ -88,7 +99,10 @@ export function annotateSCSEMStrictnessConflicts<T extends SCSEMProposalLike>(ch
     for (const [key, group] of groups) {
         const values = new Set(group.map((change) => text(change.proposedValue).toLowerCase()).filter(Boolean));
         const labels = [...new Set(group.map(scsemProposalSourceLabel))];
-        if (values.size > 1 && labels.length > 1) conflicting.set(key, { labels, count: group.length });
+        const newControlConflict = group.some((change) => change.action === "addControl") && labels.length > 1;
+        if ((values.size > 1 && labels.length > 1) || newControlConflict) {
+            conflicting.set(key, { labels, count: group.length });
+        }
     }
 
     return changes.map((change) => {
@@ -124,13 +138,51 @@ export function strictnessApprovalErrors({
 }): string[] {
     const groupId = text(candidate.sourceEvidence?.strictnessGroupId);
     if (!groupId) return [];
-    const conflicts = allChanges.filter((change) =>
-        text(change.sourceEvidence?.strictnessGroupId) === groupId && change.id !== candidate.id
-    );
+    const candidateIdentity = proposalSourceIdentity(candidate);
+    let skippedCandidate = false;
+    const conflicts = allChanges.filter((change) => {
+        if (text(change.sourceEvidence?.strictnessGroupId) !== groupId) return false;
+        const isCandidate = !skippedCandidate &&
+            proposalSourceIdentity(change) === candidateIdentity &&
+            text(change.proposedValue) === text(candidate.proposedValue);
+        if (isCandidate) {
+            skippedCandidate = true;
+            return false;
+        }
+        return true;
+    });
     const simultaneouslyApproved = conflicts.some((change) => approvingIds.has(text(change.id)));
     const previouslyApproved = conflicts.some((change) => change.status === "APPROVED");
     if (!simultaneouslyApproved && !previouslyApproved) return [];
     return [
-        "Competing source proposals for the same SCSEM cell are mutually exclusive; approve only the strictest applicable control after reviewing CIS, STIG, and Publication 1075 evidence",
+        "Competing source proposals for the same SCSEM control are mutually exclusive; approve only the strictest applicable control after reviewing CIS, STIG, and Publication 1075 evidence",
     ];
+}
+
+/** Round-robin authority classes before applying a hard proposal cap. */
+export function fairlyLimitSCSEMProposals<T extends SCSEMProposalLike>(changes: T[], limit: number): T[] {
+    if (limit <= 0) return [];
+    if (changes.length <= limit) return changes;
+    const buckets = new Map<string, T[]>();
+    for (const change of changes) {
+        const label = scsemProposalSourceLabel(change);
+        buckets.set(label, [...(buckets.get(label) || []), change]);
+    }
+    const labels = [...buckets.keys()];
+    const indexes = new Map(labels.map((label) => [label, 0]));
+    const selected: T[] = [];
+    while (selected.length < limit) {
+        let added = false;
+        for (const label of labels) {
+            if (selected.length >= limit) break;
+            const index = indexes.get(label) || 0;
+            const candidate = buckets.get(label)?.[index];
+            if (!candidate) continue;
+            selected.push(candidate);
+            indexes.set(label, index + 1);
+            added = true;
+        }
+        if (!added) break;
+    }
+    return selected;
 }

@@ -1381,7 +1381,7 @@ function SourceEvidencePanel({ change }: { change: UpdaterChange }) {
         ["Competing authorities", Array.isArray(evidence.competingAuthorities) ? evidence.competingAuthorities.join(", ") : sourceEvidenceText(evidence, "competingAuthorities")],
         ["Target sheet", change.targetSheet || sourceEvidenceText(evidence, "sourceSheet")],
         ["Pub 1075", sourceEvidenceText(evidence, "pub1075Version")],
-        ["NIST fallback", sourceEvidenceText(evidence, "nistVersion")],
+        ["NIST mapping / assessment", sourceEvidenceText(evidence, "nistVersion")],
     ].filter(([, value]) => Boolean(value));
 
     if (rows.length === 0) return null;
