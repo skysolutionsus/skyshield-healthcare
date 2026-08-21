@@ -42,6 +42,7 @@ export interface ResolveSCSEMBenchmarkSourcesInput {
 export type BenchmarkCandidateResolutionOutcome =
     | "accepted"
     | "download_failed"
+    | "parse_failed"
     | "no_profile"
     | "insufficient_control_overlap";
 
@@ -78,7 +79,9 @@ export function hasUnavailableApplicableBenchmarkQuery(
     diagnostics: BenchmarkQueryResolutionDiagnostic[]
 ): boolean {
     return diagnostics.some((diagnostic) =>
-        diagnostic.candidateAttempts.some((attempt) => attempt.outcome === "download_failed") &&
+        diagnostic.candidateAttempts.some((attempt) =>
+            attempt.outcome === "download_failed" || attempt.outcome === "parse_failed"
+        ) &&
         !diagnostic.candidateAttempts.some((attempt) => attempt.outcome === "accepted")
     );
 }
@@ -552,6 +555,15 @@ async function evaluateQuery({
                 ...attemptBase,
                 outcome: "download_failed",
                 reason: scsemBenchmarkCandidateFailureReason(error),
+            });
+            continue;
+        }
+
+        if (downloaded.recommendations.length === 0) {
+            candidateAttempts.push({
+                ...attemptBase,
+                outcome: "parse_failed",
+                reason: "downloaded workbook contained no parseable benchmark recommendations",
             });
             continue;
         }

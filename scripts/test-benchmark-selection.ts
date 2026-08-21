@@ -330,6 +330,13 @@ function assertExactCurrentBenchmarkSurvivesRenumbering() {
     query: failedAttempt.query,
     sheetName: failedAttempt.sheetName,
     catalogCandidates: [],
+    candidateAttempts: [{ ...failedAttempt, outcome: "parse_failed", reason: "no parseable recommendations" }],
+  }]), true, "a schema/parse failure must fail closed just like a download failure");
+  assert.equal(hasUnavailableApplicableBenchmarkQuery([{
+    kind: "CIS",
+    query: failedAttempt.query,
+    sheetName: failedAttempt.sheetName,
+    catalogCandidates: [],
     candidateAttempts: [failedAttempt, { ...failedAttempt, outcome: "accepted", reason: "accepted" }],
   }]), false, "an accepted fallback candidate resolves the query-level availability blocker");
 }
