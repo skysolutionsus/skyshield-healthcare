@@ -895,6 +895,52 @@ export function SCSEMUpdater() {
                             SkyShield parses every listed test-case tab. Compliance batches retain the exact source tab, and full reviews resolve CIS WorkBench candidates independently for each version/provider tab.
                         </p>
                     </div>
+                    {session.audit.issueCodeAudit && (
+                        <div className={`mt-3 rounded-lg border px-3 py-3 ${session.audit.issueCodeAudit.complete
+                            ? "border-emerald-500/25 bg-emerald-500/10"
+                            : "border-amber-500/30 bg-amber-500/10"
+                            }`}>
+                            <div className="flex items-start gap-3">
+                                {session.audit.issueCodeAudit.complete
+                                    ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+                                    : <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />}
+                                <div className="min-w-0 flex-1">
+                                    <p className={`text-sm font-semibold ${session.audit.issueCodeAudit.complete ? "text-emerald-100" : "text-amber-100"}`}>
+                                        Issue Code Table cross-check {session.audit.issueCodeAudit.complete ? "passed" : "needs review"}
+                                    </p>
+                                    <p className={`mt-1 text-xs leading-5 ${session.audit.issueCodeAudit.complete ? "text-emerald-100/80" : "text-amber-100/80"}`}>
+                                        Checked {session.audit.issueCodeAudit.issueCodeReferences} issue-code reference(s) across {session.audit.issueCodeAudit.testCaseRows} test case(s) against {session.audit.issueCodeAudit.issueCodeTableEntries} entries in this workbook&apos;s Issue Code Table.
+                                        {session.audit.issueCodeAudit.complete
+                                            ? " Every assigned code exists in the table."
+                                            : ` Found ${session.audit.issueCodeAudit.errorCount} ${session.audit.issueCodeAudit.errorCount === 1 ? "discrepancy" : "discrepancies"}. Existing controls were not changed automatically.`}
+                                    </p>
+                                    {!session.audit.issueCodeAudit.complete && (
+                                        <details className="mt-3">
+                                            <summary className="cursor-pointer text-xs font-semibold text-amber-100 hover:text-white">
+                                                Review discrepancy locations
+                                            </summary>
+                                            <div className="mt-2 space-y-2">
+                                                {session.audit.issueCodeAudit.findings.map((finding, index) => (
+                                                    <div
+                                                        key={`${finding.sheetName}-${finding.row}-${finding.issueCode || "blank"}-${index}`}
+                                                        className="rounded border border-amber-500/20 bg-black/10 px-2.5 py-2 text-xs leading-5 text-amber-50"
+                                                    >
+                                                        <span className="font-semibold">{finding.sheetName}!{finding.row} · {finding.testId}</span>
+                                                        {` — ${finding.message}`}
+                                                    </div>
+                                                ))}
+                                                {session.audit.issueCodeAudit.truncatedFindingCount > 0 && (
+                                                    <p className="text-xs text-amber-100/75">
+                                                        {session.audit.issueCodeAudit.truncatedFindingCount} additional discrepancy record(s) are included in the aggregate count but omitted from this bounded view.
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </details>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     {session.status === "analyzing" && (
                         <div
                             role={staleAnalysisRecoverable ? "alert" : "status"}

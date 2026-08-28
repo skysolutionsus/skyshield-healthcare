@@ -8,6 +8,10 @@ import {
     boundedStoredSCSEMBenchmarkAttemptReason,
     boundedStoredSCSEMBenchmarkNarrative,
 } from "@/lib/scsem-benchmark-failure";
+import type {
+    SCSEMIssueCodeAudit,
+    SCSEMIssueCodeAuditFinding,
+} from "@/lib/scsem-issue-codes";
 
 type ClientEvidenceValue = string | number | boolean | null | string[];
 
@@ -79,6 +83,29 @@ export type SCSEMUpdaterClientDisaStigSource = Pick<
     | "error"
 >;
 
+export type SCSEMUpdaterClientIssueCodeAudit = Pick<
+    SCSEMIssueCodeAudit,
+    | "complete"
+    | "issueCodeTableEntries"
+    | "testCaseRows"
+    | "rowsWithIssueCodes"
+    | "issueCodeReferences"
+    | "validIssueCodeReferences"
+    | "errorCount"
+    | "truncatedFindingCount"
+> & {
+    findings: Array<Pick<
+        SCSEMIssueCodeAuditFinding,
+        | "severity"
+        | "kind"
+        | "sheetName"
+        | "row"
+        | "testId"
+        | "issueCode"
+        | "message"
+    >>;
+};
+
 export interface SCSEMUpdaterClientSession {
     id: string;
     revision: number;
@@ -122,6 +149,7 @@ export interface SCSEMUpdaterClientSession {
         };
         benchmarkLookupError?: string;
         benchmarkLookupErrorCode?: string;
+        issueCodeAudit?: SCSEMUpdaterClientIssueCodeAudit;
         supplementalComparison?: {
             mode: "ai" | "deterministic_fallback" | "no_delta" | "not_requested" | "failed";
             complete: boolean;
@@ -398,6 +426,29 @@ export function clientSafeSCSEMUpdaterSession(
                 : {}),
             ...(session.audit.benchmarkLookupErrorCode !== undefined
                 ? { benchmarkLookupErrorCode: session.audit.benchmarkLookupErrorCode }
+                : {}),
+            ...(session.audit.issueCodeAudit !== undefined
+                ? {
+                    issueCodeAudit: {
+                        complete: session.audit.issueCodeAudit.complete,
+                        issueCodeTableEntries: session.audit.issueCodeAudit.issueCodeTableEntries,
+                        testCaseRows: session.audit.issueCodeAudit.testCaseRows,
+                        rowsWithIssueCodes: session.audit.issueCodeAudit.rowsWithIssueCodes,
+                        issueCodeReferences: session.audit.issueCodeAudit.issueCodeReferences,
+                        validIssueCodeReferences: session.audit.issueCodeAudit.validIssueCodeReferences,
+                        errorCount: session.audit.issueCodeAudit.errorCount,
+                        findings: session.audit.issueCodeAudit.findings.map((finding) => ({
+                            severity: finding.severity,
+                            kind: finding.kind,
+                            sheetName: finding.sheetName,
+                            row: finding.row,
+                            testId: finding.testId,
+                            issueCode: finding.issueCode,
+                            message: finding.message,
+                        })),
+                        truncatedFindingCount: session.audit.issueCodeAudit.truncatedFindingCount,
+                    },
+                }
                 : {}),
             ...(session.audit.supplementalComparison !== undefined
                 ? {

@@ -17,6 +17,10 @@ import type {
     SCSEMSupplementalComparison,
 } from "@/lib/scsem-analysis-coverage";
 import {
+    auditSCSEMIssueCodesFile,
+    type SCSEMIssueCodeAudit,
+} from "@/lib/scsem-issue-codes";
+import {
     resolveRuntimeFilePath,
     runtimeDataDir,
     storedPathForRuntimeFile,
@@ -262,6 +266,7 @@ export interface SCSEMUpdaterSession {
         nistSourceSha256?: string;
         nistSnapshotSha256?: string;
         nistAssessmentControlCount?: number;
+        issueCodeAudit?: SCSEMIssueCodeAudit;
         analysisCoverage?: SCSEMAnalysisCoverage;
         supplementalComparison?: SCSEMSupplementalComparison;
         complianceCoverage?: {
@@ -927,12 +932,19 @@ export function resolveUpdaterPath(storedPath: string): string {
     return resolveRuntimeFilePath(storedPath);
 }
 
-function parseUploadedSCSEMBuffer(originalFileName: string, workbookBuffer: Buffer): ParsedSCSEM {
+function inspectUploadedSCSEMBuffer(
+    originalFileName: string,
+    workbookBuffer: Buffer
+): { parsed: ParsedSCSEM; issueCodeAudit: SCSEMIssueCodeAudit } {
     const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "skyshield-scsem-parse-"));
     const temporaryPath = path.join(temporaryDirectory, safeFileName(originalFileName));
     try {
         fs.writeFileSync(temporaryPath, workbookBuffer, { mode: 0o600 });
-        return parseSCSEMFile(temporaryPath);
+        const parsed = parseSCSEMFile(temporaryPath);
+        return {
+            parsed,
+            issueCodeAudit: auditSCSEMIssueCodesFile(temporaryPath, parsed),
+        };
     } finally {
         fs.rmSync(temporaryDirectory, { recursive: true, force: true });
     }
@@ -1134,7 +1146,10 @@ async function createSCSEMUpdaterSessionWithPersistence(
     const dir = sessionDir(id);
     const fileName = safeFileName(originalFileName);
     const absoluteFilePath = path.join(dir, fileName);
-    const parsed = parseUploadedSCSEMBuffer(originalFileName, workbookBuffer);
+    const { parsed, issueCodeAudit } = inspectUploadedSCSEMBuffer(
+        originalFileName,
+        workbookBuffer
+    );
     const technologyInference = officialSource
         ? inferOfficialSCSEMTechnologyDetails(officialSource, parsed)
         : inferSCSEMTechnologyDetails(
@@ -1172,6 +1187,7 @@ async function createSCSEMUpdaterSessionWithPersistence(
         audit: {
             uploadedSha256: sha256(workbookBuffer),
             uploadedSizeBytes: workbookBuffer.length,
+            issueCodeAudit,
             ...(officialSource ? { officialSource } : {}),
             ...(admission?.structuralAdmission
                 ? { structuralAdmission: admission.structuralAdmission }

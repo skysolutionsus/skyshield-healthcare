@@ -1,11 +1,16 @@
 import * as fs from "node:fs";
 import * as XLSX from "xlsx";
+import {
+    SCSEM_SHEET_ROW_LIMIT,
+    type ParsedSCSEM,
+} from "@/lib/xlsx-parser";
 
 XLSX.set_fs(fs);
 
 const ISSUE_CODE_SHEET = "Issue Code Table";
 const ISSUE_CODE_PATTERN = /^[A-Z]{2,5}\d+$/;
 const MAX_SELECTED_ISSUE_CODES = 10;
+const MAX_AUDIT_FINDINGS = 100;
 
 export interface SCSEMIssueCodeEntry {
     code: string;
@@ -18,6 +23,35 @@ export interface SCSEMIssueCodeSelection {
     issueCode: string;
     issueCodeDescription: string;
     entries: SCSEMIssueCodeEntry[];
+}
+
+export type SCSEMIssueCodeAuditFindingKind =
+    | "scan_limit_reached"
+    | "missing_assignment"
+    | "malformed_code"
+    | "duplicate_code"
+    | "code_not_in_table";
+
+export interface SCSEMIssueCodeAuditFinding {
+    severity: "error";
+    kind: SCSEMIssueCodeAuditFindingKind;
+    sheetName: string;
+    row: number;
+    testId: string;
+    issueCode: string | null;
+    message: string;
+}
+
+export interface SCSEMIssueCodeAudit {
+    complete: boolean;
+    issueCodeTableEntries: number;
+    testCaseRows: number;
+    rowsWithIssueCodes: number;
+    issueCodeReferences: number;
+    validIssueCodeReferences: number;
+    errorCount: number;
+    findings: SCSEMIssueCodeAuditFinding[];
+    truncatedFindingCount: number;
 }
 
 export class SCSEMIssueCodeError extends Error {
@@ -119,6 +153,137 @@ export function readSCSEMIssueCodeCatalog(
     return readSCSEMIssueCodeCatalogFromWorkbook(
         XLSX.readFile(filePath, { cellFormula: true, cellDates: false })
     );
+}
+
+/**
+ * Cross-check every existing Test Cases issue-code assignment against the
+ * exact Issue Code Table embedded in the same workbook. This is deliberately
+ * read-only: source defects remain reviewer-visible evidence and are never
+ * silently repaired or used to rewrite a Government workbook.
+ */
+export function auditSCSEMIssueCodes(
+    parsed: Pick<ParsedSCSEM, "sheets">,
+    catalog: ReadonlyMap<string, SCSEMIssueCodeEntry>
+): SCSEMIssueCodeAudit {
+    const findings: SCSEMIssueCodeAuditFinding[] = [];
+    let testCaseRows = 0;
+    let rowsWithIssueCodes = 0;
+    let issueCodeReferences = 0;
+    let validIssueCodeReferences = 0;
+    let errorCount = 0;
+
+    const recordFinding = (finding: SCSEMIssueCodeAuditFinding) => {
+        errorCount++;
+        if (findings.length < MAX_AUDIT_FINDINGS) findings.push(finding);
+    };
+
+    for (const sheet of parsed.sheets.filter((candidate) => candidate.sheetType === "test_cases")) {
+        if ((sheet.rawData?.length || 0) >= SCSEM_SHEET_ROW_LIMIT) {
+            recordFinding({
+                severity: "error",
+                kind: "scan_limit_reached",
+                sheetName: sheet.sheetName,
+                row: SCSEM_SHEET_ROW_LIMIT,
+                testId: "(sheet scan)",
+                issueCode: null,
+                message:
+                    `${sheet.sheetName} reached SkyShield's ${SCSEM_SHEET_ROW_LIMIT.toLocaleString("en-US")}-row parser safety limit, so issue-code assignments beyond that boundary cannot be certified.`,
+            });
+        }
+        for (const control of sheet.controls) {
+            testCaseRows++;
+            const excelRow = control.rowIndex + 1;
+            const rawSelection = control.issueCode?.trim() || "";
+            if (!rawSelection) {
+                recordFinding({
+                    severity: "error",
+                    kind: "missing_assignment",
+                    sheetName: sheet.sheetName,
+                    row: excelRow,
+                    testId: control.testId,
+                    issueCode: null,
+                    message: `${control.testId} has no issue-code assignment.`,
+                });
+                continue;
+            }
+
+            rowsWithIssueCodes++;
+            const rowCodes = rawSelection
+                .split(/\r?\n/)
+                .map((code) => code.trim().toUpperCase())
+                .filter(Boolean);
+            const seen = new Set<string>();
+
+            for (const code of rowCodes) {
+                issueCodeReferences++;
+                if (seen.has(code)) {
+                    recordFinding({
+                        severity: "error",
+                        kind: "duplicate_code",
+                        sheetName: sheet.sheetName,
+                        row: excelRow,
+                        testId: control.testId,
+                        issueCode: code,
+                        message: `${control.testId} assigns issue code ${code} more than once.`,
+                    });
+                    continue;
+                }
+                seen.add(code);
+
+                if (!ISSUE_CODE_PATTERN.test(code)) {
+                    recordFinding({
+                        severity: "error",
+                        kind: "malformed_code",
+                        sheetName: sheet.sheetName,
+                        row: excelRow,
+                        testId: control.testId,
+                        issueCode: code,
+                        message: `${control.testId} uses ${code}, which is not in the expected IRS issue-code format.`,
+                    });
+                    continue;
+                }
+                if (!catalog.has(code)) {
+                    recordFinding({
+                        severity: "error",
+                        kind: "code_not_in_table",
+                        sheetName: sheet.sheetName,
+                        row: excelRow,
+                        testId: control.testId,
+                        issueCode: code,
+                        message: `${control.testId} uses ${code}, but ${code} is not present in this workbook's Issue Code Table.`,
+                    });
+                    continue;
+                }
+                validIssueCodeReferences++;
+            }
+        }
+    }
+
+    return {
+        complete: errorCount === 0,
+        issueCodeTableEntries: catalog.size,
+        testCaseRows,
+        rowsWithIssueCodes,
+        issueCodeReferences,
+        validIssueCodeReferences,
+        errorCount,
+        findings,
+        truncatedFindingCount: Math.max(0, errorCount - findings.length),
+    };
+}
+
+export function auditSCSEMIssueCodesFromWorkbook(
+    parsed: Pick<ParsedSCSEM, "sheets">,
+    workbook: XLSX.WorkBook
+): SCSEMIssueCodeAudit {
+    return auditSCSEMIssueCodes(parsed, readSCSEMIssueCodeCatalogFromWorkbook(workbook));
+}
+
+export function auditSCSEMIssueCodesFile(
+    filePath: string,
+    parsed: Pick<ParsedSCSEM, "sheets">
+): SCSEMIssueCodeAudit {
+    return auditSCSEMIssueCodes(parsed, readSCSEMIssueCodeCatalog(filePath));
 }
 
 export function resolveSCSEMIssueCodeSelection(

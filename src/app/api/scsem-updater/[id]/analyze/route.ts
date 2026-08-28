@@ -85,6 +85,7 @@ import {
     type SCSEMSupplementalComparison,
     type SCSEMSupplementalComparisonMode,
 } from "@/lib/scsem-analysis-coverage";
+import { auditSCSEMIssueCodesFile } from "@/lib/scsem-issue-codes";
 
 export const runtime = "nodejs";
 
@@ -1576,6 +1577,7 @@ export async function POST(
         const parsed = officialReference?.selectedAsBase
             ? parseSCSEMFile(verifiedBase.absolutePath)
             : uploadedParsed;
+        const issueCodeAudit = auditSCSEMIssueCodesFile(verifiedBase.absolutePath, parsed);
         const controls = controlsFromParsedSCSEM(parsed);
         if (controls.length === 0) {
             throw new Error("No SCSEM test case controls were found in the uploaded workbook.");
@@ -1820,6 +1822,7 @@ export async function POST(
             nistSourceSha256: compliance.nist.sourceSha256,
             nistSnapshotSha256: compliance.nist.snapshotSha256,
             nistAssessmentControlCount: compliance.nist.assessmentControlIds.length,
+            issueCodeAudit,
             complianceCoverage: {
                 requested: compliance.requestedControlIds.length,
                 pub1075: compliance.pub1075.controlIds.length,

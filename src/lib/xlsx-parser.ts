@@ -10,6 +10,8 @@ import {
 
 XLSX.set_fs(fs);
 
+export const SCSEM_SHEET_ROW_LIMIT = 10_000;
+
 export interface ParsedSheet {
     sheetName: string;
     sheetType: 'test_cases' | 'dashboard' | 'results' | 'instructions' | 'changelog' | 'appendix' | 'issue_codes' | 'other';
@@ -402,7 +404,7 @@ export function parseSCSEMFile(filePath: string): ParsedSCSEM {
     // coordinates for every supported template.
     const sourceBuffer = fs.readFileSync(fullPath);
     const workbookSha256 = createHash('sha256').update(sourceBuffer).digest('hex');
-    const wb = XLSX.read(sourceBuffer, { sheetRows: 10_000 });
+    const wb = XLSX.read(sourceBuffer, { sheetRows: SCSEM_SHEET_ROW_LIMIT });
     const workbookSheetNamesSignature = scsemWorkbookSheetNamesSignature(wb.SheetNames);
     const sheets: ParsedSheet[] = [];
     let totalControls = 0;
