@@ -28,6 +28,8 @@ assert.equal(files.length, 60, "Expected the 60 pinned individual IRS SCSEM file
 let auditedTestCaseRows = 0;
 let auditedIssueCodeReferences = 0;
 let surfacedCorpusDiscrepancies = 0;
+const corpusDiscrepancyKeys: string[] = [];
+let cleanCorpusWorkbooks = 0;
 let fixtureParsed: ParsedSCSEM | null = null;
 let fixtureCatalog: ReturnType<typeof readSCSEMIssueCodeCatalog> | null = null;
 
@@ -46,6 +48,19 @@ for (const fileName of files) {
     auditedTestCaseRows += audit.testCaseRows;
     auditedIssueCodeReferences += audit.issueCodeReferences;
     surfacedCorpusDiscrepancies += audit.errorCount;
+    if (audit.complete) {
+        cleanCorpusWorkbooks += 1;
+    }
+    for (const finding of audit.findings) {
+        corpusDiscrepancyKeys.push([
+            fileName,
+            finding.sheetName.trim(),
+            finding.row,
+            finding.testId,
+            finding.issueCode || "",
+            finding.kind,
+        ].join("|"));
+    }
     if (!fixtureParsed) {
         fixtureParsed = parsed;
         fixtureCatalog = catalog;
@@ -77,6 +92,18 @@ for (const fileName of files) {
         (error: unknown) => error instanceof SCSEMIssueCodeError && /format/i.test(error.message)
     );
 }
+
+assert.equal(auditedTestCaseRows, 11_055, "Pinned corpus Test Cases row count changed");
+assert.equal(auditedIssueCodeReferences, 12_183, "Pinned corpus issue-code reference count changed");
+assert.equal(cleanCorpusWorkbooks, 57, "Expected 57 pinned workbooks with clean Issue Code cross-checks");
+assert.deepEqual(corpusDiscrepancyKeys.sort(), [
+    "safeguards-scsem-db2-luw-zos.xlsx|DB2 v13 for z_OS Test Cases|13|DB2v13z_OS-11|HCA64|code_not_in_table",
+    "safeguards-scsem-db2-luw-zos.xlsx|DB2 v13 for z_OS Test Cases|13|DB2v13z_OS-11|HCA65|code_not_in_table",
+    "safeguards-scsem-db2-luw-zos.xlsx|DB2 v13 for z_OS Test Cases|13|DB2v13z_OS-11|HCA66|code_not_in_table",
+    "safeguards-scsem-gentax.xlsx|GenTax 10 and 11|19|FASTAPP-17|HTCM2|code_not_in_table",
+    "safeguards-scsem-gentax.xlsx|GenTax 10 and 11|8|FASTAPP-6|HTCM2|code_not_in_table",
+    "safeguards-scsem-mot-v6-2.xlsx|MOT|78|MOT-49|HIR2|duplicate_code",
+].sort(), "Pinned corpus Issue Code discrepancies changed");
 
 assert.ok(fixtureParsed && fixtureCatalog, "Expected an SCSEM fixture for issue-code audit tests");
 const fixtureSheet = fixtureParsed.sheets.find((sheet) => sheet.sheetType === "test_cases");
