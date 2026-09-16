@@ -152,6 +152,15 @@ export interface SCSEMUpdaterNewControl {
     remediationProcedure?: string | null;
 }
 
+export interface SCSEMGeneratorReviewerEvidence {
+    expectedResultsSourceQuote: string;
+    expectedResultsRationale: string;
+    applicabilityRationale: string;
+    policyEvidenceSha256: string;
+    reviewedBy?: string;
+    reviewedAt?: string;
+}
+
 export interface SCSEMUpdaterChange {
     id: string;
     status: SCSEMUpdaterChangeStatus;
@@ -164,6 +173,7 @@ export interface SCSEMUpdaterChange {
     confidence?: string;
     targetSheet?: string;
     sourceEvidence?: Record<string, unknown> | null;
+    reviewerEvidence?: SCSEMGeneratorReviewerEvidence;
     newControl?: SCSEMUpdaterNewControl;
 }
 

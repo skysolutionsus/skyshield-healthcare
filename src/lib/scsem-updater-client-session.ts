@@ -27,6 +27,7 @@ export type SCSEMUpdaterClientChange = Pick<
     | "reason"
     | "confidence"
     | "targetSheet"
+    | "reviewerEvidence"
 > & {
     sourceEvidence?: Record<string, ClientEvidenceValue> | null;
     newControl?: {
@@ -228,6 +229,13 @@ const SOURCE_EVIDENCE_KEYS = [
     "adjacentSourceCategory",
     "applicabilityRationale",
     "sourceSheet",
+    "sourceRow",
+    "sourceSha256",
+    "sourceBenchmarkVersion",
+    "sourceAudit",
+    "sourceRemediation",
+    "sourceDescription",
+    "bootstrapDraft",
     "pub1075Version",
     "nistVersion",
     "sourceKind",
@@ -282,6 +290,7 @@ function clientChange(change: SCSEMUpdaterChange): SCSEMUpdaterClientChange {
         reason: change.reason,
         ...(change.confidence !== undefined ? { confidence: change.confidence } : {}),
         ...(change.targetSheet !== undefined ? { targetSheet: change.targetSheet } : {}),
+        ...(change.reviewerEvidence ? { reviewerEvidence: { ...change.reviewerEvidence } } : {}),
         ...(change.sourceEvidence !== undefined
             ? { sourceEvidence: clientSourceEvidence(change.sourceEvidence) }
             : {}),

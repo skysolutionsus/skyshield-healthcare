@@ -13,10 +13,11 @@ import { parseSCSEMFile } from "../src/lib/xlsx-parser";
 import { readSCSEMIssueCodeCatalog } from "../src/lib/scsem-issue-codes";
 import { addIdsToChanges, type SCSEMUpdaterSession } from "../src/lib/scsem-updater-store";
 import { buildSCSEMUpdaterWorkbookBuffer } from "../src/lib/scsem-workbook-export";
+import { resolveGeneratorPolicyEvidence } from "../src/lib/scsem-generator-evidence";
 import type { CISBenchmarkRecommendation } from "../src/lib/cis-benchmark-xlsx";
 
 async function main() {
-    const blank = buildCISBootstrapBlankWorkbook("IBM Db2 11", "2.0.0", 2);
+    const blank = await buildCISBootstrapBlankWorkbook("IBM Db2 11", "2.0.0", 2);
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "skyshield-cis-bootstrap-"));
     const blankPath = path.join(tempDir, "db2-cis-working-draft.xlsx");
     const outputPath = path.join(tempDir, "db2-cis-candidate.xlsx");
@@ -70,11 +71,14 @@ async function main() {
             benchmarkTitle: "CIS IBM Db2 11 Benchmark",
             benchmarkVersion: "2.0.0",
             profile: "Level 1",
+            sourceSha256: "a".repeat(64), // explicitly synthetic artifact identity
         }));
         for (const change of changes) {
             change.status = "APPROVED";
             change.newControl = {
                 ...change.newControl,
+                expectedResults: "Synthetic test-only reviewer criterion: approved secure setting is enabled.",
+                criticality: "Moderate", // synthetic reviewer choice, not a generator default
                 nistId: "CM-6",
                 nistControlName: "Configuration Settings",
                 issueCode,
@@ -117,6 +121,13 @@ async function main() {
             },
         };
 
+        await assert.rejects(() => buildSCSEMUpdaterWorkbookBuffer(session, parsed, blankPath), /reviewerEvidence|provenance/, "core exporter must reject generator approvals with no evidence, including old sessions");
+        for (const change of changes) change.reviewerEvidence = {
+            expectedResultsSourceQuote: "Apply the approved secure setting.",
+            expectedResultsRationale: "Synthetic test-only reviewer criterion, not licensed content or an actual compliance determination.",
+            applicabilityRationale: "Synthetic configuration-setting fixture exercising the evidence contract only.",
+            policyEvidenceSha256: resolveGeneratorPolicyEvidence("CM-6").sha256,
+        };
         const output = await buildSCSEMUpdaterWorkbookBuffer(
             session,
             parsed,
@@ -136,7 +147,7 @@ async function main() {
         );
         assert.equal(target?.controls[0].issueCode, issueCode);
 
-        const workbook = XLSX.read(output, { type: "buffer", cellFormula: true });
+        const workbook = XLSX.read(output, { type: "buffer", cellFormula: true, sheetStubs: true });
         const sheet = workbook.Sheets[CIS_BOOTSTRAP_TARGET_SHEET];
         const formulaCells = Object.keys(sheet).filter((address) =>
             !address.startsWith("!") && typeof sheet[address]?.f === "string"

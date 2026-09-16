@@ -25,5 +25,6 @@ export function scsemUpdaterAuditChange(change: SCSEMUpdaterChange) {
         reason: truncate(change.reason, 1_200),
         newControl: change.newControl ? { ...change.newControl } : null,
         sourceEvidence: change.sourceEvidence || null,
+        ...(change.reviewerEvidence ? { reviewerEvidence: { ...change.reviewerEvidence } } : {}),
     };
 }

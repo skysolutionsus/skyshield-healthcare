@@ -145,6 +145,12 @@ export async function POST(request: Request) {
         const recommendations = downloaded.recommendations.filter(
             (recommendation) => recommendation.profile === selectedProfile
         );
+        if (recommendations.length > 5000) {
+            return NextResponse.json({
+                error: "This profile exceeds the 5000-recommendation bootstrap limit. No session was created; select a smaller profile.",
+                code: "CIS_BOOTSTRAP_TOO_MANY_RECOMMENDATIONS",
+            }, { status: 422 });
+        }
         const technology = benchmarkTechnology(benchmark.benchmarkTitle);
         if (!technology) {
             return NextResponse.json({
@@ -153,7 +159,7 @@ export async function POST(request: Request) {
             }, { status: 422 });
         }
 
-        const blank = buildCISBootstrapBlankWorkbook(
+        const blank = await buildCISBootstrapBlankWorkbook(
             technology,
             benchmark.benchmarkVersion,
             recommendations.length
@@ -186,6 +192,7 @@ export async function POST(request: Request) {
             benchmarkTitle: benchmark.benchmarkTitle,
             benchmarkVersion: benchmark.benchmarkVersion,
             profile: selectedProfile,
+            sourceSha256: downloaded.snapshot.sha256,
         }));
         created.workspaceMode = "cis_bootstrap";
         created.analysisScope = "full";

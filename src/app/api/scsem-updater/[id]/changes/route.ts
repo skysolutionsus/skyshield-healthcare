@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { generatorApprovalErrors } from "@/lib/scsem-generator-evidence";
 import { auditRequestContext } from "@/lib/audit";
 import {
     assertSCSEMUpdaterRevision,
@@ -129,6 +130,17 @@ export async function PATCH(
                 code: "SCSEM_SESSION_NOT_REVIEWABLE",
             }, { status: 409 });
         }
+        const evidenceEdited = body.reviewerEvidence !== undefined;
+        if (evidenceEdited) {
+            const evidence = body.reviewerEvidence;
+            const keys = ["expectedResultsSourceQuote", "expectedResultsRationale", "applicabilityRationale", "policyEvidenceSha256"];
+            if (updaterSession.workspaceMode !== "cis_bootstrap" || changeIds.length !== 1 || !body.changeId ||
+                !evidence || typeof evidence !== "object" || Array.isArray(evidence) ||
+                Object.keys(evidence).some((key) => !keys.includes(key)) ||
+                keys.some((key) => typeof evidence[key] !== "string" || evidence[key].length > 20_000)) {
+                return NextResponse.json({ error: "Generator reviewer evidence requires one change and bounded quote, rationale, applicability and policy fingerprint fields; attribution is server-owned." }, { status: 400 });
+            }
+        }
         const ids = new Set<string>(changeIds.map(String));
         let issueCodeCatalog: Map<string, SCSEMIssueCodeEntry> | null = null;
         let targetSchemas = new Map<string, SCSEMNewControlTargetSchema>();
@@ -162,10 +174,15 @@ export async function PATCH(
             if (!ids.has(change.id)) return change;
             touched++;
 
-            const wasEdited = Boolean(body.change && body.changeId === change.id);
-            const edited = wasEdited
+            const wasEdited = Boolean((body.change || evidenceEdited) && body.changeId === change.id);
+            let edited = body.change && body.changeId === change.id
                 ? mergeEditableChange(change, body.change)
                 : change;
+            if (evidenceEdited && body.changeId === change.id) {
+                edited = { ...edited, reviewerEvidence: {
+                    ...body.reviewerEvidence, reviewedBy: user.id, reviewedAt: new Date().toISOString(),
+                } };
+            }
             const previousStatus = change.status;
             // A saved edit invalidates an earlier approval unless the reviewer
             // explicitly approves the edited value in this same request.
@@ -178,14 +195,8 @@ export async function PATCH(
                     allChanges: updaterSession.changes,
                     approvingIds: ids,
                 }));
-                if (
-                    updaterSession.workspaceMode === "cis_bootstrap" &&
-                    updated.action === "addControl" &&
-                    !updated.newControl?.nistId?.trim()
-                ) {
-                    errors.push(
-                        "CIS bootstrap controls require an exact reviewer-confirmed NIST ID before approval"
-                    );
+                if (updaterSession.workspaceMode === "cis_bootstrap") {
+                    errors.push(...generatorApprovalErrors(updated));
                 }
                 if (updated.action === "addControl" && issueCodeCatalog) {
                     const targetSheet = updated.targetSheet?.trim() || "";

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { generatorApprovalErrors } from "@/lib/scsem-generator-evidence";
 import { auditRequestContext, createAuditOperationId, logAuditStrict } from "@/lib/audit";
 import {
     requireSCSEMUpdaterExpectedRevision,
@@ -68,6 +69,14 @@ export async function GET(
                     }, { status: 409 });
                 }
 
+                if (updaterSession.workspaceMode === "cis_bootstrap") {
+                    const changes = approvedChanges.map((change) => ({ changeId: change.id, errors: generatorApprovalErrors(change) }))
+                        .filter((change) => change.errors.length > 0);
+                    if (changes.length > 0) return NextResponse.json({
+                        error: "Generator evidence must be reviewed before export.",
+                        code: "INVALID_GENERATOR_EVIDENCE", changes,
+                    }, { status: 400 });
+                }
                 const draftRequested = new URL(request.url).searchParams.get("draft") === "1";
                 if (updaterSession.status === "analysis_incomplete" && !draftRequested) {
                     return NextResponse.json({

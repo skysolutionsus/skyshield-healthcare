@@ -18,6 +18,7 @@ import {
     XCircle,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
+import { GeneratorEvidenceEditor } from "@/components/scsem-generator-evidence-editor";
 import type {
     SCSEMUpdaterClientAuditSource as AuditSource,
     SCSEMUpdaterClientChange as UpdaterChange,
@@ -486,10 +487,24 @@ export function SCSEMUpdater() {
                     "Content-Type": "application/json",
                     "If-Match": `"${session.revision}"`,
                 },
-                body: JSON.stringify({ changeId, status, change: editableChange }),
+                body: JSON.stringify({ changeId, status, change: editableChange,
+                    ...(session.workspaceMode === "cis_bootstrap" && change?.reviewerEvidence ? {
+                        reviewerEvidence: {
+                            expectedResultsSourceQuote: change.reviewerEvidence.expectedResultsSourceQuote,
+                            expectedResultsRationale: change.reviewerEvidence.expectedResultsRationale,
+                            applicabilityRationale: change.reviewerEvidence.applicabilityRationale,
+                            policyEvidenceSha256: change.reviewerEvidence.policyEvidenceSha256,
+                        },
+                    } : {}),
+                }),
             });
-            const data = await readApiJson<{ error?: string; code?: string; session: UpdaterSession }>(res, "Could not update change");
-            if (!res.ok) await throwMutationError(res, data, "Could not update change.", session.id);
+            const data = await readApiJson<{ error?: string; code?: string; changes?: Array<{ errors: string[] }>; session: UpdaterSession }>(res, "Could not update change");
+            if (!res.ok) {
+                if (session.workspaceMode === "cis_bootstrap" && data.changes?.length) {
+                    throw new Error(data.changes.flatMap((item) => item.errors).join("; "));
+                }
+                await throwMutationError(res, data, "Could not update change.", session.id);
+            }
             setSession(data.session);
         } catch (err: any) {
             setError(err.message || "Could not update change.");
@@ -1192,6 +1207,7 @@ export function SCSEMUpdater() {
                             {session.changes.map((change) => (
                                 <ChangeReview
                                     key={change.id}
+                                    generatorSessionId={session.workspaceMode === "cis_bootstrap" ? session.id : undefined}
                                     change={change}
                                     expanded={expandedChangeId === change.id}
                                     busy={busy}
@@ -1450,6 +1466,7 @@ function SourceEvidencePanel({ change }: { change: UpdaterChange }) {
 }
 
 function ChangeReview({
+    generatorSessionId,
     change,
     expanded,
     busy,
@@ -1460,6 +1477,7 @@ function ChangeReview({
     onApprove,
     onReject,
 }: {
+    generatorSessionId?: string;
     change: UpdaterChange;
     expanded: boolean;
     busy: string | null;
@@ -1553,6 +1571,7 @@ function ChangeReview({
                     </div>
 
                     <SourceEvidencePanel change={change} />
+                    {generatorSessionId && <GeneratorEvidenceEditor sessionId={generatorSessionId} change={change} onChange={(reviewerEvidence) => onLocalChange({ reviewerEvidence })} />}
 
                     <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
                         <button

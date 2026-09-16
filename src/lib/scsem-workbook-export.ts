@@ -6,6 +6,7 @@ import JSZip from "jszip";
 import type { ParsedControl, ParsedSCSEM, ParsedSheet } from "@/lib/xlsx-parser";
 import type { SCSEMUpdaterChange, SCSEMUpdaterSession } from "@/lib/scsem-updater-store";
 import { ALLOWED_UPDATE_FIELDS } from "@/lib/scsem-update-engine";
+import { generatorApprovalErrors } from "@/lib/scsem-generator-evidence";
 import { approvedProposalValidationErrors } from "@/lib/scsem-proposal-validation";
 import { resolveSCSEMIssueCodeSelectionFromWorkbook } from "@/lib/scsem-issue-codes";
 import { boundedStoredSCSEMBenchmarkNarrative } from "@/lib/scsem-benchmark-failure";
@@ -3985,6 +3986,12 @@ export async function buildSCSEMUpdaterWorkbookBuffer(
     _uploadedAssessmentWorkbook?: ParsedSCSEM
 ): Promise<Buffer> {
     exportDebug("starting updater export");
+    if (session.workspaceMode === "cis_bootstrap") {
+        for (const change of session.changes.filter((item) => item.status === "APPROVED")) {
+            const errors = generatorApprovalErrors(change);
+            if (errors.length) throw approvedChangeError(change, errors.join("; "));
+        }
+    }
     if (!fs.existsSync(originalAbsolutePath)) {
         throw new Error(`Cannot export SCSEM workbook: source file not found at ${originalAbsolutePath}.`);
     }
