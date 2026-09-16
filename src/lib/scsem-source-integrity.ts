@@ -10,6 +10,8 @@ import {
 import type { SCSEMUpdaterSession } from "@/lib/scsem-updater-store";
 import { resolveRuntimeFilePath } from "@/lib/runtime-storage";
 import { admitUnrecognizedSCSEMBuffer } from "@/lib/scsem-structural-admission";
+import { CIS_BOOTSTRAP_BASELINE_SHA256 } from "@/lib/scsem-cis-blank-workbook";
+import { CIS_BOOTSTRAP_TARGET_SHEET } from "@/lib/scsem-cis-bootstrap";
 
 export class SCSEMSourceIntegrityError extends Error {
     readonly code = "SCSEM_SOURCE_INTEGRITY_FAILURE";
@@ -25,7 +27,7 @@ export type VerifiedSCSEMSource = {
     sha256: string;
     sizeBytes: number;
     officialSource?: OfficialSCSEMManifestEntry;
-    sourceTrust: "official_individual_xlsx" | "unverified_structural_draft";
+    sourceTrust: "official_individual_xlsx" | "unverified_structural_draft" | "cis_bootstrap_draft";
 };
 
 const PINNED_SCSEM_DIRECTORY = path.join(process.cwd(), "data", "scsems", "current");
@@ -113,6 +115,28 @@ export function assertSCSEMUpdaterSourceIntegrity(
             officialSource: canonical,
             sourceTrust: "official_individual_xlsx",
         };
+    }
+
+    // A generated blank shell is neither an official upload nor a populated
+    // structurally admitted draft. Its bytes were bound at creation above;
+    // independently revalidate the exact generator-approved baseline identity.
+    // Do not broaden either ordinary updater admission path for this case.
+    if (session.workspaceMode === "cis_bootstrap") {
+        const baseline = session.audit.cisBootstrap?.structuralBaseline;
+        const pinned = officialSCSEMManifest().workbooks.find((entry) =>
+            entry.subject === "Generic Application" && entry.sha256 === CIS_BOOTSTRAP_BASELINE_SHA256
+        );
+        if (!baseline || !pinned || session.audit.officialSource || session.audit.structuralAdmission ||
+            baseline.sourceFileName !== pinned.fileName || baseline.sourceUrl !== pinned.sourceUrl ||
+            baseline.sourceSha256 !== pinned.sha256 || baseline.sourceVersion !== pinned.version ||
+            baseline.targetSheet !== CIS_BOOTSTRAP_TARGET_SHEET) {
+            integrityFailure("The CIS bootstrap structural baseline no longer matches the pinned generator source.");
+        }
+        const baselineBuffer = readSource(resolvePinnedSCSEMPath(pinned), "The CIS bootstrap structural baseline");
+        if (baselineBuffer.length !== pinned.sizeBytes || sha256Hex(baselineBuffer) !== pinned.sha256) {
+            integrityFailure("The CIS bootstrap structural baseline failed its pinned size or SHA-256 check.");
+        }
+        return { absolutePath, sha256, sizeBytes, sourceTrust: "cis_bootstrap_draft" };
     }
 
     const recordedAdmission = session.audit.structuralAdmission;

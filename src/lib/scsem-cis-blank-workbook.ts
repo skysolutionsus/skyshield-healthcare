@@ -8,7 +8,7 @@ import type { CISBootstrapStructuralBaseline } from "@/lib/scsem-cis-bootstrap";
 
 // This is deliberately a generator profile, not a general workbook updater.
 // Any baseline revision must get its own structural review before admission.
-const SOURCE_SHA256 = "4553b3aa46ae4986084a39a5dccc0aabefb8cefa5d930de6717c94c156002217";
+export const CIS_BOOTSTRAP_BASELINE_SHA256 = "4553b3aa46ae4986084a39a5dccc0aabefb8cefa5d930de6717c94c156002217";
 const TARGET = "General App Test Cases";
 const CELLS = /<c\b[^>]*\/>|<c\b[^>]*>[\s\S]*?<\/c>/g;
 const ROWS = /<row\b[^>]*\/>|<row\b[^>]*>[\s\S]*?<\/row>/g;
@@ -75,7 +75,7 @@ export async function buildCISBootstrapBlankWorkbook(
     const entry = officialSCSEMManifest().workbooks.find((item) => item.subject === "Generic Application");
     if (!entry) throw new Error("The pinned Generic Application SCSEM baseline is unavailable.");
     const source = fs.readFileSync(path.join(process.cwd(), entry.file));
-    if (entry.sha256 !== SOURCE_SHA256 || source.length !== entry.sizeBytes || sha256Buffer(source) !== entry.sha256) {
+    if (entry.sha256 !== CIS_BOOTSTRAP_BASELINE_SHA256 || source.length !== entry.sizeBytes || sha256Buffer(source) !== entry.sha256) {
         throw new Error("The pinned Generic Application SCSEM baseline failed integrity validation.");
     }
     const zip = await JSZip.loadAsync(source);

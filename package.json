@@ -30,7 +30,7 @@
     "test:scsem-semantic-proposals": "node --expose-gc --import tsx scripts/test-scsem-semantic-proposals.ts",
     "test:scsem-source-precedence": "node --import tsx scripts/test-scsem-source-precedence.ts",
     "verify:disa-stig-live-sources": "node --import tsx scripts/verify-disa-stig-live-sources.ts",
-    "test:scsem-source-integrity": "npx tsx scripts/test-scsem-source-integrity.ts",
+    "test:scsem-source-integrity": "npx tsx scripts/test-scsem-source-integrity.ts && tsx scripts/test-scsem-bootstrap-integrity.ts",
     "test:runtime-hardening": "npx tsx scripts/test-runtime-hardening.ts",
     "test:legacy-scsem-retirement": "npx tsx scripts/test-legacy-scsem-retirement.ts",
     "test:user-management-security": "npx tsx scripts/test-user-management-security.ts",
